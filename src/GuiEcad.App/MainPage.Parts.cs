@@ -75,6 +75,20 @@ public sealed partial class MainPage
         open.Click += OnOpenShapeFolder;
         menu.Items.Add(open);
 
+        menu.Items.Add(new MenuFlyoutSeparator());
+
+        var export = new MenuFlyoutItem
+        {
+            Text = "ライブラリのエクスポート...",
+            IsEnabled = _document.Library?.ById.Count > 0,
+        };
+        export.Click += OnExportLibrary;
+        menu.Items.Add(export);
+
+        var import = new MenuFlyoutItem { Text = "ライブラリのインポート..." };
+        import.Click += OnImportLibrary;
+        menu.Items.Add(import);
+
         // 同じ位置（表示(V)とヘルプ(H)の間）へ差し替える
         int idx = TopMenuBar.Items.IndexOf(_shapeMenuItem);
         if (idx >= 0)
@@ -213,6 +227,56 @@ public sealed partial class MainPage
                 FileName = _folderStore.RootDir,
                 UseShellExecute = true,
             });
+        }
+        catch (Exception ex) { await ShowErrorAsync(ex.Message); }
+    }
+
+    private async void OnExportLibrary(object sender, RoutedEventArgs e)
+    {
+        if (_document.Library is not { } lib || lib.ById.Count == 0)
+        {
+            await ShowErrorAsync("エクスポートするパーツがありません。");
+            return;
+        }
+
+        var picker = new FileSavePicker(GetPickerWindowId());
+        picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+        picker.SuggestedFileName = "parts";
+        picker.FileTypeChoices.Add("パーツライブラリ", new List<string> { ".gcadparts" });
+
+        var file = await picker.PickSaveFileAsync();
+        if (file is null) return;
+
+        try { PartLibrarySerializer.Save(lib, file.Path); }
+        catch (Exception ex) { await ShowErrorAsync(ex.Message); }
+    }
+
+    private async void OnImportLibrary(object sender, RoutedEventArgs e)
+    {
+        var picker = new FileOpenPicker(GetPickerWindowId());
+        picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+        picker.FileTypeFilter.Add(".gcadparts");
+        picker.FileTypeFilter.Add(".gcadpart");
+
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+
+        try
+        {
+            IReadOnlyList<PartDefinition> parts;
+            if (file.Path.EndsWith(".gcadpart", StringComparison.OrdinalIgnoreCase))
+                parts = new[] { PartLibrarySerializer.LoadOne(file.Path) };
+            else
+                parts = PartLibrarySerializer.Load(file.Path);
+
+            _document.Library ??= new PartLibrary();
+            foreach (var def in parts)
+                _document.Library.ById[def.Id] = def;
+
+            MarkDirty();
+            RebuildOtherPartMenu();
+            RebuildShapeMenu();
+            Canvas.Invalidate();
         }
         catch (Exception ex) { await ShowErrorAsync(ex.Message); }
     }
