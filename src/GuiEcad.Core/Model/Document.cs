@@ -8,7 +8,6 @@ public sealed class LadderDocument
     public DocumentInfo Info { get; set; } = new();
     public DocumentSettings Settings { get; set; } = new();
     public DeviceTable Devices { get; set; } = new();
-    public PartsList Parts { get; set; } = new();
     /// <summary>ドキュメント埋め込みの自作パーツライブラリ（null = 組込み種別のみ）。</summary>
     public PartLibrary? Library { get; set; }
     public List<Sheet> Sheets { get; set; } = new();

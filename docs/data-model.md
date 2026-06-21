@@ -7,8 +7,7 @@
 LadderDocument（プロジェクト全体）
 ├─ DocumentInfo   … タイトルブロック（図番・客先・設計/製図/検図・日付）
 ├─ Settings       … 既定母線名・既定グリッド等
-├─ DeviceTable    … 機器（CR11, PB1…）を名前で一元管理 ← 状態・相互参照のキー
-├─ PartsList      … 部品リスト（名称・メーカー・型式・容量・数量）
+├─ DeviceTable    … 機器（CR11, PB1…）を名前で一元管理 ← 状態・相互参照のキー。BOM(型式/メーカー/数量)も保持
 └─ Sheets[]       … 各ページ
      ├─ GridSpec     … 行数・列数（セルmmは DrawingTheme 側）
      ├─ BusConfig    … 左右母線名（固定でなく設定可）+ 電源ラベル
@@ -57,7 +56,7 @@ namespace GuiEcad.Model;
 
 public sealed class LadderDocument {
     public DocumentInfo Info; public DocumentSettings Settings;
-    public DeviceTable Devices = new(); public PartsList Parts = new();
+    public DeviceTable Devices = new();
     public List<Sheet> Sheets = new();
 }
 public sealed class Sheet {
@@ -91,10 +90,10 @@ public sealed class VerticalConnector { public int Column; public int TopRow; pu
 public sealed class GroupFrame { public string Label; public GridPos TopLeft; public int Width; public int Height; }
 
 public enum DeviceClass { Relay, PushButton, SelectSwitch, Lamp, Timer, Counter, Terminal, Other }
-public sealed class Device { public string Name; public DeviceClass Class; public string? PartId; }
+// BOM(部品表)は Device に一元化（型式/メーカー/数量）。
+public sealed class Device { public string Name; public DeviceClass Class; public string? PartId;
+                             public string? Model, Maker; public int Quantity = 1; }
 public sealed class DeviceTable { public Dictionary<string,Device> ByName = new(); }
-public sealed class Part { public string Id, Name, Maker, Model; public string? Rating; public int Quantity; }
-public sealed class PartsList { public List<Part> Items = new(); }
 ```
 ```csharp
 namespace GuiEcad.Simulation;   // 幾何から導出（永続化しない）

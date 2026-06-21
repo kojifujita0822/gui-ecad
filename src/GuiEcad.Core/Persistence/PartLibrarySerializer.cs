@@ -63,6 +63,8 @@ public static class PartLibrarySerializer
     public static PartDefinition LoadOne(string path)
         => DeserializeOne(File.ReadAllText(path, Encoding.UTF8));
 
+    // 単体パーツ(.gcadpart)は PartDefinition を素のままシリアライズするためバージョンフィールドを持たない。
+    // よってライブラリ/ドキュメントのような SchemaVersion 検査は行わない（非対称は意図的）。
     public static PartDefinition DeserializeOne(string json)
         => JsonSerializer.Deserialize<PartDefinition>(json, Options)
             ?? throw new InvalidDataException("Failed to deserialize part definition.");

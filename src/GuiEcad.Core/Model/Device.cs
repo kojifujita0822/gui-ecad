@@ -20,19 +20,3 @@ public sealed class DeviceTable
 {
     public Dictionary<string, Device> ByName { get; set; } = new();
 }
-
-/// <summary>部品リストの1項目。</summary>
-public sealed class Part
-{
-    public string Id { get; set; } = "";
-    public string Name { get; set; } = "";
-    public string Maker { get; set; } = "";
-    public string Model { get; set; } = "";
-    public string? Rating { get; set; }
-    public int Quantity { get; set; }
-}
-
-public sealed class PartsList
-{
-    public List<Part> Items { get; set; } = new();
-}

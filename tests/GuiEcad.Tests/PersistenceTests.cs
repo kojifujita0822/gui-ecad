@@ -23,10 +23,8 @@ public class PersistenceTests
             },
         };
 
-        doc.Devices.ByName["CR11"] = new Device { Name = "CR11", Class = DeviceClass.Relay };
+        doc.Devices.ByName["CR11"] = new Device { Name = "CR11", Class = DeviceClass.Relay, Maker = "オムロン", Model = "MY2N", Quantity = 2 };
         doc.Devices.ByName["PB"] = new Device { Name = "PB", Class = DeviceClass.PushButton };
-
-        doc.Parts.Items.Add(new Part { Id = "p-001", Name = "リレー", Maker = "オムロン", Model = "MY2N", Rating = "DC24V", Quantity = 2 });
 
         var sheet = new Sheet
         {
@@ -75,8 +73,8 @@ public class PersistenceTests
         Assert.Equal("N24", back.Settings.DefaultBus.LeftName);
         Assert.True(back.Devices.ByName.ContainsKey("CR11"));
         Assert.Equal(DeviceClass.Relay, back.Devices.ByName["CR11"].Class);
-        Assert.Single(back.Parts.Items);
-        Assert.Equal("MY2N", back.Parts.Items[0].Model);
+        Assert.Equal("MY2N", back.Devices.ByName["CR11"].Model);
+        Assert.Equal(2, back.Devices.ByName["CR11"].Quantity);
     }
 
     [Fact]
