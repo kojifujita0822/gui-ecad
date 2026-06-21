@@ -1,14 +1,12 @@
 using GuiEcad.Model;
 using GuiEcad.Simulation;
 using Xunit;
+using static GuiEcad.Tests.TestHelper;
 
 namespace GuiEcad.Tests;
 
 public class TestSessionTests
 {
-    private static ElementInstance El(ElementKind k, int row, int col, string? dev = null)
-        => new() { Kind = k, Pos = new GridPos(row, col), DeviceName = dev };
-
     // L —[ST]—[SP(NC)]— (Coil R1) — R ＋ R1自己保持接点（列1で合流）
     private static Sheet SelfHold()
     {

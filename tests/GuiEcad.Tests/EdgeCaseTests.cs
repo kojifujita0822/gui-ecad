@@ -1,15 +1,13 @@
 using GuiEcad.Model;
 using GuiEcad.Simulation;
 using Xunit;
+using static GuiEcad.Tests.TestHelper;
 
 namespace GuiEcad.Tests;
 
 /// <summary>境界値・退化ケース・エッジ入力でのロバスト性テスト。</summary>
 public class EdgeCaseTests
 {
-    private static ElementInstance El(ElementKind kind, int row, int col, string? device = null, int width = 1)
-        => new() { Kind = kind, Pos = new GridPos(row, col), CellWidth = width, DeviceName = device };
-
     // F-1: 1列グリッドにコイルのみ → 左右母線が直結 → コイル励磁（接点不要）
     [Fact]
     public void SingleCellGrid_CoilDirectConnected_IsEnergized()

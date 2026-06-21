@@ -97,6 +97,7 @@ public sealed class Evaluator
     }
 
     /// <summary>励磁状態を決定論的な文字列に変換してハッシュキーにする。</summary>
+    /// <remarks>キー昇順ソートにより O(n log n) が反復ごとに走るが、機器数 n は通常数十以下で無視できる範囲。</remarks>
     private static string ComputeEnergizedHash(Dictionary<string, bool> energized)
     {
         // キー昇順でソートして "key:0/1" を連結→重複なし・順序依存なし

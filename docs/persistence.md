@@ -13,15 +13,27 @@
 {
   "schemaVersion": 1,
   "info": { "title": "コンプレッサー遠方運転盤", "drawingNo": "...", "designer": "赤松", "date": "2022-08-25" },
-  "settings": { "defaultBus": { "left": "N24", "right": "P24" } },
-  "devices": [ { "name": "CR11", "class": "Relay", "partId": "p-001" } ],
-  "parts":   [ { "id": "p-001", "name": "リレー", "maker": "オムロン", "model": "MY2N", "rating": "DC24V", "quantity": 5 } ],
-  "sheets":  [ { "id": "...", "pageNumber": 7, "name": "制御回路図",
-                 "grid": { "rows": 22, "columns": 40 },
-                 "bus": { "left": "N24", "right": "P24", "powerLabel": "DC24V" },
-                 "elements": [ { "id":"...", "kind":"ContactNO", "pos":{"row":6,"col":3}, "cellWidth":1, "deviceName":"CR11", "params":{} } ],
-                 "connectors": [ { "column": 5, "topRow": 3, "bottomRow": 5 } ],
-                 "frames": [ { "label":"中継ボックス", "topLeft":{"row":2,"col":2}, "width":10, "height":6 } ],
-                 "lines": [ { "row": 6, "circuitNumber": 14 } ] } ]
+  "settings": { "defaultBus": { "leftName": "N24", "rightName": "P24", "powerLabel": "DC24V" }, "enableBorder": false },
+  "devices": { "byName": {
+    "CR11": { "name": "CR11", "class": "relay", "model": "MY2N", "maker": "オムロン", "quantity": 1 }
+  } },
+  // library: 自作パーツあり時のみ。null は省略（WhenWritingNull）
+  "sheets": [ {
+    "id": "...", "pageNumber": 7, "name": "制御回路図",
+    "grid": { "rows": 22, "columns": 40 },
+    "bus": { "leftName": "N24", "rightName": "P24", "powerLabel": "DC24V" },
+    "elements": [ { "id":"...", "kind":"contactNO", "pos":{"row":6,"column":3}, "cellWidth":1, "deviceName":"CR11", "params":{} } ],
+    "connectors": [ { "column": 5, "topRow": 3, "bottomRow": 5 } ],
+    "frames": [ { "label":"中継ボックス", "topLeft":{"row":2,"column":2}, "width":10, "height":6 } ],
+    "lines": [ { "row": 6, "circuitNumber": 14 } ]
+  } ]
 }
 ```
+
+> **主なシリアライズ規則**（`JsonNamingPolicy.CamelCase` + `WhenWritingNull`）:
+> - `DeviceTable` は辞書: `"devices": { "byName": { "CR11": {...} } }`
+> - `BusConfig` フィールド名: `leftName` / `rightName` / `powerLabel`
+> - `GridPos` フィールド名: `row` / `column`（`col` ではない）
+> - `ElementKind` は camelCase enum 文字列: `"contactNO"` / `"coil"` 等
+> - `Device` の BOM フィールド: `model` / `maker` / `quantity`（`parts` セクションは廃止）
+> - `library` は `null` の場合省略

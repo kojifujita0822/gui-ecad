@@ -1,15 +1,13 @@
 using GuiEcad.Model;
 using GuiEcad.Simulation;
 using Xunit;
+using static GuiEcad.Tests.TestHelper;
 
 namespace GuiEcad.Tests;
 
 /// <summary>DRC（設計ルール検査）拡張テスト。全メソッド複合・エッジケース・カスタムパーツ対応。</summary>
 public class DrcExtendedTests
 {
-    private static ElementInstance El(ElementKind kind, int row, int col, string? device = null)
-        => new() { Kind = kind, Pos = new GridPos(row, col), DeviceName = device };
-
     private static LadderDocument MakeDoc(params Sheet[] sheets)
     {
         var doc = new LadderDocument();

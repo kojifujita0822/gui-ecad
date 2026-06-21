@@ -4,14 +4,14 @@ using GuiEcad.Persistence;
 using GuiEcad.Rendering;
 using GuiEcad.Simulation;
 using Xunit;
+using static GuiEcad.Tests.TestHelper;
 
 namespace GuiEcad.Tests;
 
 /// <summary>図面作成 → 保存/読込 → シミュレーション → DRC → PDF の統合テスト。</summary>
 public class IntegrationTests
 {
-    private static ElementInstance El(ElementKind kind, int row, int col, string? device = null)
-        => new() { Kind = kind, Pos = new GridPos(row, col), DeviceName = device };
+
 
     private static string TempDir()
     {

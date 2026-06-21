@@ -1,14 +1,12 @@
 using GuiEcad.Model;
 using GuiEcad.Simulation;
 using Xunit;
+using static GuiEcad.Tests.TestHelper;
 
 namespace GuiEcad.Tests;
 
 public class SimulationTests
 {
-    private static ElementInstance El(ElementKind kind, int row, int col, string? device = null, int width = 1)
-        => new() { Kind = kind, Pos = new GridPos(row, col), CellWidth = width, DeviceName = device };
-
     private static EvalResult Run(Sheet sheet, SimState state)
         => new Evaluator(NetlistBuilder.Build(sheet)).Evaluate(state);
 

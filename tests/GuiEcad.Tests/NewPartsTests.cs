@@ -1,15 +1,13 @@
 using GuiEcad.Model;
 using GuiEcad.Simulation;
 using Xunit;
+using static GuiEcad.Tests.TestHelper;
 
 namespace GuiEcad.Tests;
 
 /// <summary>サンプル凡例の追加2端子パーツ（タイマ接点 a/b・非常停止押釦・サーマルOL）の導通挙動。</summary>
 public class NewPartsTests
 {
-    private static ElementInstance El(ElementKind kind, int row, int col, string? device = null)
-        => new() { Kind = kind, Pos = new GridPos(row, col), DeviceName = device };
-
     private static bool Energized(ElementKind contact, string dev, bool input)
     {
         // L —[contact dev]— (Coil C) — R

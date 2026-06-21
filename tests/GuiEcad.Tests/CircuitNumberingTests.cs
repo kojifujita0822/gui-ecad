@@ -1,14 +1,12 @@
 using GuiEcad.Model;
 using GuiEcad.Simulation;
 using Xunit;
+using static GuiEcad.Tests.TestHelper;
 
 namespace GuiEcad.Tests;
 
 public class CircuitNumberingTests
 {
-    private static ElementInstance El(ElementKind kind, int row, int col, string? device = null)
-        => new() { Kind = kind, Pos = new GridPos(row, col), DeviceName = device };
-
     // ---- 単シート ----
 
     [Fact]

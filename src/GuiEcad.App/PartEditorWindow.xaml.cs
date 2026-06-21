@@ -773,7 +773,8 @@ public sealed partial class PartEditorWindow : Window
     // ===== Undo/Redo =====
 
     // 図形・ポートに加えサイズ・役割も含む（LoadTemplate がこれらを変更するため Undo 復元対象にする）。
-    private readonly record struct EditorSnapshot(
+    // sealed record（参照型）を使うことで List<T> フィールドの値スナップショット意図を明示する。
+    private sealed record EditorSnapshot(
         List<PartPrimitive> Prims, List<PortDef> Ports, int W, int H, PartRole Role);
 
     private EditorSnapshot Snapshot() => new(new(_prims), new(_ports), _w, _h, CurrentRole());

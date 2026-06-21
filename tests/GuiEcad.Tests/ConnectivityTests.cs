@@ -1,14 +1,12 @@
 using GuiEcad.Model;
 using GuiEcad.Simulation;
 using Xunit;
+using static GuiEcad.Tests.TestHelper;
 
 namespace GuiEcad.Tests;
 
 public class ConnectivityTests
 {
-    private static ElementInstance El(ElementKind kind, int row, int col, string? device = null, int width = 1)
-        => new() { Kind = kind, Pos = new GridPos(row, col), CellWidth = width, DeviceName = device };
-
     private static (Net A, Net B) NetsOf(Netlist nl, string device)
     {
         var c = nl.Components.Find(x => x.DeviceName == device)!;

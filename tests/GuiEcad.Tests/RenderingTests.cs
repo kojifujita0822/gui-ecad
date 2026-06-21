@@ -3,14 +3,12 @@ using GuiEcad.Pdf;
 using GuiEcad.Rendering;
 using GuiEcad.Simulation;
 using Xunit;
+using static GuiEcad.Tests.TestHelper;
 
 namespace GuiEcad.Tests;
 
 public class RenderingTests
 {
-    private static ElementInstance El(ElementKind kind, int row, int col, string? device = null, int width = 1)
-        => new() { Kind = kind, Pos = new GridPos(row, col), CellWidth = width, DeviceName = device };
-
     // 検証用サンプル図（self-hold＋分岐＋各種記号）を作る
     private static Sheet SampleSheet()
     {
