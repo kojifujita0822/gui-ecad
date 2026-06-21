@@ -269,6 +269,13 @@ public sealed partial class MainPage : Page
 
     // ===== ツール選択 =====
 
+    // 縦パレットの接点系ラジオボタンの選択を解除（その他部品・フォルダ図形が配置対象であることを明示）。
+    private void ClearToolRadios()
+    {
+        foreach (UIElement child in ToolStackPanel.Children)
+            if (child is RadioButton rb) rb.IsChecked = false;
+    }
+
     private void OnToolSelected(object sender, RoutedEventArgs e)
     {
         var tag = (sender as RadioButton)?.Tag as string;
@@ -288,9 +295,7 @@ public sealed partial class MainPage : Page
 
         _placeConnector = false;
         _connStartRow = null;
-        // ツールバーの接点系ラジオボタンの選択を解除（その他部品が配置対象であることを明示）
-        foreach (UIElement child in ToolStackPanel.Children)
-            if (child is RadioButton rb) rb.IsChecked = false;
+        ClearToolRadios();
 
         if (tag.StartsWith("part:", StringComparison.Ordinal))
         {
@@ -579,8 +584,7 @@ public sealed partial class MainPage : Page
 
         _placeConnector = false;
         _connStartRow = null;
-        foreach (UIElement child in ToolStackPanel.Children)
-            if (child is RadioButton rb) rb.IsChecked = false;
+        ClearToolRadios();
 
         _placePartId = entry.Definition.Id;
         _placeKind = ElementKind.ContactNO;   // PartId 指定時は無視されるが既定値を置く
@@ -775,6 +779,14 @@ public sealed partial class MainPage : Page
             StatusWarn.Visibility = Visibility.Collapsed;
         }
 
+        UpdateStatusExtras();
+    }
+
+    // Undo 履歴に乗らない変更（ドキュメント情報・シート設定・BOM 等）を確実にダーティ表示にする。
+    // _savedUndoDepth=-1 は UndoDepth と決して一致しないセンチネル。次回保存でリセットされる。
+    private void MarkDirty()
+    {
+        _savedUndoDepth = -1;
         UpdateStatusExtras();
     }
 
@@ -1327,6 +1339,7 @@ public sealed partial class MainPage : Page
             if (!string.IsNullOrEmpty(rev.Rev) || !string.IsNullOrEmpty(rev.Description))
                 info.Revisions.Add(rev);
         }
+        MarkDirty();   // ドキュメント情報は Undo 対象外。変更を保存対象として記録
     }
 
     // ===== シート設定（母線名・グリッドサイズ） =====
@@ -1404,6 +1417,7 @@ public sealed partial class MainPage : Page
             : 1;
         _sheet.Grid.Rows = Math.Max(newRows, minRows);
 
+        MarkDirty();   // シート設定（母線名・グリッド）は Undo 対象外。変更を保存対象として記録
         Canvas.Invalidate();
     }
 
@@ -1503,11 +1517,7 @@ public sealed partial class MainPage : Page
             dev.Quantity = qty;
         }
 
-        if (changed)
-        {
-            _savedUndoDepth = -1;   // BOM 変更は Undo 対象外。確実にダーティ表示にする
-            UpdateStatusExtras();
-        }
+        if (changed) MarkDirty();   // BOM 変更は Undo 対象外。確実にダーティ表示にする
     }
 
     private static DeviceClass MapDeviceClass(ElementKind kind) => kind switch
@@ -2004,6 +2014,12 @@ if ($LASTEXITCODE -eq 0) {
 
     // ===== ポインタ =====
 
+    // 要素／縦コネクタ／枠の選択は相互排他。選んだ1種以外を null にする（分岐ごとの重複クリアを集約）。
+    private void SelectElement(ElementInstance e) { _selected = e; _selectedConnector = null; _selectedFrame = null; }
+    private void SelectConnector(VerticalConnector c) { _selectedConnector = c; _selected = null; _selectedFrame = null; }
+    private void SelectFrame(GroupFrame f) { _selectedFrame = f; _selected = null; _selectedConnector = null; }
+    private void ClearSelection() { _selected = null; _selectedConnector = null; _selectedFrame = null; }
+
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         // 右クリックはコンテキストメニュー専用（RightTapped で処理）。
@@ -2045,7 +2061,7 @@ if ($LASTEXITCODE -eq 0) {
             {
                 if (HitTest(row, col) is ElementInstance dhit)
                 {
-                    _selected = dhit; _selectedConnector = null; _selectedFrame = null;
+                    SelectElement(dhit);
                     ShowDeviceNameEditor(dhit);
                     Canvas.Invalidate();
                     return;
@@ -2149,25 +2165,19 @@ if ($LASTEXITCODE -eq 0) {
         var hitElem = HitTest(row, col);
         if (hitElem is not null)
         {
-            _selected = hitElem;
-            _selectedConnector = null;
-            _selectedFrame = null;
+            SelectElement(hitElem);
             _moving = hitElem;
             _moveStartPos = hitElem.Pos;
         }
         else if (HitTestConnector(xMm, yMm) is VerticalConnector hitConn)
         {
-            _selectedConnector = hitConn;
+            SelectConnector(hitConn);
             _movingConnector = hitConn;
             _connMoveStartColumn = hitConn.Column;
-            _selected = null;
-            _selectedFrame = null;
         }
         else if (HitTestFrame(xMm, yMm) is GroupFrame hitFrame)
         {
-            _selectedFrame = hitFrame;
-            _selected = null;
-            _selectedConnector = null;
+            SelectFrame(hitFrame);
             _movingFrame = true;
             _moveFrameOriginX = hitFrame.VisualXMm ?? _geo.X(hitFrame.TopLeft.Column);
             _moveFrameOriginY = hitFrame.VisualYMm ?? (_geo.YRow(hitFrame.TopLeft.Row) - _geo.CellMm * 0.4);
@@ -2176,9 +2186,7 @@ if ($LASTEXITCODE -eq 0) {
         }
         else
         {
-            _selected = null;
-            _selectedConnector = null;
-            _selectedFrame = null;
+            ClearSelection();
             _selectedSet.Clear();
             if (row >= 0 && col >= 0)
             {
