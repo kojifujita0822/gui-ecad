@@ -1,0 +1,132 @@
+using System.Numerics;
+using GuiEcad.Model;
+using GuiEcad.Rendering;
+using Microsoft.Graphics.Canvas;
+using Microsoft.Graphics.Canvas.Geometry;
+using Microsoft.Graphics.Canvas.Text;
+using WinColor = Windows.UI.Color;
+
+namespace GuiEcad_App;
+
+/// <summary>
+/// Win2D（CanvasDrawingSession）による <see cref="IRenderer"/> 実装。
+/// 描画はワールド座標 mm。base 変換（mm→DIP・ズーム・パン）を session.Transform に積む。
+/// 線幅・フォントサイズも mm 指定→変換で DIP にスケールされる。
+/// </summary>
+internal sealed class Win2DRenderer : IRenderer
+{
+    private readonly CanvasDrawingSession _g;
+    private readonly Stack<Matrix3x2> _stack = new();
+    private readonly Stack<CanvasActiveLayer> _layers = new();
+    private Matrix3x2 _current;
+
+    public Win2DRenderer(CanvasDrawingSession g, Matrix3x2 baseTransform)
+    {
+        _g = g;
+        _current = baseTransform;
+        _g.Transform = _current;
+    }
+
+    public void PushTransform(double translateX, double translateY, double scale = 1.0)
+    {
+        _stack.Push(_current);
+        var local = Matrix3x2.CreateScale((float)scale) *
+                    Matrix3x2.CreateTranslation((float)translateX, (float)translateY);
+        _current = local * _current;
+        _g.Transform = _current;
+    }
+
+    public void PopTransform()
+    {
+        if (_stack.Count > 0) { _current = _stack.Pop(); _g.Transform = _current; }
+    }
+
+    public void PushClip(Rect2D rect)
+        => _layers.Push(_g.CreateLayer(1f, new Windows.Foundation.Rect(rect.X, rect.Y, rect.Width, rect.Height)));
+
+    public void PopClip()
+    {
+        if (_layers.Count > 0) _layers.Pop().Dispose();
+    }
+
+    public void DrawLine(Point2D a, Point2D b, StrokeStyle stroke)
+        => _g.DrawLine(V(a), V(b), Col(stroke.Color), W(stroke), Style(stroke));
+
+    public void DrawPolyline(ReadOnlySpan<Point2D> points, StrokeStyle stroke)
+    {
+        for (int i = 1; i < points.Length; i++)
+            _g.DrawLine(V(points[i - 1]), V(points[i]), Col(stroke.Color), W(stroke), Style(stroke));
+    }
+
+    public void DrawRectangle(Rect2D rect, StrokeStyle stroke)
+        => _g.DrawRectangle((float)rect.X, (float)rect.Y, (float)rect.Width, (float)rect.Height, Col(stroke.Color), W(stroke), Style(stroke));
+
+    public void FillRectangle(Rect2D rect, Color color)
+        => _g.FillRectangle((float)rect.X, (float)rect.Y, (float)rect.Width, (float)rect.Height, Col(color));
+
+    public void DrawCircle(Point2D center, double radius, StrokeStyle stroke)
+        => _g.DrawCircle(V(center), (float)radius, Col(stroke.Color), W(stroke), Style(stroke));
+
+    public void FillCircle(Point2D center, double radius, Color color)
+        => _g.FillCircle(V(center), (float)radius, Col(color));
+
+    public void DrawEllipse(Point2D center, double radiusX, double radiusY, StrokeStyle stroke)
+        => _g.DrawEllipse(V(center), (float)radiusX, (float)radiusY, Col(stroke.Color), W(stroke), Style(stroke));
+
+    public void DrawArc(Point2D center, double radius, double startDeg, double sweepDeg, StrokeStyle stroke)
+    {
+        double a0 = startDeg * Math.PI / 180.0, sweep = sweepDeg * Math.PI / 180.0;
+        var start = new Vector2((float)(center.X + radius * Math.Cos(a0)), (float)(center.Y + radius * Math.Sin(a0)));
+        using var pb = new CanvasPathBuilder(_g.Device);
+        pb.BeginFigure(start);
+        pb.AddArc(new Vector2((float)center.X, (float)center.Y), (float)radius, (float)radius, (float)a0, (float)sweep);
+        pb.EndFigure(CanvasFigureLoop.Open);
+        using var geo = CanvasGeometry.CreatePath(pb);
+        _g.DrawGeometry(geo, Col(stroke.Color), W(stroke), Style(stroke));
+    }
+
+    public void DrawText(string text, Point2D position, TextStyle style)
+    {
+        using var layout = Layout(text, style);
+        var b = layout.LayoutBounds;
+        double x = style.HAlign switch { HAlign.Center => position.X - b.Width / 2, HAlign.Right => position.X - b.Width, _ => position.X };
+        double y = style.VAlign switch { VAlign.Middle => position.Y - b.Height / 2, VAlign.Bottom or VAlign.Baseline => position.Y - b.Height, _ => position.Y };
+        _g.DrawTextLayout(layout, new Vector2((float)x, (float)y), Col(style.Color));
+    }
+
+    public Size2D MeasureText(string text, TextStyle style)
+    {
+        using var layout = Layout(text, style);
+        return new Size2D(layout.LayoutBounds.Width, layout.LayoutBounds.Height);
+    }
+
+    private CanvasTextLayout Layout(string text, TextStyle style)
+    {
+        var fmt = new CanvasTextFormat
+        {
+            FontFamily = style.FontFamily,
+            FontSize = (float)style.FontSizeMm,
+            FontWeight = style.Bold ? Microsoft.UI.Text.FontWeights.Bold : Microsoft.UI.Text.FontWeights.Normal,
+            FontStyle = style.Italic ? Windows.UI.Text.FontStyle.Italic : Windows.UI.Text.FontStyle.Normal,
+            WordWrapping = CanvasWordWrapping.NoWrap,   // 幅0指定での1文字ずつ縦折り返しを防ぐ（横書き固定）
+        };
+        return new CanvasTextLayout(_g.Device, text, fmt, 0f, 0f);
+    }
+
+    private static Vector2 V(Point2D p) => new((float)p.X, (float)p.Y);
+    private static WinColor Col(Color c) => WinColor.FromArgb(c.A, c.R, c.G, c.B);
+    private static float W(StrokeStyle s) => (float)Math.Max(s.Width, 0.01);
+
+    private static CanvasStrokeStyle Style(StrokeStyle s) => new()
+    {
+        DashStyle = s.Style switch { LineStyle.Dashed => CanvasDashStyle.Dash, LineStyle.Dotted => CanvasDashStyle.Dot, _ => CanvasDashStyle.Solid },
+        StartCap = Cap(s.Cap), EndCap = Cap(s.Cap), DashCap = Cap(s.Cap),
+    };
+
+    private static CanvasCapStyle Cap(LineCap c) => c switch
+    {
+        LineCap.Round => CanvasCapStyle.Round,
+        LineCap.Square => CanvasCapStyle.Square,
+        _ => CanvasCapStyle.Flat,
+    };
+}

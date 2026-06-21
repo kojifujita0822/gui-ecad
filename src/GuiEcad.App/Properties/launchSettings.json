@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "GuiEcad.App (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "GuiEcad.App (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

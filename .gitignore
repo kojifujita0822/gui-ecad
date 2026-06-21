@@ -1,0 +1,44 @@
+# .NET build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# WinUI / MSIX packaging
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+AppPackages/
+BundleArtifacts/
+*.pfx
+*.cer
+
+# NuGet
+*.nupkg
+packages/
+
+# Test / coverage
+[Tt]est[Rr]esult*/
+*.coverage
+*.trx
+
+# OS / editor
+Thumbs.db
+.DS_Store
+*.swp
+
+# 作業用一時ファイル（レビュー報告・ログ等）
+temp/

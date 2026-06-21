@@ -1,0 +1,61 @@
+﻿{
+  "schemaVersion": 1,
+  "parts": [
+    {
+      "id": "f407d8fc945248eab6390fe4292a379a",
+      "name": "B接点",
+      "widthCells": 1,
+      "heightCells": 1,
+      "role": "contactNC",
+      "ports": [
+        {
+          "name": "P2",
+          "rowOffset": 0,
+          "boundaryOffset": 0
+        },
+        {
+          "name": "P1",
+          "rowOffset": 0,
+          "boundaryOffset": 1
+        }
+      ],
+      "primitives": [
+        {
+          "type": "line",
+          "x1": 0.25,
+          "y1": -0.5,
+          "x2": 0.25,
+          "y2": 0.5
+        },
+        {
+          "type": "line",
+          "x1": 0.75,
+          "y1": -0.5,
+          "x2": 0.75,
+          "y2": 0.5
+        },
+        {
+          "type": "line",
+          "x1": 0.75,
+          "y1": -0,
+          "x2": 1,
+          "y2": -0
+        },
+        {
+          "type": "line",
+          "x1": 0.25,
+          "y1": -0,
+          "x2": 0,
+          "y2": -0
+        },
+        {
+          "type": "line",
+          "x1": 1,
+          "y1": -0.5,
+          "x2": -0,
+          "y2": 0.5
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{101FDFF8-4F67-4F53-85BE-F7F484F92EA3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GuiEcad.Core", "src\GuiEcad.Core\GuiEcad.Core.csproj", "{9BF71759-E889-4F1C-935D-17E19B74ACB9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GuiEcad.Pdf", "src\GuiEcad.Pdf\GuiEcad.Pdf.csproj", "{0364E71A-BC11-4140-935D-A8B89289565D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{47A45493-C295-4802-8296-6539F93B7B34}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GuiEcad.Tests", "tests\GuiEcad.Tests\GuiEcad.Tests.csproj", "{4EBEB8E5-99AC-495B-8409-6DA1D04CE869}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GuiEcad.App", "src\GuiEcad.App\GuiEcad.App.csproj", "{41BD98D7-A738-47A8-A2DC-3E17A94B7783}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9BF71759-E889-4F1C-935D-17E19B74ACB9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9BF71759-E889-4F1C-935D-17E19B74ACB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9BF71759-E889-4F1C-935D-17E19B74ACB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9BF71759-E889-4F1C-935D-17E19B74ACB9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0364E71A-BC11-4140-935D-A8B89289565D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0364E71A-BC11-4140-935D-A8B89289565D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0364E71A-BC11-4140-935D-A8B89289565D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0364E71A-BC11-4140-935D-A8B89289565D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4EBEB8E5-99AC-495B-8409-6DA1D04CE869}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4EBEB8E5-99AC-495B-8409-6DA1D04CE869}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4EBEB8E5-99AC-495B-8409-6DA1D04CE869}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4EBEB8E5-99AC-495B-8409-6DA1D04CE869}.Release|Any CPU.Build.0 = Release|Any CPU
+		{41BD98D7-A738-47A8-A2DC-3E17A94B7783}.Debug|Any CPU.ActiveCfg = Debug|x86
+		{41BD98D7-A738-47A8-A2DC-3E17A94B7783}.Debug|Any CPU.Build.0 = Debug|x86
+		{41BD98D7-A738-47A8-A2DC-3E17A94B7783}.Release|Any CPU.ActiveCfg = Release|x86
+		{41BD98D7-A738-47A8-A2DC-3E17A94B7783}.Release|Any CPU.Build.0 = Release|x86
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{9BF71759-E889-4F1C-935D-17E19B74ACB9} = {101FDFF8-4F67-4F53-85BE-F7F484F92EA3}
+		{0364E71A-BC11-4140-935D-A8B89289565D} = {101FDFF8-4F67-4F53-85BE-F7F484F92EA3}
+		{4EBEB8E5-99AC-495B-8409-6DA1D04CE869} = {47A45493-C295-4802-8296-6539F93B7B34}
+		{41BD98D7-A738-47A8-A2DC-3E17A94B7783} = {101FDFF8-4F67-4F53-85BE-F7F484F92EA3}
+	EndGlobalSection
+EndGlobal
