@@ -19,6 +19,11 @@ public sealed class DrawingTheme
     public static readonly Color Powered = new(255, 230, 60, 0);       // テストモード: 通電/励磁
     public static readonly Color ManualForced = new(110, 0, 80, 220);  // テストモード: 接点手動強制（半透明青）
     public static readonly Color GridGray = new(255, 210, 210, 210);
+    public static readonly Color TableHeaderFill = new(255, 230, 230, 230);   // 機器表・表ヘッダの淡いグレー背景
+
+    // 表（機器表・クロスリファレンス・表題欄）の罫線幅と、テスト通電配線の強調線幅(mm)。
+    public const double TableLineWidth = 0.18;
+    public const double PoweredWireWidth = 0.45;
 
     /// <summary>線幅の最小クランプ(mm)。画面(Win2D)とPDFで同一に保ち、極細線がどちらでも消えないようにする。</summary>
     public const double MinStrokeWidthMm = 0.05;

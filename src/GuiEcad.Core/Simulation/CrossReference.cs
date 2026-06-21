@@ -59,7 +59,7 @@ public static class CrossReferenceBuilder
         foreach (var sheet in doc.Sheets.OrderBy(s => s.PageNumber))
         {
             // Row → CircuitNumber のルックアップ
-            var circuitByRow = sheet.Lines.ToDictionary(l => l.Row, l => l.CircuitNumber);
+            var circuitByRow = sheet.CircuitByRow();
 
             foreach (var elem in sheet.Elements)
             {

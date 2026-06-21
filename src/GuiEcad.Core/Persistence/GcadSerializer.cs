@@ -1,8 +1,5 @@
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Text.Unicode;
 using GuiEcad.Model;
 
 namespace GuiEcad.Persistence;
@@ -12,15 +9,7 @@ public static class GcadSerializer
 {
     public const int CurrentSchemaVersion = 1;
 
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
-    };
+    private static JsonSerializerOptions Options => JsonOptions.Default;
 
     /// <summary>LadderDocument を .GCAD ファイルへ保存する。</summary>
     public static void Save(LadderDocument doc, string path)

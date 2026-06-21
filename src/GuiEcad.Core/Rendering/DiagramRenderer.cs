@@ -317,7 +317,7 @@ public sealed class DiagramRenderer
     {
         var stroke = _theme.Get(StrokeRole.Wire);
         if (powered is not null && net is int pid && powered.Contains(pid))
-            stroke = stroke with { Color = DrawingTheme.Powered, Width = 0.45 };   // テスト: 通電
+            stroke = stroke with { Color = DrawingTheme.Powered, Width = DrawingTheme.PoweredWireWidth };   // テスト: 通電
         else if (report is not null && net is int nid)
             stroke = stroke with { Color = report.Of(nid) == WireStatus.Connected ? DrawingTheme.Blue : DrawingTheme.Black };
         r.DrawLine(new(x1, y1), new(x2, y2), stroke);
@@ -373,7 +373,7 @@ public sealed class DiagramRenderer
         double x2 = x1 + CoilColW;
         double x3 = X(columns);
 
-        var outline = _theme.Get(StrokeRole.SymbolOutline) with { Width = 0.18 };
+        var outline = _theme.Get(StrokeRole.SymbolOutline) with { Width = DrawingTheme.TableLineWidth };
         var headerText = _theme.Text(TextRole.CrossRef) with { Bold = true, FontSizeMm = 2.4, VAlign = VAlign.Middle };
         var cellText = _theme.Text(TextRole.CrossRef) with { FontSizeMm = 2.2, VAlign = VAlign.Middle };
         double pad = 1.0;   // セル内左余白(mm)
@@ -400,7 +400,7 @@ public sealed class DiagramRenderer
     private static void DrawTableRow(IRenderer r, StrokeStyle s,
         double x0, double y, double x1, double x2, double x3, double rh, bool fill)
     {
-        if (fill) r.FillRectangle(new(x0, y, x3 - x0, rh), new Color(255, 230, 230, 230));
+        if (fill) r.FillRectangle(new(x0, y, x3 - x0, rh), DrawingTheme.TableHeaderFill);
         r.DrawRectangle(new(x0, y, x3 - x0, rh), s);
         r.DrawLine(new(x1, y), new(x1, y + rh), s);
         r.DrawLine(new(x2, y), new(x2, y + rh), s);
@@ -499,7 +499,7 @@ public sealed class DiagramRenderer
         double totalW = x1 - x0;
         double h1 = TitleBlockH * 0.45;   // 1行目高さ
         double h2 = TitleBlockH - h1;     // 2行目高さ
-        var outline = _theme.Get(StrokeRole.SymbolOutline) with { Width = 0.18 };
+        var outline = _theme.Get(StrokeRole.SymbolOutline) with { Width = DrawingTheme.TableLineWidth };
         var labelStyle = _theme.Text(TextRole.CrossRef) with { FontSizeMm = 1.8, VAlign = VAlign.Middle, Bold = true };
         var dataStyle  = _theme.Text(TextRole.CrossRef) with { FontSizeMm = 2.2, VAlign = VAlign.Middle };
         double pad = 1.0;
@@ -549,7 +549,7 @@ public sealed class DiagramRenderer
     private void DrawRevisionBlock(IRenderer r, DocumentInfo info, double x0, double x1, double startY)
     {
         double totalW = x1 - x0;
-        var s = _theme.Get(StrokeRole.SymbolOutline) with { Width = 0.18 };
+        var s = _theme.Get(StrokeRole.SymbolOutline) with { Width = DrawingTheme.TableLineWidth };
         var hdrStyle  = _theme.Text(TextRole.CrossRef) with { FontSizeMm = 1.8, VAlign = VAlign.Middle, Bold = true };
         var dataStyle = _theme.Text(TextRole.CrossRef) with { FontSizeMm = 2.0, VAlign = VAlign.Middle };
         double pad = 1.0;

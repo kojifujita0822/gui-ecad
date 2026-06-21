@@ -49,7 +49,7 @@ public static class DesignRuleCheck
         foreach (var sheet in doc.Sheets.OrderBy(s => s.PageNumber))
         {
             // Row → CircuitNumber のルックアップ（CrossReferenceBuilder と同一規則）
-            var circuitByRow = sheet.Lines.ToDictionary(l => l.Row, l => l.CircuitNumber);
+            var circuitByRow = sheet.CircuitByRow();
 
             foreach (var elem in sheet.Elements)
             {
@@ -104,7 +104,7 @@ public static class DesignRuleCheck
 
         foreach (var sheet in doc.Sheets.OrderBy(s => s.PageNumber))
         {
-            var circuitByRow = sheet.Lines.ToDictionary(l => l.Row, l => l.CircuitNumber);
+            var circuitByRow = sheet.CircuitByRow();
 
             foreach (var elem in sheet.Elements)
             {
@@ -163,7 +163,7 @@ public static class DesignRuleCheck
     public static IReadOnlyList<Diagnostic> CheckVerticalCrossings(Sheet sheet, Netlist net)
     {
         if (net.VerticalCrossings.Count == 0) return Array.Empty<Diagnostic>();
-        var circuitByRow = sheet.Lines.ToDictionary(l => l.Row, l => l.CircuitNumber);
+        var circuitByRow = sheet.CircuitByRow();
         var diags = new List<Diagnostic>();
         foreach (var (row, col) in net.VerticalCrossings)
         {
@@ -183,7 +183,7 @@ public static class DesignRuleCheck
     {
         var fromLeft  = FloodContacts(net, net.LeftRailNet);
         var fromRight = FloodContacts(net, net.RightRailNet);
-        var circuitByRow = sheet.Lines.ToDictionary(l => l.Row, l => l.CircuitNumber);
+        var circuitByRow = sheet.CircuitByRow();
 
         // SourceElementId → 回路番号 のルックアップ
         var elemCircuit = sheet.Elements.ToDictionary(e => e.Id,
