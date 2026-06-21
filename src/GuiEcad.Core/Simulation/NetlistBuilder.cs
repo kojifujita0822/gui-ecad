@@ -36,12 +36,16 @@ public static class NetlistBuilder
         var rightBoundary = new int[elements.Count];
         var leftNode = new int[elements.Count];
         var rightNode = new int[elements.Count];
+        var hasPorts = new bool[elements.Count];   // 接続点を持ち電気的に有効な要素のみ true
         var unions = new List<(int, int)>();
 
         for (int i = 0; i < elements.Count; i++)
         {
             var e = elements[i];
             var ports = PartResolver.Ports(e, parts);
+            // ポート0個（接続点なし）の自作パーツは電気的に寄与しない。配列はデフォルトのまま残し、後段の配線・Component 化から除外する。
+            if (ports.Count == 0) continue;
+            hasPorts[i] = true;
             // 全ポートのノードを作成。中間ポート（多端子）も座標一致で自動結線される。
             foreach (var p in ports)
                 Node(e.Pos.Row + p.RowOffset, e.Pos.Column + p.BoundaryOffset);
@@ -73,6 +77,7 @@ public static class NetlistBuilder
         var byRow = new Dictionary<int, List<int>>();
         for (int i = 0; i < elements.Count; i++)
         {
+            if (!hasPorts[i]) continue;   // 接続点なしの要素は横配線・母線接続の対象外
             int row = elements[i].Pos.Row;
             if (!byRow.TryGetValue(row, out var list)) { list = new(); byRow[row] = list; }
             list.Add(i);
@@ -148,6 +153,7 @@ public static class NetlistBuilder
         for (int i = 0; i < elements.Count; i++)
         {
             var e = elements[i];
+            if (!hasPorts[i]) continue;   // 接続点なし＝ネット未定義。Component 化しない
             if (!PartResolver.CreatesComponent(e, parts)) continue;   // 記号のみ(三相モータ・非シミュ自作)は評価対象外
             var kind = PartResolver.ComponentKind(e, parts);
             var role = ElementCatalog.IsLoad(kind) ? ComponentRole.Load

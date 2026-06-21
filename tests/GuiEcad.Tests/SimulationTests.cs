@@ -170,4 +170,50 @@ public class SimulationTests
         Assert.True(Run(sheet, new SimState { Inputs = { ["A"] = true } }).State.Energized["C"]);
         Assert.False(Run(sheet, new SimState { Inputs = { ["A"] = false } }).State.Energized.TryGetValue("C", out var v) && v);
     }
+
+    [Fact]
+    public void ShortCircuit_DetectedWhenContactBridgesBothRails()
+    {
+        // L —[NO A]— R （列0..1、接点が負荷を介さず両母線を直結＝短絡）
+        var sheet = new Sheet { Grid = new GridSpec { Columns = 1 } };
+        sheet.Elements.Add(El(ElementKind.ContactNO, 0, 0, "A"));
+
+        // A=ON → 負荷非経由で左右母線が導通＝短絡を検出
+        Assert.NotEmpty(Run(sheet, new SimState { Inputs = { ["A"] = true } }).ShortCircuitNets);
+        // A=OFF → 導通せず短絡なし
+        Assert.Empty(Run(sheet, new SimState { Inputs = { ["A"] = false } }).ShortCircuitNets);
+    }
+
+    [Fact]
+    public void NormalLoadCircuit_IsNotFlaggedAsShort()
+    {
+        // 負荷(コイル)を介して通電する正常回路。保持回路の戻り線(自己保持接点)があっても短絡誤検出しない。
+        var sheet = new Sheet { Grid = new GridSpec { Columns = 5 } };
+        sheet.Elements.Add(El(ElementKind.PushButtonNO, 0, 0, "ST"));
+        sheet.Elements.Add(El(ElementKind.PushButtonNC, 0, 2, "SP"));
+        sheet.Elements.Add(El(ElementKind.Coil, 0, 4, "R1"));
+        sheet.Elements.Add(El(ElementKind.ContactNO, 1, 0, "R1"));   // 自己保持接点（戻り線）
+        sheet.Connectors.Add(new VerticalConnector { Column = 1, TopRow = 0, BottomRow = 1 });
+
+        // 自己保持で励磁中でも、負荷を介す正常回路なので短絡ではない
+        var held = Run(sheet, new SimState { Inputs = { ["ST"] = false }, Energized = { ["R1"] = true } });
+        Assert.Equal(EvalStatus.Converged, held.Status);
+        Assert.Empty(held.ShortCircuitNets);
+    }
+
+    [Fact]
+    public void PortlessPart_DoesNotCrashNetlistBuild()
+    {
+        // ポート0個の自作パーツ（接続点なし図形）が混在しても NetlistBuilder が落ちず、他要素は正常評価される。
+        var parts = new PartLibrary();
+        parts.ById["deco"] = new PartDefinition { Id = "deco", Name = "装飾", Ports = new() };
+        var sheet = new Sheet { Grid = new GridSpec { Columns = 4 } };
+        sheet.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 1), PartId = "deco" });
+        sheet.Elements.Add(El(ElementKind.PushButtonNO, 1, 0, "A"));
+        sheet.Elements.Add(El(ElementKind.Coil, 1, 3, "C"));
+
+        var net = NetlistBuilder.Build(sheet, parts);
+        var result = new Evaluator(net).Evaluate(new SimState { Inputs = { ["A"] = true } });
+        Assert.True(result.State.Energized["C"]);
+    }
 }
