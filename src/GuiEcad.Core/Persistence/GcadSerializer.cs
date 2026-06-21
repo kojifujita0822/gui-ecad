@@ -9,13 +9,11 @@ public static class GcadSerializer
 {
     public const int CurrentSchemaVersion = 1;
 
-    private static JsonSerializerOptions Options => JsonOptions.Default;
-
     /// <summary>LadderDocument を .GCAD ファイルへ保存する。doc.SchemaVersion を CurrentSchemaVersion に更新する。</summary>
     public static void Save(LadderDocument doc, string path)
     {
         doc.SchemaVersion = CurrentSchemaVersion;
-        var json = JsonSerializer.Serialize(doc, Options);
+        var json = JsonSerializer.Serialize(doc, JsonOptions.Default);
         File.WriteAllText(path, json, Encoding.UTF8);
     }
 
@@ -30,7 +28,7 @@ public static class GcadSerializer
     /// <summary>JSON 文字列から LadderDocument を復元する（テスト・インポート向け）。</summary>
     public static LadderDocument Deserialize(string json)
     {
-        var doc = JsonSerializer.Deserialize<LadderDocument>(json, Options)
+        var doc = JsonSerializer.Deserialize<LadderDocument>(json, JsonOptions.Default)
             ?? throw new InvalidDataException("Failed to deserialize .GCAD document.");
         if (doc.SchemaVersion != CurrentSchemaVersion)
             throw new NotSupportedException(
@@ -43,7 +41,7 @@ public static class GcadSerializer
     {
         var saved = doc.SchemaVersion;
         doc.SchemaVersion = CurrentSchemaVersion;
-        try { return JsonSerializer.Serialize(doc, Options); }
+        try { return JsonSerializer.Serialize(doc, JsonOptions.Default); }
         finally { doc.SchemaVersion = saved; }
     }
 }

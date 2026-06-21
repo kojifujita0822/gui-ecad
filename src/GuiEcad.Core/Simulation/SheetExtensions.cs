@@ -6,6 +6,6 @@ namespace GuiEcad.Simulation;
 internal static class SheetExtensions
 {
     /// <summary>行→回路番号の対応表。採番済み Lines から導出する。</summary>
-    public static Dictionary<int, int> CircuitByRow(this Sheet sheet)
+    internal static Dictionary<int, int> CircuitByRow(this Sheet sheet)
         => sheet.Lines.ToDictionary(l => l.Row, l => l.CircuitNumber);
 }

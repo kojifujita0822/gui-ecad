@@ -390,7 +390,7 @@
                     <TextBox x:Name="ReplaceBox" Width="130" PlaceholderText="置換後の機器名" />
                     <Button Content="置換" Click="OnReplaceOne" />
                     <Button Content="全置換" Click="OnReplaceAll" />
-                    <Button Width="28" Content="✕" Click="OnFindClose" ToolTipService.ToolTip="閉じる" />
+                    <Button Width="28" Click="OnFindClose" ToolTipService.ToolTip="閉じる"><FontIcon Glyph="&#xE8BB;" FontSize="12" /></Button>
                 </StackPanel>
             </Border>
 

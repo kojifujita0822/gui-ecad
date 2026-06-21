@@ -110,7 +110,7 @@ internal sealed class Win2DRenderer : IRenderer
 
     private CanvasTextLayout Layout(string text, TextStyle style)
     {
-        var fmt = new CanvasTextFormat
+        using var fmt = new CanvasTextFormat
         {
             FontFamily = style.FontFamily,
             FontSize = (float)style.FontSizeMm,
