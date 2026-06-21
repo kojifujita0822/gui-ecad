@@ -1525,14 +1525,18 @@ public sealed partial class MainPage : Page
 
     // ===== メニュー =====
 
-    private void OnMenuUndo(object sender, RoutedEventArgs e) { _history.Undo(); RefreshDevicePanel(); RefreshPropertiesPanel(); Canvas.Invalidate(); }
-    private void OnMenuRedo(object sender, RoutedEventArgs e) { _history.Redo(); RefreshDevicePanel(); RefreshPropertiesPanel(); Canvas.Invalidate(); }
+    // Undo/Redo の後処理はメニュー・ボタン・アクセラレータで共通（履歴操作→パネル/プロパティ更新→再描画）。
+    private void DoUndo() { _history.Undo(); RefreshDevicePanel(); RefreshPropertiesPanel(); Canvas.Invalidate(); }
+    private void DoRedo() { _history.Redo(); RefreshDevicePanel(); RefreshPropertiesPanel(); Canvas.Invalidate(); }
+
+    private void OnMenuUndo(object sender, RoutedEventArgs e) => DoUndo();
+    private void OnMenuRedo(object sender, RoutedEventArgs e) => DoRedo();
 
     // Ctrl+Z/Y はフォーカスに依存しない KeyboardAccelerator で処理（ツール選択中でも効く）
     private void OnUndoAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    { _history.Undo(); RefreshDevicePanel(); RefreshPropertiesPanel(); Canvas.Invalidate(); args.Handled = true; }
+    { DoUndo(); args.Handled = true; }
     private void OnRedoAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    { _history.Redo(); RefreshDevicePanel(); RefreshPropertiesPanel(); Canvas.Invalidate(); args.Handled = true; }
+    { DoRedo(); args.Handled = true; }
 
     // Delete もフォーカス非依存に（ツール選択中・要素/縦コネクタ選択後でも効く）
     private void OnDeleteAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
@@ -2240,7 +2244,6 @@ if ($LASTEXITCODE -eq 0) {
         {
             movFr.VisualXMm = _moveFrameOriginX + (sxMm - _moveFrameClickX);
             movFr.VisualYMm = _moveFrameOriginY + (syMm - _moveFrameClickY);
-            AppLog($"[DRAG] sxMm={sxMm:F2} syMm={syMm:F2} vx={movFr.VisualXMm:F2} vy={movFr.VisualYMm:F2}");
             Canvas.Invalidate();
             return;
         }
@@ -2593,13 +2596,8 @@ if ($LASTEXITCODE -eq 0) {
     {
         if (_findIndex < 0 || _findIndex >= _findResults.Count) return;
         var hit = _findResults[_findIndex];
-        if (hit.Sheet != _sheet)
-        {
-            _sheet = hit.Sheet;
-            _selected = null;
-            if (_testMode) _testSession = GetOrCreateTestSession(_sheet);
-            SelectNavTreeSheet(hit.Sheet);
-        }
+        // シート切替は SwitchToSheet 一本化（編集中コミット・選択/テストセッション整合を担保）。
+        if (hit.Sheet != _sheet) SwitchToSheet(hit.Sheet);
         Canvas.Invalidate();
     }
 
@@ -2711,15 +2709,8 @@ if ($LASTEXITCODE -eq 0) {
         if (diag.Locations.Count == 0) return;
         var loc = diag.Locations[0];
         var target = _document.Sheets.FirstOrDefault(s => s.PageNumber == loc.PageNumber);
-        if (target != null && target != _sheet)
-        {
-            _sheet = target;
-            _selected = null;
-            _selectedConnector = null;
-            if (_testMode) _testSession = GetOrCreateTestSession(_sheet);
-            SelectNavTreeSheet(_sheet);
-            Canvas.Invalidate();
-        }
+        // シート切替は SwitchToSheet 一本化（編集中コミット・選択/テストセッション整合を担保）。
+        if (target != null && target != _sheet) SwitchToSheet(target);
     }
 
     private void RefreshSearchResultPanel()
