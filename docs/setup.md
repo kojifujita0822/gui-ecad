@@ -49,13 +49,14 @@ dotnet sln add src/GuiEcad.Core src/GuiEcad.Pdf src/GuiEcad.App tests/GuiEcad.Te
 
 ## ビルド / 実行 / テスト
 ```pwsh
-# WinUI3 アプリは x64 プラットフォーム指定でビルドする
-dotnet build src/GuiEcad.App/GuiEcad.App.csproj -p:Platform=x64
-dotnet run   --project src/GuiEcad.App -p:Platform=x64
+# WinUI3 アプリは RID 指定でビルド/実行する（win-x64 ツリーに統一）
+# ※ -p:Platform=x64 は別ツリー(bin\x64)へ出力し旧バイナリ実行の事故元になるため使わない（2026-06-21 案A）
+dotnet build src/GuiEcad.App/GuiEcad.App.csproj -r win-x64
+dotnet run   --project src/GuiEcad.App
 # Core/Pdf/Tests（クラスライブラリ/テスト）
 dotnet build GuiEcad.sln
 dotnet test  GuiEcad.sln
 dotnet test  GuiEcad.sln --filter "FullyQualifiedName~<テスト名>"   # 単体
 ```
 
-> 注: WinUI 3 アプリは `Platform=x64`（または x86/arm64）が必要（AnyCPU 不可）。配布時は MSIX パッケージ化を別途検討。
+> 注: WinUI 3 アプリは AnyCPU 不可（x64/x86/arm64 が必要）。`dotnet run`/`-r win-x64` は既定で win-x64 RID ツリー（`bin\Debug\...\win-x64`）を使う。`-p:Platform=x64` は出力先が `bin\x64\Debug` と別ツリーになり古いバイナリを実行する事故の元なので使わない。配布時は MSIX パッケージ化を別途検討。

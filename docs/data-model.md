@@ -66,7 +66,11 @@ public sealed class Sheet {
     public List<VerticalConnector> Connectors = new();
     public List<GroupFrame> Frames = new();
     public List<CircuitLine> Lines = new();          // 横の回路線（回路番号）
+    public List<FreeLine> FreeLines = new();         // 主回路用の自由直線（mm 座標・グリッド非依存）
+    public bool MainCircuit;                          // 主回路モード（母線・自動横配線を描かない）
 }
+// 主回路(動力回路)用の自由直線。mm 実座標。GroupFrame の VisualXMm と同流儀。
+public sealed class FreeLine { public double X1Mm, Y1Mm, X2Mm, Y2Mm; public LineStyle Style; }
 public sealed class GridSpec { public int Rows; public int Columns; }   // Row は内部座標のみ（ステップ番号は表示しない）
 // 回路番号: 図面全体通しの連番。横1本の回路線ごと（1出力=2,3本の並列線になる場合あり）。自動順送り。
 public sealed class CircuitLine { public int Row; public int CircuitNumber; }

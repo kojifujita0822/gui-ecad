@@ -1,7 +1,7 @@
 # 未決定事項 / TODO
 
-> **2026-06-20 更新**: 129テスト合格。GX Works3 UI刷新 P1〜P6 すべて完了。プロパティパネル（SelectSwitch/Timer Params 編集）完了。
-> 以下は**未着手・保留**のみ。
+> **2026-06-21 更新**: 138テスト合格。コードレビュー対応リファクタ・ライト/ダークテーマ・三相主回路フェーズ1 完了。
+> 以下は**未着手・保留**のみ（完了項目は末尾「完了済み（参照用）」と各 commit を参照）。
 
 ## 描画・記号
 - [x] **記号の最終調整（ラベル重なり）** — 密配置時のラベル重なり対策。修正済み 2026-06-21。（端子台◎は直径0.3セルに確定済み。標準記号側の追加微調整が必要なら別途相談）
@@ -11,7 +11,7 @@
 - [ ] **配線（横線）の個別削除** — 保留。要モデル拡張（どのセル間の線を削除したか記録）。具体的なユースケース未確定のため着手条件はユーザー判断。
 - [ ] **線番の手動固定** — 要素追加・削除時の再採番タイミング（自動再採番か固定かの方針未確定）。
 - [x] **部品リスト（BOM）UI** — 「図面(D)→部品リスト(BOM)」。図面から機器名を自動列挙し型式/メーカー/数量を編集（`OnBomEditor`）。`Device` に `Model`/`Maker`/`Quantity` を追加し `DeviceTable.ByName` に永続化。完了 2026-06-21。
-- [ ] **部品リスト（BOM）の PDF 出力** — 現状は `.GCAD` 内に保存・ダイアログ編集のみ。BOM を表形式で PDF へ出力したい（専用ページ or クロスリファレンス表の下など。`DeviceTable` の Model/Maker/Quantity を集計表示）。CSV 出力も候補。（2026-06-21 ユーザー要望）
+- [x] **部品リスト（BOM）の PDF 出力** — BOM 専用ページを PDF 出力の末尾に追加。完了 2026-06-21（commit 8b07879）。
 - [x] **新規シートの母線名デフォルト** — 新規シートは `Settings.DefaultBus` を使用。シート設定ダイアログに「この母線名を新規シートの既定にする」チェック追加。完了 2026-06-21。
 
 ## 自作パーツ
@@ -21,19 +21,16 @@
 - [x] **パーツライブラリの外部ファイル運用** — `.gcadparts`（ライブラリ）/.`gcadpart`（単体）形式でエクスポート/インポート。「図形(G)→ライブラリのエクスポート/インポート」メニューを実装。複数プロジェクト間でパーツ共有可能。完了 2026-06-21。
 - [x] **パレット編集UI** — 既存自作パーツの再編集。`OnEditPart`（MainPage.xaml.cs:333）で「その他▼→パーツ名→編集...」から `PartEditorWindow` を再利用して編集可能。完了済み（実装確認 2026-06-21）。
 
-## テストモード
-- [ ] **タイマ時限モデル（P4）** — タイマコイル励磁→時間経過→接点反転の連動。`SimState` に経過時間、`TestSession.Tick(dt)` API が必要。変更規模大。
-
 ## UI
 - [x] **P3: 下部出力パネル** — DRC/検索結果/接続検査の結果をタブ表示する下部ドック。TabView（折りたたみボタン付き）。完了 2026-06-20。
 - [x] **プロパティパネル（基本）** — SelectSwitch ノッチ位置（`Params["Position"]`）・Timer 設定時間（`Params["Setpoint"]`）を `NumberBox` で編集。`SetParamCommand` で Undo/Redo 対応。完了 2026-06-20。
 - [x] **プロパティパネル拡張** — 機器名（`RenameDeviceCommand`）・コメント（`SetCommentCommand`）を全要素共通の編集欄として追加。`AddGeneralAttributes` で TextBox 表示、LostFocus/Enter でコミット・Undo/Redo 対応。完了 2026-06-21。
+- [x] **ライト/ダークテーマ** — `App.xaml` の ThemeDictionaries ＋ `RequestedTheme` 切替。各パネルを階調化しステータスバーをアクセント帯に。表示メニュー「ダークモード」、設定を `MyDocuments\GuiEcad\ui-theme.txt` に保存・起動時復元。完了 2026-06-21（commit 2f72354）。
+- [x] **ヘルプ「使い方」・バージョン1.0.0・起動時空シート** — ヘルプに操作ガイド追加、バージョンを csproj 一元管理＋動的取得、起動時のサンプル回路を廃止。完了 2026-06-21（commit 8922829）。
 
 ## 操作機能（追加候補）
-> 実装プラン（優先順位・コード例）: [impl-plan-operations.md](impl-plan-operations.md)
-
 （2026-06-21 調査: 以下はすべてコード実装済み。実機動作確認を行うこと）
-- [x] **範囲選択・コピー・ペースト** — CopySelection/PasteSelection (MainPage.xaml.cs L1263-1319)、機器名自動リネーム実装済み
+- [ ] **範囲選択・コピー・ペースト** — CopySelection/PasteSelection (MainPage.xaml.cs L1263-1319)、機器名自動リネーム実装済み
 - [x] **選択位置への行追加・削除** — `InsertRowCommand` / `DeleteRowCommand` (ElementCommands.cs L259-370)、右クリックメニューからも操作可能
 - [x] **全モードの空白ドラッグスクロール** — スペースキーパン `_spacePanActive` (MainPage.xaml.cs L96, 1417-)
 - [x] **右クリックコンテキストメニュー（作画モード）** — `ShowDrawingContextMenu` (L2293-)、`OnCanvasRightTapped` で統一
@@ -43,6 +40,14 @@
 - [x] **枠の自由作成（スナップ解除）** — 作成時にグリッドへスナップせず mm 連続座標で配置。`GroupFrame.VisualWidthMm/HeightMm` 追加、作成は `_frameStartMm/_frameCurMm` で追跡。描画/ヒットテスト/選択ハイライト/プレビューを Visual* 優先に統一。完了 2026-06-21。
 - [x] **ウィンドウタイトルにファイル名表示** — `MainWindow.SetDocumentTitle`、`UpdateStatusExtras` から呼出。"&lt;ファイル名&gt;[*] - GuiEcad"。完了 2026-06-21。
 - [x] **行番号表示** — `DiagramRenderer.DrawRowNumbers`（左母線左側・1始まり・画面/PDF共通）。`RenderOptions.ShowRowNumbers`（既定 true）。完了 2026-06-21。※従来「行番号は不採用」の設計判断を変更。
+
+## 三相動力回路（主回路図）
+制御回路(単線ラダー)とは別構造。多様(3極/2極/インバータ/計器)でグリッド自動配線に乗らないため**自由配線方式**（記号＋自由直線・シミュレーション不要）。参照 `temp/SAMPLE.png`（実図面）。
+- [x] **自由直線ツール** — 縦パレット「直線」。2点ドラッグ・1/4セル格子スナップ・選択/移動/削除/Undo（`FreeLine`・Place/Delete/MoveFreeLineCommand）。完了 2026-06-21（commit 64dc138）。
+- [x] **主回路モード** — シート設定で「主回路（動力回路）」ON＝左右母線・母線名・自動横配線を描かず自由直線で結線（`Sheet.MainCircuit`）。完了 2026-06-21。
+- [x] **グリッド表示** — 表示メニュー「グリッド表示」で薄い格子線（`RenderOptions.ShowGrid`）。完了 2026-06-21。
+- [ ] **ツールパレットのフロート化（Jw_cad 風）** — タイトルバーをドラッグで移動。C# ハンドラ追加済み・XAML 未対応で未コミット。次回 `ToolOverlay`/`ToolPaletteFloat`/`ToolPaletteHandle` の XAML を揃える。
+- [ ] **主回路用記号** — ブレーカ(NFB/MCCB/ELB)・OLリレー(3極サーマル)を `ElementKind` 追加（非シミュレート）。電磁接触器主接点は既存 ContactNO 流用、三相モータは既存 Motor。母線R/S/Tは自由直線。未着手。
 
 ## アプリ全般
 - [ ] **パッケージング・配布** — MSIX 等。開発完成後に検討。

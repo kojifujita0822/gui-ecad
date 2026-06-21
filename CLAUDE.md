@@ -2,7 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **本ファイルは設計の索引です。** 基盤実装・129テスト合格・GUI 一式（作画/テスト/PDF/検索/ナビゲーションツリー/機器表/枠/表題欄/GX Works3風UI/プロパティパネル/コピペ/右クリックメニュー/枠操作）動作済み。
+> **本ファイルは設計の索引です。** 基盤実装・138テスト合格・GUI 一式（作画/テスト/PDF/検索/ナビゲーションツリー/機器表/枠/表題欄/GX Works3風UI/プロパティパネル/コピペ/右クリックメニュー/枠操作/ライト・ダークテーマ）動作済み。
+> **三相動力回路（主回路図）の自由配線作図を実装中**（自由直線ツール・主回路モード・グリッド表示は実装済み）。
 > 詳細は `docs/` 配下（各 `docs/` が正典）。未着手・保留は [docs/todo.md](docs/todo.md)。
 >
 > **運用ルール**: 本ファイル（CLAUDE.md）は **200行以内**に収める。超過する内容は `docs/` 配下へ分離し、CLAUDE.md には**要約とリンクのみ**を記載する。
@@ -69,8 +70,10 @@ dotnet test  GuiEcad.sln
 | [docs/simulation.md](docs/simulation.md) | テストモード評価アルゴリズム（不動点・発振検出） |
 | [docs/persistence.md](docs/persistence.md) | 永続化フォーマット（JSON / `.GCAD`） |
 | [docs/setup.md](docs/setup.md) | セットアップ・プロジェクト構成・雛形生成手順 |
-| [docs/todo.md](docs/todo.md) | 未着手・保留タスク一覧 |
-| [docs/ui-gxworks3-plan.md](docs/ui-gxworks3-plan.md) | GX Works3 風 UI 刷新プラン（P1-P6 すべて完了） |
-| [docs/operation-features-plan.md](docs/operation-features-plan.md) | 操作機能追加プラン（コピペ/右クリックメニュー/枠移動・線種/スペースキーパン等 — 実装済み、実機確認待ち） |
+| [docs/todo.md](docs/todo.md) | 未着手・保留タスク一覧／進捗 |
+
+> 完了済みの実装計画書（GX Works3 UI 刷新・操作機能追加・自作パーツ実装・右クリックメニュー）は
+> 2026-06-21 に削除した。実装済みのためコードと各正典・[docs/todo.md](docs/todo.md) が現状の正典。
+> 履歴が必要なときは git 履歴を参照。
 
 参照サンプル: `sample/ex1.png`（実図面の分岐ドット●・端子台◎の例）。

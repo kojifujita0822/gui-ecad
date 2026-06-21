@@ -105,3 +105,11 @@ public sealed class DrawingTheme
 - **文字メトリクス差**: `MeasureText` は Win2D（DirectWrite）と PDFsharp で僅差が出うる。厳密な揃えは片方の計測に依存せず**グリッド座標で算術的に決める**。
 - 画面とPDFで**同一フォント**を使用する前提（差異・埋め込みは別途検討）。
 - `DrawArc` は押ボタン等の曲線記号用。直線・円で代替可能なら最小化してよい。
+
+## 2026-06-21 追加・確定事項
+- **バックエンド間の描画統一**（commit 3d42128）: `VAlign` を3バックエンドで同一意味化（Baseline=フォントのベースライン基準／Bottom=下辺基準。Win2D は `LineMetrics` でベースライン取得、PDF は Bottom を `XLineAlignment.Far` に明示）。最小線幅クランプを `DrawingTheme.MinStrokeWidthMm`(0.05) に単一化。破線は線幅倍数のカスタムパターン（Dash 4:2 / Dot 1:2）を Win2D/PDF/SVG で共通化。SVG は `DrawText`/`PushClip`/`PopClip` 非対応（アイコン生成専用・契約上 no-op）。
+- **テーマ定数化**: `DiagramRenderer` のハードコードを `DrawingTheme` 定数へ昇格（`TableLineWidth`=0.18／`PoweredWireWidth`=0.45／`TableHeaderFill`）。
+- **グリッド表示**: `RenderOptions.ShowGrid` で薄い格子（`StrokeRole.Grid`）を作図ガイドに描画（`DiagramRenderer.DrawGrid`・表示メニュー連動）。
+- **自由直線**: `Sheet.FreeLines`（mm 座標）を `DiagramRenderer.DrawFreeLines` が `StrokeRole.Wire` で描画（主回路の母線・結線）。
+- **主回路モード**: `Sheet.MainCircuit` が true のとき母線（`DrawRails`）・母線名・自動横配線（`DrawRungWires`）を描かない。
+- **ライト/ダークテーマ（UIシェル）**: アプリ側 `App.xaml` の `ThemeDictionaries`＋`RequestedTheme` 切替（図面キャンバスは両テーマとも白地固定＝黒線前提のため）。詳細は [[gui-ecad-winui-gotchas]] 項8。
