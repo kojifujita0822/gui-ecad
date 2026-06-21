@@ -11,7 +11,7 @@ public static class GcadSerializer
 
     private static JsonSerializerOptions Options => JsonOptions.Default;
 
-    /// <summary>LadderDocument を .GCAD ファイルへ保存する。</summary>
+    /// <summary>LadderDocument を .GCAD ファイルへ保存する。doc.SchemaVersion を CurrentSchemaVersion に更新する。</summary>
     public static void Save(LadderDocument doc, string path)
     {
         doc.SchemaVersion = CurrentSchemaVersion;
@@ -38,10 +38,12 @@ public static class GcadSerializer
         return doc;
     }
 
-    /// <summary>LadderDocument を JSON 文字列へシリアライズする（テスト・エクスポート向け）。</summary>
+    /// <summary>LadderDocument を JSON 文字列へシリアライズする（テスト・エクスポート向け）。doc は変更しない。</summary>
     public static string Serialize(LadderDocument doc)
     {
+        var saved = doc.SchemaVersion;
         doc.SchemaVersion = CurrentSchemaVersion;
-        return JsonSerializer.Serialize(doc, Options);
+        try { return JsonSerializer.Serialize(doc, Options); }
+        finally { doc.SchemaVersion = saved; }
     }
 }

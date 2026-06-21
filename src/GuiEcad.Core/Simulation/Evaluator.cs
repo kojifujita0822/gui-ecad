@@ -65,7 +65,7 @@ public sealed class Evaluator
             {
                 var powered = new HashSet<int>(floodL);
                 powered.UnionWith(floodR);
-                // 短絡: 負荷を除いた導通グラフで左右母線が同一連結成分に属する。
+                // 短絡: 負荷を除いた導通グラフで左右母線フラッド集合が重なる（floodL ∩ floodR が非空）。
                 var shorts = new HashSet<int>(floodL);
                 shorts.IntersectWith(floodR);
                 return new EvalResult

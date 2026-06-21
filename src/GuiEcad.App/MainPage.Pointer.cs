@@ -132,7 +132,7 @@ public sealed partial class MainPage
             {
                 _frameStartMm = (xMm, yMm);
                 _frameCurMm = (xMm, yMm);
-                _selectedFrame = null;
+                ClearSelection();
                 Canvas.CapturePointer(e.Pointer);
             }
             return;
@@ -334,7 +334,7 @@ public sealed partial class MainPage
                     VisualHeightMm = hMm,
                 };
                 _history.Execute(new AddFrameCommand(_sheet, frame));
-                _selectedFrame = frame;
+                SelectFrame(frame);
             }
             Canvas.ReleasePointerCapture(e.Pointer);
             Canvas.Invalidate();

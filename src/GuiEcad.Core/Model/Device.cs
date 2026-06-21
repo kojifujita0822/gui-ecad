@@ -7,7 +7,6 @@ public sealed class Device
 {
     public string Name { get; set; } = "";
     public DeviceClass Class { get; set; }
-    public string? PartId { get; set; }
     /// <summary>部品表(BOM)用: 型式。</summary>
     public string? Model { get; set; }
     /// <summary>部品表(BOM)用: メーカー。</summary>

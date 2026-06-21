@@ -333,6 +333,7 @@ public sealed class DiagramRenderer
     private int LeftBoundary(ElementInstance e)
     {
         var ports = PartResolver.Ports(e, _lib);
+        if (ports.Count == 0) return e.Pos.Column;
         int min = ports[0].BoundaryOffset;
         foreach (var p in ports) min = Math.Min(min, p.BoundaryOffset);
         return e.Pos.Column + min;
@@ -341,6 +342,7 @@ public sealed class DiagramRenderer
     private int RightBoundary(ElementInstance e)
     {
         var ports = PartResolver.Ports(e, _lib);
+        if (ports.Count == 0) return e.Pos.Column + e.CellWidth;
         int max = ports[0].BoundaryOffset;
         foreach (var p in ports) max = Math.Max(max, p.BoundaryOffset);
         return e.Pos.Column + max;

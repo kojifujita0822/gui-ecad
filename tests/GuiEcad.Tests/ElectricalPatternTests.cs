@@ -206,9 +206,9 @@ public class ElectricalPatternTests
         Assert.Equal(10, nl.Nets.Count(n => !n.IsRail));
     }
 
-    // A-8: Counter種別 — Componentを生成しない（記号のみ・非シミュレート）
+    // A-8: Counter種別 — IsLoad=true（コイル的扱い）でComponentを生成する
     [Fact]
-    public void Counter_IsNonSimulated_NoComponent()
+    public void Counter_IsLoad_CreatesComponent()
     {
         var sheet = new Sheet { Grid = new GridSpec { Columns = 4 } };
         sheet.Elements.Add(new ElementInstance
@@ -220,7 +220,8 @@ public class ElectricalPatternTests
 
         var nl = NetlistBuilder.Build(sheet);
 
-        Assert.False(ElementCatalog.CreatesComponent(ElementKind.Counter));
-        Assert.DoesNotContain(nl.Components, c => c.DeviceName == "CTR1");
+        Assert.True(ElementCatalog.IsLoad(ElementKind.Counter));
+        Assert.True(ElementCatalog.CreatesComponent(ElementKind.Counter));
+        Assert.Contains(nl.Components, c => c.DeviceName == "CTR1");
     }
 }

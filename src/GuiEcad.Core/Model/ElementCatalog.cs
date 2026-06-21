@@ -58,9 +58,9 @@ public static class ElementCatalog
         ElementKind.TimerContactNO or ElementKind.TimerContactNC or
         ElementKind.EmergencyStop or ElementKind.ThermalOverload;
 
-    /// <summary>負荷（コイル・ランプ・タイマコイル）か。</summary>
+    /// <summary>負荷（コイル・ランプ・タイマコイル・カウンタコイル）か。</summary>
     public static bool IsLoad(ElementKind k) => k is
-        ElementKind.Coil or ElementKind.Lamp or ElementKind.Timer;
+        ElementKind.Coil or ElementKind.Lamp or ElementKind.Timer or ElementKind.Counter;
 
     /// <summary>常時導通の通過要素（端子台）か。</summary>
     public static bool IsPassthrough(ElementKind k) => k is ElementKind.Terminal;

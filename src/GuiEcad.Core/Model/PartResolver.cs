@@ -43,7 +43,8 @@ public static class PartResolver
             PartRole.Coil => ElementKind.Coil,
             PartRole.Lamp => ElementKind.Lamp,
             PartRole.Terminal => ElementKind.Terminal,
-            _ => ElementKind.ContactNO,   // NonSimulated は CreatesComponent=false で未使用
+            _ => throw new InvalidOperationException(
+                $"ComponentKind called for role '{part.Role}'. Check CreatesComponent before calling ComponentKind."),
         };
     }
 }

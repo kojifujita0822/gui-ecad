@@ -32,10 +32,12 @@ public static class DeviceRenamer
             }
         }
 
-        // DeviceTable のキー移行（from が登録されていれば to へ移す）
-        if (doc.Devices.ByName.TryGetValue(from, out var device))
+        // DeviceTable のキー移行（from が登録されていれば to へ移す。大文字小文字を区別しない）
+        var key = doc.Devices.ByName.Keys
+            .FirstOrDefault(k => string.Equals(k, from, StringComparison.OrdinalIgnoreCase));
+        if (key is not null && doc.Devices.ByName.TryGetValue(key, out var device))
         {
-            doc.Devices.ByName.Remove(from);
+            doc.Devices.ByName.Remove(key);
             device.Name = to;
             doc.Devices.ByName[to] = device;
         }

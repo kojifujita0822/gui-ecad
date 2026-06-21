@@ -54,7 +54,7 @@ public static class BasicPartTemplates
         WidthCells = 1,
         HeightCells = 1,
         Role = PartRole.ContactNC,
-        Ports = { new PortDef("P2", 0, 0), new PortDef("P1", 0, 1) },
+        Ports = TwoPorts(),
         Primitives =
         {
             new PartLine(0.92, -0.42, 0.08, 0.42),       // 斜線
@@ -110,7 +110,7 @@ public static class BasicPartTemplates
         WidthCells = 1,
         HeightCells = 1,
         Role = PartRole.ContactNO,
-        Ports = { new PortDef("P2", 0, 0), new PortDef("P1", 0, 1) },
+        Ports = TwoPorts(),
         Primitives =
         {
             new PartCircle(0.875, 0, 0.125),             // 右端子円

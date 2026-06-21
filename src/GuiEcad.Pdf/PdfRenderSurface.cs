@@ -50,8 +50,6 @@ public sealed class PdfRenderSurface : IRenderSurface
 /// familyName を元に以下の順でフォントを探す：
 ///   Gothic 系名称（"gothic"/"ゴシック"含む）→ Yu Gothic（.ttc）→ Meiryo/MS Gothic → 明朝 → Arial
 ///   それ以外 → Yu Mincho（日本語・単一ttf）→ Arial にフォールバック。
-/// 注: PDFsharp 6.1 以降は TrueType Collection（.ttc）に対応するため、Yu Gothic 等の
-///     .ttc を直接埋め込める（コレクション先頭フォントを使用）。
 /// </summary>
 internal sealed class WindowsFontResolver : IFontResolver
 {
@@ -67,8 +65,7 @@ internal sealed class WindowsFontResolver : IFontResolver
 
     private static bool IsGothicFamily(string name) =>
         name.Contains("Gothic", StringComparison.OrdinalIgnoreCase) ||
-        name.Contains("ゴシック", StringComparison.Ordinal) ||
-        name.Contains("gothic", StringComparison.OrdinalIgnoreCase);
+        name.Contains("ゴシック", StringComparison.Ordinal);
 
     public FontResolverInfo? ResolveTypeface(string familyName, bool isBold, bool isItalic)
     {
@@ -252,7 +249,7 @@ internal sealed class PdfRenderer : IRenderer, IDisposable
             VAlign.Middle => XLineAlignment.Center,
             VAlign.Baseline => XLineAlignment.BaseLine,
             VAlign.Bottom => XLineAlignment.Far,
-            _ => XLineAlignment.Far,
+            _ => XLineAlignment.Near,
         },
     };
 }

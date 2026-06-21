@@ -532,7 +532,7 @@ public sealed partial class MainPage : Page
         if (shortNets?.Count > 0)
             warnings.Add($"デッドショート検出 ({shortNets.Count} ネット)");
 
-        // P3/P2/P6: DRC（テストモード開始時のみ評価=ドキュメント変更なし）
+        // P3/P2/P6: DRC（テストモード中は毎更新時に評価）
         CircuitNumberer.Number(_document);
         var drcAll = DesignRuleCheck.CheckCrossReference(_document, _document.Library)
             .Concat(DesignRuleCheck.CheckDeviceTypeConsistency(_document, _document.Library))
@@ -591,7 +591,7 @@ public sealed partial class MainPage : Page
         => SetRightPanelVisible(!_devicePanelVisible);
 
     private void OnRightPanelToggle(object sender, RoutedEventArgs e)
-        => SetRightPanelVisible(!_devicePanelVisible);
+        => OnDevicePanelToggle(sender, e);
 
     private const double RightPanelWidth = 220;
 
@@ -894,7 +894,7 @@ public sealed partial class MainPage : Page
         if (item.Tag is not (Sheet sheet, ElementInstance elem)) return;
         DeviceListView.SelectedItem = null;   // 選択をリセット（次回の同一機器クリックを有効にする）
         SwitchToSheet(sheet);
-        _selected = elem;
+        SelectElement(elem);
         RefreshPropertiesPanel();
         Canvas.Invalidate();
     }
@@ -975,6 +975,9 @@ public sealed partial class MainPage : Page
 
     private void OnAddSheetBtn(object sender, RoutedEventArgs e)
     {
+        CommitDeviceName(true);
+        CommitComment(true);
+        CommitRungComment(true);
         var def = _document.Settings.DefaultBus;
         var sheet = new Sheet
         {
@@ -983,27 +986,36 @@ public sealed partial class MainPage : Page
         };
         _document.Sheets.Add(sheet);
         _sheet = sheet;
-        _selected = null;
+        ClearSelection();
+        _moving = null;
         if (_testMode) _testSession = GetOrCreateTestSession(_sheet);
         RebuildNavTree();
+        RefreshPropertiesPanel();
+        MarkDirty();
         Canvas.Invalidate();
     }
 
     private void OnDeleteSheetBtn(object sender, RoutedEventArgs e)
     {
         if (_document.Sheets.Count <= 1) return;
+        CommitDeviceName(true);
+        CommitComment(true);
+        CommitRungComment(true);
         var sheet = _sheet;
         int idx = _document.Sheets.IndexOf(sheet);
         _document.Sheets.Remove(sheet);
         _history.RemoveCommandsForSheet(sheet);
         _testSessions.Remove(sheet);
         _sheet = _document.Sheets[Math.Clamp(idx, 0, _document.Sheets.Count - 1)];
-        _selected = null;
+        ClearSelection();
+        _moving = null;
         if (_testMode) _testSession = GetOrCreateTestSession(_sheet);
         _findResults.RemoveAll(r => ReferenceEquals(r.Sheet, sheet));
         if (_findIndex >= _findResults.Count) _findIndex = _findResults.Count - 1;
         RebuildNavTree();
         UpdateFindStatus();
+        RefreshPropertiesPanel();
+        MarkDirty();
         Canvas.Invalidate();
     }
 
@@ -1024,6 +1036,7 @@ public sealed partial class MainPage : Page
         {
             _sheet.Name = box.Text.Trim();
             RebuildNavTree();
+            MarkDirty();
         }
     }
 
@@ -1510,8 +1523,8 @@ public sealed partial class MainPage : Page
                 RefreshDevicePanel();
                 Canvas.Invalidate();
             });
-            AddItem(menu, "コメント編集(F2)", () => { _selected = hitElem; ShowCommentEditor(hitElem); });
-            AddItem(menu, "機器名変更(Enter)", () => { _selected = hitElem; ShowDeviceNameEditor(hitElem); });
+            AddItem(menu, "コメント編集(F2)", () => { SelectElement(hitElem); ShowCommentEditor(hitElem); });
+            AddItem(menu, "機器名変更(Enter)", () => { SelectElement(hitElem); ShowDeviceNameEditor(hitElem); });
         }
         else if (HitTestConnector(xMm, yMm) is VerticalConnector hitVc)
         {
@@ -1667,6 +1680,7 @@ public sealed partial class MainPage : Page
     {
         if (_sheet.Grid.Columns >= MaxColumns) return;
         _sheet.Grid.Columns++;
+        MarkDirty();
         Canvas.Invalidate();
     }
 
@@ -1682,6 +1696,7 @@ public sealed partial class MainPage : Page
         if (_sheet.Grid.Columns > maxRight)
         {
             _sheet.Grid.Columns--;
+            MarkDirty();
             Canvas.Invalidate();
         }
     }
