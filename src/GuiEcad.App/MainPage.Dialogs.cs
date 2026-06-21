@@ -143,12 +143,18 @@ public sealed partial class MainPage
         };
 
         var defaultCheck = new CheckBox { Content = "この母線名を新規シートの既定にする" };
+        var mainCircuitCheck = new CheckBox
+        {
+            Content = "主回路（動力回路）: 母線・自動配線を描かず自由直線で結線",
+            IsChecked = _sheet.MainCircuit,
+        };
 
         var panel = new StackPanel { Spacing = 10 };
         panel.Children.Add(leftBox);
         panel.Children.Add(rightBox);
         panel.Children.Add(voltageBox);
         panel.Children.Add(defaultCheck);
+        panel.Children.Add(mainCircuitCheck);
         panel.Children.Add(colBox);
         panel.Children.Add(rowBox);
 
@@ -165,6 +171,7 @@ public sealed partial class MainPage
 
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
+        _sheet.MainCircuit = mainCircuitCheck.IsChecked == true;
         _sheet.Bus = new BusConfig
         {
             LeftName  = leftBox.Text.Trim().Length > 0 ? leftBox.Text.Trim() : _sheet.Bus.LeftName,

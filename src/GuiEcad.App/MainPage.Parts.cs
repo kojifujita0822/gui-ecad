@@ -288,7 +288,9 @@ public sealed partial class MainPage
         _selectedSet.Clear();
         _placeConnector = tag == "connector";
         _placeFrame = tag == "frame";
+        _placeLine = tag == "line";
         _frameStartMm = null;
+        _lineStartMm = null;
         _connStartRow = null;
         if (tag == "select")
         {

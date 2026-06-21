@@ -12,6 +12,8 @@ public sealed class RenderOptions
     public bool ShowWireNumbers { get; init; } = true;
     /// <summary>左母線の左側に行番号（1 始まり）を表示する。</summary>
     public bool ShowRowNumbers { get; init; } = true;
+    /// <summary>作図ガイドの薄いグリッド線を表示する（既定 false）。</summary>
+    public bool ShowGrid { get; init; }
     /// <summary>接続検査モード: 接続済み配線を青、未結線を黒で表示（docs/rendering.md）。</summary>
     public bool ConnectivityCheck { get; init; }
 }
@@ -100,11 +102,19 @@ public sealed class DiagramRenderer
         int maxRow = 0;
         foreach (var e in sheet.Elements) maxRow = Math.Max(maxRow, e.Pos.Row);
 
-        DrawRails(r, columns, maxRow);
-        DrawBusLabels(r, sheet, columns);
+        if (_opt.ShowGrid) DrawGrid(r, columns, Math.Max(sheet.Grid.Rows, maxRow + 1));
+
+        // 主回路（動力回路）モードでは左右母線・母線名・自動横配線を描かない（自由直線で結線する）。
+        if (!sheet.MainCircuit)
+        {
+            DrawRails(r, columns, maxRow);
+            DrawBusLabels(r, sheet, columns);
+        }
         DrawRowNumbers(r, Math.Max(sheet.Grid.Rows, maxRow + 1));
-        DrawRungWires(r, sheet, columns, elemNet, netlist, report, powered);
+        if (!sheet.MainCircuit)
+            DrawRungWires(r, sheet, columns, elemNet, netlist, report, powered);
         DrawConnectors(r, sheet);
+        DrawFreeLines(r, sheet);
         DrawFrames(r, sheet);
         foreach (var e in sheet.Elements) DrawElement(r, e, energized, sim?.Inputs);
         DrawRungComments(r, sheet, columns);
@@ -287,6 +297,31 @@ public sealed class DiagramRenderer
     }
 
     // 設置場所グルーピング枠（点線矩形＋左上ラベル）
+    // 作図ガイドの薄いグリッド（列境界・行境界の格子）。背面に描く。
+    private void DrawGrid(IRenderer r, int columns, int rows)
+    {
+        var s = _theme.Get(StrokeRole.Grid);
+        double yTop = _opt.MarginMm, yBot = _opt.MarginMm + rows * Cell;
+        for (int c = 0; c <= columns; c++)
+            r.DrawLine(new(X(c), yTop), new(X(c), yBot), s);
+        double xL = X(0), xR = X(columns);
+        for (int rw = 0; rw <= rows; rw++)
+        {
+            double y = _opt.MarginMm + rw * Cell;
+            r.DrawLine(new(xL, y), new(xR, y), s);
+        }
+    }
+
+    // 自由直線（主回路の母線・結線・注記線）。mm 実座標をそのまま描く。
+    private void DrawFreeLines(IRenderer r, Sheet sheet)
+    {
+        foreach (var fl in sheet.FreeLines)
+        {
+            var s = _theme.Get(StrokeRole.Wire) with { Style = fl.Style };
+            r.DrawLine(new(fl.X1Mm, fl.Y1Mm), new(fl.X2Mm, fl.Y2Mm), s);
+        }
+    }
+
     private void DrawFrames(IRenderer r, Sheet sheet)
     {
         var baseStroke = _theme.Get(StrokeRole.GroupFrame);

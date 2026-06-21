@@ -14,6 +14,11 @@ public sealed class Sheet
     public List<CircuitLine> Lines { get; set; } = new();
     /// <summary>右母線の右側に表示する行コメント一覧。</summary>
     public List<RungComment> RungComments { get; set; } = new();
+    /// <summary>グリッドに依存しない自由直線（主回路の母線・結線・注記線）。mm 実座標。</summary>
+    public List<FreeLine> FreeLines { get; set; } = new();
+    /// <summary>主回路（動力回路）モード: 左右母線・母線名・自動横配線を描かず、自由直線で結線する。
+    /// 旧ファイルは false（=従来の制御回路）で互換。</summary>
+    public bool MainCircuit { get; set; }
 }
 
 /// <summary>均一グリッドの行数・列数（セルの mm 寸法は DrawingTheme 側）。Row は内部座標のみ。</summary>

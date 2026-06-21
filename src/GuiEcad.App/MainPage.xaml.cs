@@ -95,6 +95,19 @@ public sealed partial class MainPage : Page
     private (double X, double Y) _frameCurMm;
     private GroupFrame? _selectedFrame;
     private GroupFrame? _editingFrame;
+
+    // 作図ガイドの薄いグリッド表示
+    private bool _showGrid;
+
+    // 自由直線ツール（主回路用・mm 座標・格子点スナップ）
+    private bool _placeLine;
+    private (double X, double Y)? _lineStartMm;
+    private (double X, double Y) _lineCurMm;
+    private FreeLine? _selectedLine;
+    // 自由直線のドラッグ移動
+    private bool _movingLine;
+    private (double X, double Y) _lineMoveClick;
+    private (double X1, double Y1, double X2, double Y2) _lineOrig;
     // 枠ドラッグ移動（mm 座標で自由移動）
     private bool _movingFrame;
     private double _moveFrameOriginX, _moveFrameOriginY; // ドラッグ開始時の枠 VisualXMm/YMm
@@ -179,6 +192,12 @@ public sealed partial class MainPage : Page
         catch { /* 設定保存失敗は致命的でない */ }
     }
 
+    private void OnGridToggle(object sender, RoutedEventArgs e)
+    {
+        _showGrid = GridMenuItem.IsChecked;
+        Canvas.Invalidate();
+    }
+
     // ===== SVG ツールバーアイコン =====
 
     private async Task LoadToolIconsAsync()
@@ -220,13 +239,26 @@ public sealed partial class MainPage : Page
 
     // ===== 描画 =====
 
+    // 自由直線のスナップ細かさ: セルを何分割した格子に吸着するか（4=約2.25mm刻み）。
+    // 整数分割なので列境界(セル境界)・行中心も格子点に含まれ、記号端子に合わせつつ微調整もできる。
+    private const double LineSnapDiv = 4.0;
+
+    // ポインタ mm を細分格子に吸着する。
+    private (double X, double Y) SnapLine(double xMm, double yMm)
+    {
+        double step = _geo.CellMm / LineSnapDiv;
+        double x = Math.Round((xMm - _geo.MarginMm) / step) * step + _geo.MarginMm;
+        double y = Math.Round((yMm - _geo.MarginMm) / step) * step + _geo.MarginMm;
+        return (x, y);
+    }
+
     private void OnDraw(CanvasControl sender, CanvasDrawEventArgs args)
     {
         double scale = DipsPerMm * _zoom;
         var transform = Matrix3x2.CreateScale((float)scale) * Matrix3x2.CreateTranslation((float)_panX, (float)_panY);
 
         var renderer = new Win2DRenderer(args.DrawingSession, transform);
-        var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions { ConnectivityCheck = _connectivityCheck });
+        var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions { ConnectivityCheck = _connectivityCheck, ShowGrid = _showGrid });
         dr.Render(renderer, _sheet, _document.Library, _testSession?.State);
 
         // 検索ハイライト（現在シートの一致のみ描画）
@@ -268,6 +300,11 @@ public sealed partial class MainPage : Page
                 new StrokeStyle(DrawingTheme.Blue, 0.3));
         }
 
+        // 直線ドラッグ中のプレビュー
+        if (_lineStartMm is (double lsx, double lsy))
+            renderer.DrawLine(new(lsx, lsy), new(_lineCurMm.X, _lineCurMm.Y),
+                              new StrokeStyle(DrawingTheme.Blue, 0.3));
+
         // 枠ドラッグ中のプレビュー（mm 連続座標）
         if (_frameStartMm is (double sx, double sy))
         {
@@ -275,6 +312,11 @@ public sealed partial class MainPage : Page
             double fw = Math.Abs(_frameCurMm.X - sx), fh = Math.Abs(_frameCurMm.Y - sy);
             renderer.DrawRectangle(new(fx, fy, fw, fh), new StrokeStyle(DrawingTheme.Blue, 0.25, LineStyle.Dashed));
         }
+
+        // 選択中の自由直線ハイライト
+        if (_selectedLine is FreeLine sl)
+            renderer.DrawLine(new(sl.X1Mm, sl.Y1Mm), new(sl.X2Mm, sl.Y2Mm),
+                              new StrokeStyle(new Color(160, 0, 120, 220), 0.8));
 
         // 選択中の枠ハイライト
         if (_selectedFrame is GroupFrame sf)
@@ -319,7 +361,9 @@ public sealed partial class MainPage : Page
         var tag = (sender as RadioButton)?.Tag as string;
         _placeConnector = tag == "connector";
         _placeFrame = tag == "frame";
+        _placeLine = tag == "line";
         _frameStartMm = null;
+        _lineStartMm = null;
         _connStartRow = null;
         _placePartId = null;
         _placeKind = Enum.TryParse<ElementKind>(tag, out var k) ? k : null;
@@ -1181,6 +1225,35 @@ public sealed partial class MainPage : Page
             _selectedFrame = null;
             Canvas.Invalidate();
         }
+        else if (_selectedLine is not null)
+        {
+            _history.Execute(new DeleteFreeLineCommand(_sheet, _selectedLine));
+            _selectedLine = null;
+            Canvas.Invalidate();
+        }
+    }
+
+    // 点(xMm,yMm)に最も近い自由直線を当たり判定半径内で返す。
+    private FreeLine? HitTestFreeLine(double xMm, double yMm)
+    {
+        double bestDist = _geo.CellMm * 0.3;   // 当たり判定半径(mm)
+        FreeLine? best = null;
+        foreach (var fl in _sheet.FreeLines)
+        {
+            double d = DistPointToSegment(xMm, yMm, fl.X1Mm, fl.Y1Mm, fl.X2Mm, fl.Y2Mm);
+            if (d <= bestDist) { bestDist = d; best = fl; }
+        }
+        return best;
+    }
+
+    private static double DistPointToSegment(double px, double py, double ax, double ay, double bx, double by)
+    {
+        double dx = bx - ax, dy = by - ay;
+        double len2 = dx * dx + dy * dy;
+        if (len2 < 1e-9) return Math.Sqrt((px - ax) * (px - ax) + (py - ay) * (py - ay));
+        double t = Math.Clamp(((px - ax) * dx + (py - ay) * dy) / len2, 0, 1);
+        double cx = ax + t * dx, cy = ay + t * dy;
+        return Math.Sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
     }
 
     private GroupFrame? HitTestFrame(double xMm, double yMm)

@@ -27,11 +27,12 @@ public sealed partial class MainPage
 {
     // ===== ポインタ =====
 
-    // 要素／縦コネクタ／枠の選択は相互排他。選んだ1種以外を null にする（分岐ごとの重複クリアを集約）。
-    private void SelectElement(ElementInstance e) { _selected = e; _selectedConnector = null; _selectedFrame = null; }
-    private void SelectConnector(VerticalConnector c) { _selectedConnector = c; _selected = null; _selectedFrame = null; }
-    private void SelectFrame(GroupFrame f) { _selectedFrame = f; _selected = null; _selectedConnector = null; }
-    private void ClearSelection() { _selected = null; _selectedConnector = null; _selectedFrame = null; }
+    // 要素／縦コネクタ／枠／自由直線の選択は相互排他。選んだ1種以外を null にする（分岐ごとの重複クリアを集約）。
+    private void SelectElement(ElementInstance e) { _selected = e; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; }
+    private void SelectConnector(VerticalConnector c) { _selectedConnector = c; _selected = null; _selectedFrame = null; _selectedLine = null; }
+    private void SelectFrame(GroupFrame f) { _selectedFrame = f; _selected = null; _selectedConnector = null; _selectedLine = null; }
+    private void SelectLine(FreeLine l) { _selectedLine = l; _selected = null; _selectedConnector = null; _selectedFrame = null; }
+    private void ClearSelection() { _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; }
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
@@ -125,6 +126,20 @@ public sealed partial class MainPage
             return;
         }
 
+        // 作画モード：直線ツール（2点ドラッグ・格子点スナップ）
+        if (_placeLine)
+        {
+            if (xMm >= 0 && yMm >= 0)
+            {
+                var p = SnapLine(xMm, yMm);
+                _lineStartMm = p;
+                _lineCurMm = p;
+                ClearSelection();
+                Canvas.CapturePointer(e.Pointer);
+            }
+            return;
+        }
+
         // 作画モード：枠ツール（ドラッグ開始・mm 連続座標）
         if (_placeFrame)
         {
@@ -197,6 +212,13 @@ public sealed partial class MainPage
             _moveFrameClickX = xMm;
             _moveFrameClickY = yMm;
         }
+        else if (HitTestFreeLine(xMm, yMm) is FreeLine hitLine)
+        {
+            SelectLine(hitLine);
+            _movingLine = true;
+            _lineMoveClick = (xMm, yMm);
+            _lineOrig = (hitLine.X1Mm, hitLine.Y1Mm, hitLine.X2Mm, hitLine.Y2Mm);
+        }
         else
         {
             ClearSelection();
@@ -241,6 +263,14 @@ public sealed partial class MainPage
             return;
         }
 
+        // 直線ドラッグ中：終端を格子点スナップで追従
+        if (_lineStartMm is not null)
+        {
+            _lineCurMm = SnapLine(sxMm, syMm);
+            Canvas.Invalidate();
+            return;
+        }
+
         // 枠ドラッグ中：終端座標を追従してプレビュー（mm 連続座標）
         if (_frameStartMm is not null)
         {
@@ -258,6 +288,18 @@ public sealed partial class MainPage
                 _movingConnector.Column = newCol;
                 Canvas.Invalidate();
             }
+            return;
+        }
+
+        // 自由直線のドラッグ移動（細分格子スナップで平行移動）
+        if (_movingLine && _selectedLine is FreeLine ml)
+        {
+            double step = _geo.CellMm / LineSnapDiv;
+            double dx = Math.Round((sxMm - _lineMoveClick.X) / step) * step;
+            double dy = Math.Round((syMm - _lineMoveClick.Y) / step) * step;
+            ml.X1Mm = _lineOrig.X1 + dx; ml.Y1Mm = _lineOrig.Y1 + dy;
+            ml.X2Mm = _lineOrig.X2 + dx; ml.Y2Mm = _lineOrig.Y2 + dy;
+            Canvas.Invalidate();
             return;
         }
 
@@ -305,6 +347,18 @@ public sealed partial class MainPage
                 _sheet.Elements.Where(e => e.Pos.Row >= r1 && e.Pos.Row <= r2
                                         && e.Pos.Column >= c1 && e.Pos.Column <= c2));
             Canvas.ReleasePointerCapture(e.Pointer);
+            Canvas.Invalidate();
+            return;
+        }
+
+        // 直線ドラッグの確定（格子点間）
+        if (_lineStartMm is (double lsx, double lsy))
+        {
+            _lineStartMm = null;
+            var (lex, ley) = _lineCurMm;
+            if (Math.Abs(lex - lsx) > 0.01 || Math.Abs(ley - lsy) > 0.01)
+                _history.Execute(new PlaceFreeLineCommand(_sheet,
+                    new FreeLine { X1Mm = lsx, Y1Mm = lsy, X2Mm = lex, Y2Mm = ley }));
             Canvas.Invalidate();
             return;
         }
@@ -375,6 +429,16 @@ public sealed partial class MainPage
                 movFr2.VisualXMm!.Value, movFr2.VisualYMm!.Value));
         _movingFrame = false;
 
+        // 自由直線のドラッグ移動の確定（位置が変わっていれば）
+        if (_movingLine && _selectedLine is FreeLine rl)
+        {
+            var (ox1, oy1, ox2, oy2) = _lineOrig;
+            if (rl.X1Mm != ox1 || rl.Y1Mm != oy1 || rl.X2Mm != ox2 || rl.Y2Mm != oy2)
+                _history.Execute(new MoveFreeLineCommand(_sheet, rl, ox1, oy1, ox2, oy2,
+                    rl.X1Mm, rl.Y1Mm, rl.X2Mm, rl.Y2Mm));
+        }
+        _movingLine = false;
+
         // ドラッグ移動のコマンド登録（位置が変わっていれば）
         if (_moving is not null && _moving.Pos != _moveStartPos)
             _history.Execute(new MoveElementCommand(_sheet, _moving, _moveStartPos, _moving.Pos));
@@ -394,6 +458,8 @@ public sealed partial class MainPage
         _rangeSelecting = false;
         _connStartRow = null;
         _frameStartMm = null;
+        _lineStartMm = null;
+        _movingLine = false;
     }
 
     // キャプチャ喪失（フライアウト表示・フォーカス移動等）で PointerReleased が来ないと

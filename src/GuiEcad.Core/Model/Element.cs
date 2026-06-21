@@ -53,6 +53,24 @@ public sealed class ElementInstance
     };
 }
 
+/// <summary>
+/// グリッドに依存しない自由直線。主回路（三相動力）の母線・結線・注記線に使う。
+/// 座標は mm 実座標（GroupFrame の VisualXMm と同じ流儀）。
+/// </summary>
+public sealed class FreeLine
+{
+    public double X1Mm { get; set; }
+    public double Y1Mm { get; set; }
+    public double X2Mm { get; set; }
+    public double Y2Mm { get; set; }
+    public LineStyle Style { get; set; } = LineStyle.Solid;
+
+    public FreeLine DeepClone() => new()
+    {
+        X1Mm = X1Mm, Y1Mm = Y1Mm, X2Mm = X2Mm, Y2Mm = Y2Mm, Style = Style,
+    };
+}
+
 /// <summary>同一列で複数行をつなぐ縦渡り（分岐）。接点に黒ドット● を描画して明示。</summary>
 public sealed class VerticalConnector
 {

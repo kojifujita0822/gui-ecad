@@ -34,6 +34,50 @@ internal sealed class DeleteElementCommand : IUndoCommand
     public void Undo() => _sheet.Elements.Add(_element);
 }
 
+internal sealed class PlaceFreeLineCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly FreeLine _line;
+
+    public PlaceFreeLineCommand(Sheet sheet, FreeLine line) { _sheet = sheet; _line = line; }
+
+    public Sheet Target => _sheet;
+    public void Execute() => _sheet.FreeLines.Add(_line);
+    public void Undo() => _sheet.FreeLines.Remove(_line);
+}
+
+internal sealed class DeleteFreeLineCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly FreeLine _line;
+
+    public DeleteFreeLineCommand(Sheet sheet, FreeLine line) { _sheet = sheet; _line = line; }
+
+    public Sheet Target => _sheet;
+    public void Execute() => _sheet.FreeLines.Remove(_line);
+    public void Undo() => _sheet.FreeLines.Add(_line);
+}
+
+internal sealed class MoveFreeLineCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly FreeLine _line;
+    private readonly double _ox1, _oy1, _ox2, _oy2, _nx1, _ny1, _nx2, _ny2;
+
+    public MoveFreeLineCommand(Sheet sheet, FreeLine line,
+        double ox1, double oy1, double ox2, double oy2,
+        double nx1, double ny1, double nx2, double ny2)
+    {
+        _sheet = sheet; _line = line;
+        _ox1 = ox1; _oy1 = oy1; _ox2 = ox2; _oy2 = oy2;
+        _nx1 = nx1; _ny1 = ny1; _nx2 = nx2; _ny2 = ny2;
+    }
+
+    public Sheet Target => _sheet;
+    public void Execute() { _line.X1Mm = _nx1; _line.Y1Mm = _ny1; _line.X2Mm = _nx2; _line.Y2Mm = _ny2; }
+    public void Undo() { _line.X1Mm = _ox1; _line.Y1Mm = _oy1; _line.X2Mm = _ox2; _line.Y2Mm = _oy2; }
+}
+
 internal sealed class MoveElementCommand : IUndoCommand
 {
     private readonly Sheet _sheet;

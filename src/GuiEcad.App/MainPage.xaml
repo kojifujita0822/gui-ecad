@@ -121,6 +121,7 @@
                 <MenuFlyoutItem Text="全体表示" KeyboardAcceleratorTextOverride="Ctrl+0" Click="OnFit" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="DevicePanelMenuItem" Text="機器表を表示" Click="OnDevicePanelToggle" />
+                <ToggleMenuFlyoutItem x:Name="GridMenuItem" Text="グリッド表示" Click="OnGridToggle" />
                 <MenuFlyoutSeparator />
                 <ToggleMenuFlyoutItem x:Name="DarkModeMenuItem" Text="ダークモード" Click="OnDarkModeToggle" />
             </MenuBarItem>
@@ -314,6 +315,13 @@
                             <StackPanel>
                                 <TextBlock Width="44" Height="32" FontSize="18" HorizontalAlignment="Center" TextAlignment="Center" Text="&#x25A1;" />
                                 <TextBlock FontSize="10" HorizontalAlignment="Center" Text="枠" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton GroupName="Tools" Style="{StaticResource ToolBtnStyle}" Tag="line"
+                                     Checked="OnToolSelected" ToolTipService.ToolTip="自由直線（主回路の母線・結線。格子点に吸着して2点ドラッグ）">
+                            <StackPanel>
+                                <TextBlock Width="44" Height="32" FontSize="22" HorizontalAlignment="Center" TextAlignment="Center" Text="&#x2571;" />
+                                <TextBlock FontSize="10" HorizontalAlignment="Center" Text="直線" />
                             </StackPanel>
                         </RadioButton>
                         <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource AppDividerBrush}" />
