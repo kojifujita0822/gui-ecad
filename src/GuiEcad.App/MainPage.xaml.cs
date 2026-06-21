@@ -132,6 +132,7 @@ public sealed partial class MainPage : Page
     public MainPage()
     {
         InitializeComponent();
+        LoadTheme();
         _document = new LadderDocument();
         _document.Sheets.Add(BuildSampleSheet());
         _sheet = _document.Sheets[0];
@@ -142,6 +143,40 @@ public sealed partial class MainPage : Page
             InitShapeFolder();        // _folderEntries を先に用意（その他▼の自作図形に必要）
             RebuildOtherPartMenu();
         };
+    }
+
+    // ===== テーマ（ライト/ダーク） =====
+
+    private static string ThemeSettingPath =>
+        System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "GuiEcad", "ui-theme.txt");
+
+    // 起動時に保存済みテーマを適用する（未保存ならシステム既定のまま）。
+    private void LoadTheme()
+    {
+        try
+        {
+            if (System.IO.File.Exists(ThemeSettingPath) &&
+                System.IO.File.ReadAllText(ThemeSettingPath).Trim() == "Dark")
+            {
+                RootGrid.RequestedTheme = ElementTheme.Dark;
+                DarkModeMenuItem.IsChecked = true;
+            }
+        }
+        catch { /* 設定読込失敗は無視（既定テーマで続行） */ }
+    }
+
+    private void OnDarkModeToggle(object sender, RoutedEventArgs e)
+    {
+        var theme = DarkModeMenuItem.IsChecked ? ElementTheme.Dark : ElementTheme.Light;
+        RootGrid.RequestedTheme = theme;
+        _ = LoadToolIconsAsync();   // テーマに合わせてツールアイコンを再生成（黒/明色）
+        try
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(ThemeSettingPath)!);
+            System.IO.File.WriteAllText(ThemeSettingPath, theme == ElementTheme.Dark ? "Dark" : "Light");
+        }
+        catch { /* 設定保存失敗は致命的でない */ }
     }
 
     // ===== SVG ツールバーアイコン =====
@@ -160,8 +195,11 @@ public sealed partial class MainPage : Page
             (ElementKind.Lamp,           IconLamp),
             (ElementKind.Terminal,       IconTerminal),
         };
+        // ダークテーマでは黒線アイコンが背景に埋もれるため明色で生成する。
+        bool dark = RootGrid.ActualTheme == ElementTheme.Dark;
+        var iconColor = dark ? new Color(255, 220, 220, 225) : DrawingTheme.Black;
         foreach (var (kind, img) in items)
-            img.Source = await SvgToImageSourceAsync(SvgRenderer.GenerateSymbolSvg(kind));
+            img.Source = await SvgToImageSourceAsync(SvgRenderer.GenerateSymbolSvg(kind, color: iconColor));
     }
 
     private static async Task<SvgImageSource> SvgToImageSourceAsync(string svg)

@@ -8,9 +8,42 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
-                <!-- Other merged dictionaries here -->
+                <!-- アプリ独自のセマンティックブラシ。RequestedTheme(Light/Dark)で自動切替する。
+                     UIシェル(メニュー/ツールバー/各パネル/ステータス)に階調を与え領域を区別する。
+                     キャンバス(図面)は黒線・黒記号のため両テーマとも白地固定（紙メタファー）。 -->
+                <ResourceDictionary>
+                    <ResourceDictionary.ThemeDictionaries>
+                        <!-- ===== ライト ===== -->
+                        <ResourceDictionary x:Key="Light">
+                            <SolidColorBrush x:Key="AppToolbarBackgroundBrush" Color="#FFF3F3F4" />
+                            <SolidColorBrush x:Key="AppPaletteBackgroundBrush" Color="#FFE9EAEC" />
+                            <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#FFF6F7F8" />
+                            <SolidColorBrush x:Key="AppPanelHeaderBrush" Color="#FFE2E5EA" />
+                            <SolidColorBrush x:Key="AppDividerBrush" Color="#FFCBCDD2" />
+                            <SolidColorBrush x:Key="AppCanvasBackgroundBrush" Color="#FFFFFFFF" />
+                            <SolidColorBrush x:Key="AppStatusBarBackgroundBrush" Color="#FF2B3A55" />
+                            <SolidColorBrush x:Key="AppStatusBarForegroundBrush" Color="#FFEDF0F5" />
+                            <SolidColorBrush x:Key="AppStatusBarDividerBrush" Color="#33FFFFFF" />
+                            <SolidColorBrush x:Key="AppStatusDirtyBrush" Color="#FFFFC857" />
+                            <SolidColorBrush x:Key="AppStatusWarnBrush" Color="#FFFF8A80" />
+                        </ResourceDictionary>
+                        <!-- ===== ダーク ===== -->
+                        <ResourceDictionary x:Key="Dark">
+                            <SolidColorBrush x:Key="AppToolbarBackgroundBrush" Color="#FF2D2D30" />
+                            <SolidColorBrush x:Key="AppPaletteBackgroundBrush" Color="#FF252527" />
+                            <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#FF1F1F22" />
+                            <SolidColorBrush x:Key="AppPanelHeaderBrush" Color="#FF333338" />
+                            <SolidColorBrush x:Key="AppDividerBrush" Color="#FF3F3F46" />
+                            <SolidColorBrush x:Key="AppCanvasBackgroundBrush" Color="#FFFFFFFF" />
+                            <SolidColorBrush x:Key="AppStatusBarBackgroundBrush" Color="#FF0E639C" />
+                            <SolidColorBrush x:Key="AppStatusBarForegroundBrush" Color="#FFEDF0F5" />
+                            <SolidColorBrush x:Key="AppStatusBarDividerBrush" Color="#33FFFFFF" />
+                            <SolidColorBrush x:Key="AppStatusDirtyBrush" Color="#FFFFD166" />
+                            <SolidColorBrush x:Key="AppStatusWarnBrush" Color="#FFFF8A80" />
+                        </ResourceDictionary>
+                    </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
             </ResourceDictionary.MergedDictionaries>
-            <!-- Other app resources here -->
         </ResourceDictionary>
     </Application.Resources>
 </Application>

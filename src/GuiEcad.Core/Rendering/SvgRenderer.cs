@@ -104,7 +104,7 @@ public sealed class SvgRenderer : IRenderer
 
     // ツールバーアイコン用 SVG 文字列を生成する。
     // cell=8mm, vpad=cell*0.62 でタイマ△(高さ cell*0.58)まで収まる。
-    public static string GenerateSymbolSvg(ElementKind kind, double strokeWidthMm = 0.35)
+    public static string GenerateSymbolSvg(ElementKind kind, double strokeWidthMm = 0.35, Color? color = null)
     {
         const double cell = 8.0;
         const double hpad = 0.5;
@@ -115,7 +115,7 @@ public sealed class SvgRenderer : IRenderer
         var sb = new StringBuilder();
         sb.Append($"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"{F(-hpad)} {F(-vpad)} {F(vbW)} {F(vbH)}\" width=\"{F(vbW)}\" height=\"{F(vbH)}\">\n");
 
-        var stroke = new StrokeStyle(DrawingTheme.Black, strokeWidthMm);
+        var stroke = new StrokeStyle(color ?? DrawingTheme.Black, strokeWidthMm);
         var renderer = new SvgRenderer(sb);
         SymbolGlyphs.Draw(renderer, stroke, kind, cell, cell);
 

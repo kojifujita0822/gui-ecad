@@ -71,7 +71,7 @@
         </Style>
     </Page.Resources>
 
-    <Grid KeyboardAcceleratorPlacementMode="Hidden">
+    <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" KeyboardAcceleratorPlacementMode="Hidden">
         <Grid.KeyboardAccelerators>
             <KeyboardAccelerator Modifiers="Control" Key="Z" Invoked="OnUndoAccelerator" />
             <KeyboardAccelerator Modifiers="Control" Key="Y" Invoked="OnRedoAccelerator" />
@@ -91,7 +91,7 @@
         </Grid.RowDefinitions>
 
         <!-- メニューバー -->
-        <MenuBar x:Name="TopMenuBar" Grid.Row="0">
+        <MenuBar x:Name="TopMenuBar" Grid.Row="0" Background="{ThemeResource AppToolbarBackgroundBrush}">
             <MenuBarItem Title="ファイル(F)">
                 <MenuFlyoutItem Text="新規(N)" KeyboardAcceleratorTextOverride="Ctrl+N" Click="OnMenuNew" />
                 <MenuFlyoutItem Text="開く(O)..." KeyboardAcceleratorTextOverride="Ctrl+O" Click="OnMenuOpen" />
@@ -121,6 +121,8 @@
                 <MenuFlyoutItem Text="全体表示" KeyboardAcceleratorTextOverride="Ctrl+0" Click="OnFit" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="DevicePanelMenuItem" Text="機器表を表示" Click="OnDevicePanelToggle" />
+                <MenuFlyoutSeparator />
+                <ToggleMenuFlyoutItem x:Name="DarkModeMenuItem" Text="ダークモード" Click="OnDarkModeToggle" />
             </MenuBarItem>
             <MenuBarItem x:Name="ShapeMenuBarItem" Title="図形(G)" />
             <MenuBarItem Title="ヘルプ(H)">
@@ -133,13 +135,13 @@
         <!-- 標準ツールバー (P5: 操作系ボタン) -->
         <Border
             Grid.Row="1"
-            Background="{ThemeResource LayerFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+            Background="{ThemeResource AppToolbarBackgroundBrush}"
+            BorderBrush="{ThemeResource AppDividerBrush}"
             BorderThickness="0,0,0,1">
             <StackPanel Orientation="Horizontal" Padding="4,2" Spacing="2" VerticalAlignment="Center">
                 <!-- モード切替 -->
                 <ToggleButton x:Name="TestModeBtn" VerticalAlignment="Center" Click="OnTestModeToggle" Content="テスト" />
-                <Rectangle Margin="4,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" Width="1" />
+                <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- Undo / Redo -->
                 <Button VerticalAlignment="Center" Click="OnMenuUndo" ToolTipService.ToolTip="元に戻す (Ctrl+Z)">
                     <FontIcon Glyph="&#xE7A7;" FontSize="14" />
@@ -147,15 +149,15 @@
                 <Button VerticalAlignment="Center" Click="OnMenuRedo" ToolTipService.ToolTip="やり直し (Ctrl+Y)">
                     <FontIcon Glyph="&#xE7A6;" FontSize="14" />
                 </Button>
-                <Rectangle Margin="4,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" Width="1" />
+                <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- 削除 -->
                 <Button VerticalAlignment="Center" Click="OnDelete" ToolTipService.ToolTip="選択削除 (Del)">
                     <FontIcon Glyph="&#xE74D;" FontSize="14" />
                 </Button>
-                <Rectangle Margin="4,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" Width="1" />
+                <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- 接続検査 -->
                 <ToggleButton x:Name="ConnectivityToggle" VerticalAlignment="Center" Click="OnConnectivityToggle" Content="接続検査" />
-                <Rectangle Margin="4,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" Width="1" />
+                <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- ズーム -->
                 <Button VerticalAlignment="Center" Click="OnZoomIn" ToolTipService.ToolTip="拡大 (Ctrl++)">
                     <FontIcon Glyph="&#xE8A3;" FontSize="14" />
@@ -166,15 +168,15 @@
                 <Button VerticalAlignment="Center" Click="OnFit" ToolTipService.ToolTip="全体表示 (Ctrl+0)">
                     <FontIcon Glyph="&#xE9A6;" FontSize="14" />
                 </Button>
-                <Rectangle Margin="4,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" Width="1" />
+                <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- 列 -->
                 <Button VerticalAlignment="Center" Click="OnRemoveColumn" Content="列－" ToolTipService.ToolTip="列を減らす" />
                 <Button VerticalAlignment="Center" Click="OnAddColumn" Content="列＋" ToolTipService.ToolTip="列を増やす" />
-                <Rectangle Margin="4,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" Width="1" />
+                <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- 行 -->
                 <Button VerticalAlignment="Center" Click="OnInsertRowBtn" Content="行＋" ToolTipService.ToolTip="末尾に行追加 (Ctrl+Shift+↑)" />
                 <Button VerticalAlignment="Center" Click="OnDeleteRowBtn" Content="行－" ToolTipService.ToolTip="末尾の行削除 (Ctrl+Shift+↓)" />
-                <Rectangle Margin="4,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" Width="1" />
+                <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- PDF -->
                 <Button VerticalAlignment="Center" Click="OnMenuExportPdf" ToolTipService.ToolTip="PDF出力">
                     <StackPanel Orientation="Horizontal" Spacing="3">
@@ -185,7 +187,7 @@
                 <!-- タイマ時限（テストモード時のみ有効） -->
                 <StackPanel x:Name="TimerTickPanel" Orientation="Horizontal" Spacing="4"
                             VerticalAlignment="Center" Visibility="Collapsed">
-                    <Rectangle Margin="4,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" Width="1" />
+                    <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                     <TextBlock Text="Tick" VerticalAlignment="Center" FontSize="12" />
                     <NumberBox
                         x:Name="TickValueBox"
@@ -220,8 +222,8 @@
                 Grid.Row="0"
                 Grid.RowSpan="3"
                 Grid.Column="0"
-                Background="{ThemeResource LayerFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                Background="{ThemeResource AppPaletteBackgroundBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
                 BorderThickness="0,0,1,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel x:Name="ToolStackPanel" Orientation="Vertical" Padding="2" Spacing="1" Width="64">
@@ -238,7 +240,7 @@
                                 <TextBlock FontSize="10" HorizontalAlignment="Center" Text="選択" />
                             </StackPanel>
                         </RadioButton>
-                        <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource AppDividerBrush}" />
                         <!-- 接点系 -->
                         <RadioButton GroupName="Tools" Style="{StaticResource ToolBtnStyle}" Tag="ContactNO" Checked="OnToolSelected">
                             <StackPanel>
@@ -276,7 +278,7 @@
                                 <TextBlock FontSize="10" HorizontalAlignment="Center" Text="タイマNC" />
                             </StackPanel>
                         </RadioButton>
-                        <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource AppDividerBrush}" />
                         <!-- 出力系 -->
                         <RadioButton GroupName="Tools" Style="{StaticResource ToolBtnStyle}" Tag="Coil" Checked="OnToolSelected">
                             <StackPanel>
@@ -296,7 +298,7 @@
                                 <TextBlock FontSize="10" HorizontalAlignment="Center" Text="端子" />
                             </StackPanel>
                         </RadioButton>
-                        <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource AppDividerBrush}" />
                         <!-- 特殊 -->
                         <RadioButton GroupName="Tools" Style="{StaticResource ToolBtnStyle}" Tag="connector"
                                      Checked="OnToolSelected" ToolTipService.ToolTip="縦コネクタ（並列分岐）：列の交点を上から下へドラッグ">
@@ -312,7 +314,7 @@
                                 <TextBlock FontSize="10" HorizontalAlignment="Center" Text="枠" />
                             </StackPanel>
                         </RadioButton>
-                        <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource AppDividerBrush}" />
                         <!-- その他 -->
                         <DropDownButton x:Name="OtherPartButton" HorizontalAlignment="Center" FontSize="11" Content="その他▼"
                                         ToolTipService.ToolTip="セレクトSW・サーマル等">
@@ -334,16 +336,18 @@
                 Grid.Row="0"
                 Grid.RowSpan="2"
                 Grid.Column="1"
-                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
                 BorderThickness="0,0,1,0"
-                Background="{ThemeResource LayerFillColorDefaultBrush}">
+                Background="{ThemeResource AppPanelBackgroundBrush}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Text="シート" FontSize="11" FontWeight="SemiBold" Padding="8,5" />
+                    <Border Grid.Row="0" Background="{ThemeResource AppPanelHeaderBrush}">
+                        <TextBlock Text="シート" FontSize="11" FontWeight="SemiBold" Padding="8,5" />
+                    </Border>
                     <TreeView
                         x:Name="NavTree"
                         Grid.Row="1"
@@ -364,8 +368,8 @@
                 Grid.Column="2"
                 Grid.ColumnSpan="2"
                 Visibility="Collapsed"
-                Background="{ThemeResource LayerFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                Background="{ThemeResource AppToolbarBackgroundBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="6,3">
                 <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
@@ -385,7 +389,7 @@
                     <Rectangle
                         Width="1"
                         Margin="4,2"
-                        Fill="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        Fill="{ThemeResource AppDividerBrush}"
                         VerticalAlignment="Stretch" />
                     <TextBox x:Name="ReplaceBox" Width="130" PlaceholderText="置換後の機器名" />
                     <Button Content="置換" Click="OnReplaceOne" />
@@ -395,7 +399,7 @@
             </Border>
 
             <!-- Canvas + インラインテキストオーバーレイ -->
-            <Grid Grid.Row="1" Grid.Column="2" Background="White">
+            <Grid Grid.Row="1" Grid.Column="2" Background="{ThemeResource AppCanvasBackgroundBrush}">
                 <canvas:CanvasControl
                     x:Name="Canvas"
                     Draw="OnDraw"
@@ -461,9 +465,9 @@
                 Grid.Column="1"
                 Grid.ColumnSpan="3"
                 Height="130"
-                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
                 BorderThickness="0,1,0,0"
-                Background="{ThemeResource LayerFillColorDefaultBrush}">
+                Background="{ThemeResource AppPanelBackgroundBrush}">
                 <TabView
                     x:Name="OutputTabView"
                     TabWidthMode="SizeToContent"
@@ -489,7 +493,7 @@
                             </Grid.RowDefinitions>
                             <Border
                                 Grid.Row="0"
-                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                BorderBrush="{ThemeResource AppDividerBrush}"
                                 BorderThickness="0,0,0,1"
                                 Padding="4,2">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -528,7 +532,7 @@
                             </Grid.RowDefinitions>
                             <Border
                                 Grid.Row="0"
-                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                BorderBrush="{ThemeResource AppDividerBrush}"
                                 BorderThickness="0,0,0,1"
                                 Padding="4,2">
                                 <Button Content="接続検査実行" Click="OnRunConnectivity" />
@@ -550,9 +554,9 @@
                 Grid.Column="3"
                 Width="0"
                 Visibility="Collapsed"
-                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
                 BorderThickness="1,0,0,0"
-                Background="{ThemeResource LayerFillColorDefaultBrush}">
+                Background="{ThemeResource AppPanelBackgroundBrush}">
                 <TabView
                     x:Name="RightPanelTabView"
                     TabWidthMode="SizeToContent"
@@ -582,8 +586,8 @@
                 Grid.Row="0"
                 Grid.RowSpan="3"
                 Grid.Column="4"
-                Background="{ThemeResource LayerFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                Background="{ThemeResource AppPaletteBackgroundBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
                 BorderThickness="1,0,0,0">
                 <Grid Width="28">
                     <!-- 右パネル開閉（中央・三角ハンドル） -->
@@ -605,10 +609,9 @@
         <!-- ステータスバー (P6: 強化版) -->
         <Border
             Grid.Row="3"
-            Background="{ThemeResource LayerFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-            BorderThickness="0,1,0,0"
-            Padding="8,2">
+            Background="{ThemeResource AppStatusBarBackgroundBrush}"
+            BorderThickness="0"
+            Padding="8,3">
             <Grid>
                 <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Left">
                     <TextBlock
@@ -616,25 +619,28 @@
                         FontSize="11"
                         FontWeight="SemiBold"
                         Text="作画モード"
+                        Foreground="{ThemeResource AppStatusBarForegroundBrush}"
                         VerticalAlignment="Center" />
-                    <Rectangle Width="1" Margin="0,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" />
+                    <Rectangle Width="1" Margin="0,2" Fill="{ThemeResource AppStatusBarDividerBrush}" VerticalAlignment="Stretch" />
                     <TextBlock
                         x:Name="StatusPos"
                         FontSize="11"
                         Text="行: -  列: -"
+                        Foreground="{ThemeResource AppStatusBarForegroundBrush}"
                         VerticalAlignment="Center" />
-                    <Rectangle Width="1" Margin="0,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" />
+                    <Rectangle Width="1" Margin="0,2" Fill="{ThemeResource AppStatusBarDividerBrush}" VerticalAlignment="Stretch" />
                     <TextBlock
                         x:Name="StatusSheet"
                         FontSize="11"
                         Text="シート 1 / 1"
+                        Foreground="{ThemeResource AppStatusBarForegroundBrush}"
                         VerticalAlignment="Center" />
-                    <Rectangle Width="1" Margin="0,2" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" VerticalAlignment="Stretch" />
+                    <Rectangle Width="1" Margin="0,2" Fill="{ThemeResource AppStatusBarDividerBrush}" VerticalAlignment="Stretch" />
                     <TextBlock
                         x:Name="StatusDirty"
                         FontSize="11"
                         Text=""
-                        Foreground="#C05000"
+                        Foreground="{ThemeResource AppStatusDirtyBrush}"
                         Visibility="Collapsed"
                         VerticalAlignment="Center" />
                 </StackPanel>
@@ -644,7 +650,7 @@
                     Visibility="Collapsed"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Center"
-                    Foreground="#D40000" />
+                    Foreground="{ThemeResource AppStatusWarnBrush}" />
             </Grid>
         </Border>
     </Grid>
