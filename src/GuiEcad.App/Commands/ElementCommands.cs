@@ -256,6 +256,25 @@ internal sealed class AddRungCommentCommand : IUndoCommand
     public void Undo() => _sheet.RungComments.Remove(_comment);
 }
 
+/// <summary>行挿入・削除コマンドで共有する行シフト処理。枠の高さ調整は各コマンド側に残す（条件が非対称なため）。</summary>
+internal static class RowOps
+{
+    // threshold 以上(inclusive=true)／超過(false)の行に乗る要素・コネクタ・ラング注釈を delta 行ずらす。
+    public static void ShiftRows(Sheet sheet, int threshold, int delta, bool inclusive)
+    {
+        bool Hit(int row) => inclusive ? row >= threshold : row > threshold;
+        foreach (var e in sheet.Elements)
+            if (Hit(e.Pos.Row)) e.Pos = e.Pos with { Row = e.Pos.Row + delta };
+        foreach (var c in sheet.Connectors)
+        {
+            if (Hit(c.TopRow)) c.TopRow += delta;
+            if (Hit(c.BottomRow)) c.BottomRow += delta;
+        }
+        foreach (var rc in sheet.RungComments)
+            if (Hit(rc.Row)) rc.Row += delta;
+    }
+}
+
 internal sealed class InsertRowCommand : IUndoCommand
 {
     private readonly Sheet _sheet;
@@ -266,35 +285,19 @@ internal sealed class InsertRowCommand : IUndoCommand
     public void Execute()
     {
         _sheet.Grid.Rows++;
-        foreach (var e in _sheet.Elements)
-            if (e.Pos.Row >= _targetRow) e.Pos = e.Pos with { Row = e.Pos.Row + 1 };
-        foreach (var c in _sheet.Connectors)
-        {
-            if (c.TopRow >= _targetRow) c.TopRow++;
-            if (c.BottomRow >= _targetRow) c.BottomRow++;
-        }
+        RowOps.ShiftRows(_sheet, _targetRow, +1, inclusive: true);
         foreach (var f in _sheet.Frames)
             if (f.TopLeft.Row >= _targetRow) f.TopLeft = f.TopLeft with { Row = f.TopLeft.Row + 1 };
             else if (f.TopLeft.Row + f.Height > _targetRow) f.Height++;
-        foreach (var rc in _sheet.RungComments)
-            if (rc.Row >= _targetRow) rc.Row++;
     }
 
     public void Undo()
     {
         _sheet.Grid.Rows--;
-        foreach (var e in _sheet.Elements)
-            if (e.Pos.Row > _targetRow) e.Pos = e.Pos with { Row = e.Pos.Row - 1 };
-        foreach (var c in _sheet.Connectors)
-        {
-            if (c.TopRow > _targetRow) c.TopRow--;
-            if (c.BottomRow > _targetRow) c.BottomRow--;
-        }
+        RowOps.ShiftRows(_sheet, _targetRow, -1, inclusive: false);
         foreach (var f in _sheet.Frames)
             if (f.TopLeft.Row > _targetRow) f.TopLeft = f.TopLeft with { Row = f.TopLeft.Row - 1 };
             else if (f.TopLeft.Row + f.Height > _targetRow) f.Height--;
-        foreach (var rc in _sheet.RungComments)
-            if (rc.Row > _targetRow) rc.Row--;
     }
 }
 
@@ -328,34 +331,18 @@ internal sealed class DeleteRowCommand : IUndoCommand
             else if (f.TopLeft.Row < _targetRow && f.TopLeft.Row + f.Height - 1 >= _targetRow)
                 { _shrunkFrames.Add((f, f.Height)); f.Height--; }
         }
-        foreach (var e in _sheet.Elements)
-            if (e.Pos.Row > _targetRow) e.Pos = e.Pos with { Row = e.Pos.Row - 1 };
-        foreach (var c in _sheet.Connectors)
-        {
-            if (c.TopRow > _targetRow) c.TopRow--;
-            if (c.BottomRow > _targetRow) c.BottomRow--;
-        }
+        RowOps.ShiftRows(_sheet, _targetRow, -1, inclusive: false);
         foreach (var f in _sheet.Frames)
             if (f.TopLeft.Row > _targetRow) f.TopLeft = f.TopLeft with { Row = f.TopLeft.Row - 1 };
-        foreach (var rc in _sheet.RungComments)
-            if (rc.Row > _targetRow) rc.Row--;
         _sheet.Grid.Rows--;
     }
 
     public void Undo()
     {
         _sheet.Grid.Rows++;
-        foreach (var e in _sheet.Elements)
-            if (e.Pos.Row >= _targetRow) e.Pos = e.Pos with { Row = e.Pos.Row + 1 };
-        foreach (var c in _sheet.Connectors)
-        {
-            if (c.TopRow >= _targetRow) c.TopRow++;
-            if (c.BottomRow >= _targetRow) c.BottomRow++;
-        }
+        RowOps.ShiftRows(_sheet, _targetRow, +1, inclusive: true);
         foreach (var f in _sheet.Frames)
             if (f.TopLeft.Row >= _targetRow) f.TopLeft = f.TopLeft with { Row = f.TopLeft.Row + 1 };
-        foreach (var rc in _sheet.RungComments)
-            if (rc.Row >= _targetRow) rc.Row++;
         foreach (var e in _removedElements) _sheet.Elements.Add(e);
         foreach (var c in _removedConnectors) _sheet.Connectors.Add(c);
         foreach (var rc in _removedComments) _sheet.RungComments.Add(rc);
