@@ -51,8 +51,12 @@ public sealed partial class MainPage
 
         // スペースキー保持中は全ツール共通でパン（テストモード除く）
         // KeyDown フラグ＋GetKeyStateForCurrentThread の二重判定（Canvas がキーイベントを吸収する環境に対応）
-        bool spaceDown = !_testMode && (_spacePanActive ||
-            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Space) & CoreVirtualKeyStates.Down) != 0);
+        // 物理的にスペースが押されていなければ KeyUp の取りこぼしに備えてフラグを必ず落とす。
+        // （残ると以降のクリックが常にパンになり、要素を選択できなくなる）
+        bool spacePhysical =
+            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Space) & CoreVirtualKeyStates.Down) != 0;
+        if (!spacePhysical) _spacePanActive = false;
+        bool spaceDown = !_testMode && (_spacePanActive || spacePhysical);
         if (spaceDown)
         {
             _panning = true;
@@ -247,6 +251,7 @@ public sealed partial class MainPage
         var (sxMm, syMm) = ToWorld(pos);
         int sRow = _geo.RowAt(syMm), sCol = _geo.ColAt(sxMm);
         StatusPos.Text = $"行: {Math.Max(sRow + 1, 1)}  列: {Math.Max(sCol + 1, 1)}";
+        if (sRow >= 0 && sCol >= 0) _hoverCell = new GridPos(sRow, sCol);   // ペースト基準に使用
 
         if (_rangeSelecting)
         {
@@ -422,11 +427,13 @@ public sealed partial class MainPage
             _history.Execute(new MoveConnectorCommand(_sheet, _movingConnector, _connMoveStartColumn, _movingConnector.Column));
         _movingConnector = null;
 
-        // 枠ドラッグ移動の確定
+        // 枠ドラッグ移動の確定（実際に移動して Visual 座標が確定したときのみ）。
+        // VisualXMm/YMm が null（=ドラッグせずクリックのみ・グリッド由来の枠）だと
+        // 旧コードは null!.Value でアンラップして例外→クラッシュしていた。
         if (_movingFrame && _selectedFrame is GroupFrame movFr2
-            && (movFr2.VisualXMm != _moveFrameOriginX || movFr2.VisualYMm != _moveFrameOriginY))
-            _history.Execute(new MoveFrameCommand(_sheet, movFr2, _moveFrameOriginX, _moveFrameOriginY,
-                movFr2.VisualXMm!.Value, movFr2.VisualYMm!.Value));
+            && movFr2.VisualXMm is double newFx && movFr2.VisualYMm is double newFy
+            && (newFx != _moveFrameOriginX || newFy != _moveFrameOriginY))
+            _history.Execute(new MoveFrameCommand(_sheet, movFr2, _moveFrameOriginX, _moveFrameOriginY, newFx, newFy));
         _movingFrame = false;
 
         // 自由直線のドラッグ移動の確定（位置が変わっていれば）

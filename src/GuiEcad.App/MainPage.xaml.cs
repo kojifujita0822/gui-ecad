@@ -125,6 +125,7 @@ public sealed partial class MainPage : Page
     // コピー・ペースト
     private sealed record ClipboardData(List<ElementInstance> Elements, int OriginRow, int OriginCol);
     private ClipboardData? _clipboard;
+    private GridPos _hoverCell;   // 直近のマウス位置セル（ペースト基準・OnPointerMoved で更新）
 
     // 検索・置換（全シート横断）
     private List<(Sheet Sheet, ElementInstance El)> _findResults = new();
@@ -197,6 +198,36 @@ public sealed partial class MainPage : Page
         _showGrid = GridMenuItem.IsChecked;
         Canvas.Invalidate();
     }
+
+    // ===== フロートツールパレット（Jw_cad 風・タイトルバーをドラッグで移動） =====
+    // 保留: XAML 側（ToolOverlay / ToolPaletteFloat / ToolPaletteHandle）が未整備のため一時無効化。
+    //       XAML を揃えたら下記ハンドラを復活させて配線する。詳細は docs/todo.md。
+    // private bool _paletteDragging;
+    // private Point _paletteDragOffset;
+    //
+    // private void OnPalettePressed(object sender, PointerRoutedEventArgs e)
+    // {
+    //     _paletteDragging = true;
+    //     var p = e.GetCurrentPoint(ToolOverlay).Position;
+    //     double cl = Canvas.GetLeft(ToolPaletteFloat); if (double.IsNaN(cl)) cl = 0;
+    //     double ct = Canvas.GetTop(ToolPaletteFloat);  if (double.IsNaN(ct)) ct = 0;
+    //     _paletteDragOffset = new Point(p.X - cl, p.Y - ct);
+    //     ToolPaletteHandle.CapturePointer(e.Pointer);
+    // }
+    //
+    // private void OnPaletteMoved(object sender, PointerRoutedEventArgs e)
+    // {
+    //     if (!_paletteDragging) return;
+    //     var p = e.GetCurrentPoint(ToolOverlay).Position;
+    //     Canvas.SetLeft(ToolPaletteFloat, Math.Max(0, p.X - _paletteDragOffset.X));
+    //     Canvas.SetTop(ToolPaletteFloat, Math.Max(0, p.Y - _paletteDragOffset.Y));
+    // }
+    //
+    // private void OnPaletteReleased(object sender, PointerRoutedEventArgs e)
+    // {
+    //     _paletteDragging = false;
+    //     ToolPaletteHandle.ReleasePointerCapture(e.Pointer);
+    // }
 
     // ===== SVG ツールバーアイコン =====
 
@@ -1144,40 +1175,30 @@ public sealed partial class MainPage : Page
             OriginCol: minCol);
     }
 
-    private string? ResolveUniqueName(string? name)
-    {
-        if (name is null) return null;
-        var existing = new HashSet<string>(
-            _document.Sheets.SelectMany(s => s.Elements)
-                .Select(e => e.DeviceName)
-                .Where(n => n is not null)!,
-            StringComparer.OrdinalIgnoreCase);
-        if (!existing.Contains(name)) return name;
-        for (int i = 2; i < 999; i++)
-        {
-            string candidate = $"{name}_{i}";
-            if (!existing.Contains(candidate)) return candidate;
-        }
-        return name;
-    }
-
     private void PasteSelection()
     {
         if (_clipboard is null) return;
-        int baseRow = _selected?.Pos.Row ?? 0;
-        int baseCol = _selected?.Pos.Column ?? 0;
+        // 貼り付け基準はマウス位置セル（クリップボードの左上が来る）。
+        // 範囲選択コピー後は _selected が null になるため、マウス位置を優先する。
+        int baseRow = _hoverCell.Row;
+        int baseCol = _hoverCell.Column;
 
-        var cmds = _clipboard.Elements
+        var placedList = _clipboard.Elements
             .Select(e =>
             {
                 var placed = e.DeepClone();
                 placed.Pos = new GridPos(baseRow + e.Pos.Row, baseCol + e.Pos.Column);
-                placed.DeviceName = ResolveUniqueName(placed.DeviceName);
-                return (IUndoCommand)new PlaceElementCommand(_sheet, placed);
+                // 機器名はそのまま複製（同名＝同一機器を指す。自動リネームしない）
+                return placed;
             })
             .ToList();
 
+        var cmds = placedList.Select(p => (IUndoCommand)new PlaceElementCommand(_sheet, p)).ToList();
         _history.Execute(new BatchCommand(_sheet, cmds));
+
+        // 貼り付け直後は新要素を選択状態にして、続けて移動・削除できるようにする。
+        _selectedSet = new HashSet<ElementInstance>(placedList);
+        ClearSelection();
         RefreshDevicePanel();
         Canvas.Invalidate();
     }
@@ -1624,8 +1645,24 @@ public sealed partial class MainPage : Page
         var (xMm, yMm) = ToWorld(pos);
         int row = _geo.RowAt(yMm), col = _geo.ColAt(xMm);
         var menu = new MenuFlyout();
+        var ctxElem = HitTest(row, col);
 
-        if (HitTest(row, col) is ElementInstance hitElem)
+        // --- コピー＆貼り付け（要素上／範囲選択中はコピー、クリップボードがあればクリック位置へ貼り付け） ---
+        if (ctxElem is not null || _selectedSet.Count > 0)
+            AddItem(menu, "コピー(Ctrl+C)", () =>
+            {
+                if (_selectedSet.Count == 0 && ctxElem is not null) SelectElement(ctxElem);
+                CopySelection();
+            });
+        if (_clipboard is not null && row >= 0 && col >= 0)
+            AddItem(menu, "貼り付け(Ctrl+V)", () =>
+            {
+                _hoverCell = new GridPos(row, col);   // クリック位置を左上に貼り付け
+                PasteSelection();
+            });
+        int afterCopyPaste = menu.Items.Count;
+
+        if (ctxElem is ElementInstance hitElem)
         {
             AddItem(menu, "削除(Del)", () =>
             {
@@ -1696,6 +1733,10 @@ public sealed partial class MainPage : Page
                     Canvas.Invalidate();
                 });
         }
+
+        // コピー＆貼り付けと以降の項目の間に区切り線を挿入
+        if (afterCopyPaste > 0 && menu.Items.Count > afterCopyPaste)
+            menu.Items.Insert(afterCopyPaste, new MenuFlyoutSeparator());
 
         if (menu.Items.Count > 0)
         {

@@ -8,8 +8,6 @@
 - [x] **PDFフォントのゴシック化** — PDF出力が明朝（Yu Mincho）になっていた不具合を修正。`WindowsFontResolver` を `.ttc` 対応化し、Yu Gothic（YuGothR/B.ttc）→ Meiryo → MS Gothic の順で解決。PDFsharp 6.2.4 はカスタムリゾルバ経由の `.ttc` を直接読めず `OpenTypeFontFace` で NRE になるため、TTC 先頭フォントを単一 sfnt へ再構成して埋め込む（`ExtractSingleFont`）。埋め込みフォントが `Yu Gothic Regular`/`Yu Gothic,Bold` になることを確認。完了 2026-06-21。
 
 ## 作図・データモデル
-- [ ] **配線（横線）の個別削除** — 保留。要モデル拡張（どのセル間の線を削除したか記録）。具体的なユースケース未確定のため着手条件はユーザー判断。
-- [ ] **線番の手動固定** — 要素追加・削除時の再採番タイミング（自動再採番か固定かの方針未確定）。
 - [x] **部品リスト（BOM）UI** — 「図面(D)→部品リスト(BOM)」。図面から機器名を自動列挙し型式/メーカー/数量を編集（`OnBomEditor`）。`Device` に `Model`/`Maker`/`Quantity` を追加し `DeviceTable.ByName` に永続化。完了 2026-06-21。
 - [x] **部品リスト（BOM）の PDF 出力** — BOM 専用ページを PDF 出力の末尾に追加。完了 2026-06-21（commit 8b07879）。
 - [x] **新規シートの母線名デフォルト** — 新規シートは `Settings.DefaultBus` を使用。シート設定ダイアログに「この母線名を新規シートの既定にする」チェック追加。完了 2026-06-21。
@@ -30,7 +28,7 @@
 
 ## 操作機能（追加候補）
 （2026-06-21 調査: 以下はすべてコード実装済み。実機動作確認を行うこと）
-- [ ] **範囲選択・コピー・ペースト** — CopySelection/PasteSelection (MainPage.xaml.cs L1263-1319)、機器名自動リネーム実装済み
+- [x] **範囲選択・コピー・ペースト** — 「選択」ツールで空白からドラッグ＝範囲選択（青破線）。Ctrl+C／Ctrl+V（マウス位置へ貼付・機器名はコピー元と同じまま）。右クリックメニューからもコピー／貼り付け可能。完了 2026-06-22。
 - [x] **選択位置への行追加・削除** — `InsertRowCommand` / `DeleteRowCommand` (ElementCommands.cs L259-370)、右クリックメニューからも操作可能
 - [x] **全モードの空白ドラッグスクロール** — スペースキーパン `_spacePanActive` (MainPage.xaml.cs L96, 1417-)
 - [x] **右クリックコンテキストメニュー（作画モード）** — `ShowDrawingContextMenu` (L2293-)、`OnCanvasRightTapped` で統一
@@ -71,3 +69,4 @@
 | テストモード修正 | NetlistBuilder 末尾 Passthrough 自動接続（端子台でコイルが通電されないバグ修正） |
 | プロパティパネル | SelectSwitch ノッチ位置・Timer 設定時間の Params 編集 UI（SetParamCommand/Undo対応） |
 | ユーティリティ | ヘルプメニュー「再起動」ボタン・端子台サイズ直径 0.3 セル確定 |
+| 不具合修正（2026-06-22） | 範囲選択コピペ改善（マウス位置貼付・機器名維持・右クリック対応）／枠移動時の null アンラップ クラッシュ／スペースパン後に選択不能になる不具合／ツールボタンの VisualState 競合（選択中ホバーで選択解除に見える）。XAML VisualState 競合の静的解析テストを追加 |
