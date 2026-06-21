@@ -222,11 +222,16 @@ internal sealed class PdfRenderer : IRenderer, IDisposable
 
     private static XPen Pen(StrokeStyle s)
     {
-        var pen = new XPen(XColor.FromArgb(s.Color.A, s.Color.R, s.Color.G, s.Color.B), Math.Max(s.Width, 0.05) * K)
+        var pen = new XPen(XColor.FromArgb(s.Color.A, s.Color.R, s.Color.G, s.Color.B), Math.Max(s.Width, DrawingTheme.MinStrokeWidthMm) * K)
         {
-            DashStyle = s.Style switch { LineStyle.Dashed => XDashStyle.Dash, LineStyle.Dotted => XDashStyle.Dot, _ => XDashStyle.Solid },
             LineCap = s.Cap switch { LineCap.Round => XLineCap.Round, LineCap.Square => XLineCap.Square, _ => XLineCap.Flat },
         };
+        // 破線は線幅倍数のカスタムパターンで Win2D/SVG と同一比率に揃える（XDashStyle のネイティブ値は使わない）。
+        switch (s.Style)
+        {
+            case LineStyle.Dashed: pen.DashPattern = new[] { DrawingTheme.DashOn, DrawingTheme.DashOff }; break;
+            case LineStyle.Dotted: pen.DashPattern = new[] { DrawingTheme.DotOn, DrawingTheme.DotOff }; break;
+        }
         return pen;
     }
 
@@ -241,6 +246,13 @@ internal sealed class PdfRenderer : IRenderer, IDisposable
     private static XStringFormat Format(TextStyle s) => new()
     {
         Alignment = s.HAlign switch { HAlign.Center => XStringAlignment.Center, HAlign.Right => XStringAlignment.Far, _ => XStringAlignment.Near },
-        LineAlignment = s.VAlign switch { VAlign.Top => XLineAlignment.Near, VAlign.Middle => XLineAlignment.Center, VAlign.Baseline => XLineAlignment.BaseLine, _ => XLineAlignment.Far },
+        LineAlignment = s.VAlign switch
+        {
+            VAlign.Top => XLineAlignment.Near,
+            VAlign.Middle => XLineAlignment.Center,
+            VAlign.Baseline => XLineAlignment.BaseLine,
+            VAlign.Bottom => XLineAlignment.Far,
+            _ => XLineAlignment.Far,
+        },
     };
 }

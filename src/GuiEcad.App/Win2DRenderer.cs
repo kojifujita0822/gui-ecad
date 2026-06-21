@@ -90,7 +90,15 @@ internal sealed class Win2DRenderer : IRenderer
         using var layout = Layout(text, style);
         var b = layout.LayoutBounds;
         double x = style.HAlign switch { HAlign.Center => position.X - b.Width / 2, HAlign.Right => position.X - b.Width, _ => position.X };
-        double y = style.VAlign switch { VAlign.Middle => position.Y - b.Height / 2, VAlign.Bottom or VAlign.Baseline => position.Y - b.Height, _ => position.Y };
+        // VAlign は描画原点(レイアウト上端)を基準に position.Y へ合わせる。
+        // Baseline はフォントのベースライン、Bottom は下辺。PDF/SVG と同一意味で揃える。
+        double y = style.VAlign switch
+        {
+            VAlign.Middle => position.Y - b.Height / 2,
+            VAlign.Bottom => position.Y - b.Height,
+            VAlign.Baseline => position.Y - (layout.LineMetrics.Length > 0 ? layout.LineMetrics[0].Baseline : b.Height),
+            _ => position.Y,   // Top
+        };
         _g.DrawTextLayout(layout, new Vector2((float)x, (float)y), Col(style.Color));
     }
 
@@ -115,13 +123,26 @@ internal sealed class Win2DRenderer : IRenderer
 
     private static Vector2 V(Point2D p) => new((float)p.X, (float)p.Y);
     private static WinColor Col(Color c) => WinColor.FromArgb(c.A, c.R, c.G, c.B);
-    private static float W(StrokeStyle s) => (float)Math.Max(s.Width, 0.01);
+    private static float W(StrokeStyle s) => (float)Math.Max(s.Width, DrawingTheme.MinStrokeWidthMm);
 
-    private static CanvasStrokeStyle Style(StrokeStyle s) => new()
+    private static CanvasStrokeStyle Style(StrokeStyle s)
     {
-        DashStyle = s.Style switch { LineStyle.Dashed => CanvasDashStyle.Dash, LineStyle.Dotted => CanvasDashStyle.Dot, _ => CanvasDashStyle.Solid },
-        StartCap = Cap(s.Cap), EndCap = Cap(s.Cap), DashCap = Cap(s.Cap),
-    };
+        var cs = new CanvasStrokeStyle { StartCap = Cap(s.Cap), EndCap = Cap(s.Cap), DashCap = Cap(s.Cap) };
+        // 破線は線幅倍数のカスタムパターンで PDF/SVG と同一比率に揃える（CanvasDashStyle のネイティブ値はライブラリ依存のため使わない）。
+        switch (s.Style)
+        {
+            case LineStyle.Dashed:
+                cs.CustomDashStyle = new[] { (float)DrawingTheme.DashOn, (float)DrawingTheme.DashOff };
+                break;
+            case LineStyle.Dotted:
+                cs.CustomDashStyle = new[] { (float)DrawingTheme.DotOn, (float)DrawingTheme.DotOff };
+                break;
+            default:
+                cs.DashStyle = CanvasDashStyle.Solid;
+                break;
+        }
+        return cs;
+    }
 
     private static CanvasCapStyle Cap(LineCap c) => c switch
     {

@@ -29,6 +29,7 @@ public sealed class SvgRenderer : IRenderer
         if (_stack.Count > 0) (_tx, _ty, _scale) = _stack.Pop();
     }
 
+    // クリップは非対応（アイコン生成にクリップ不要）。契約上 no-op。
     public void PushClip(Rect2D rect) { }
     public void PopClip() { }
 
@@ -95,6 +96,7 @@ public sealed class SvgRenderer : IRenderer
         _sb.Append($"  <path d=\"M{F(sx)},{F(sy)} A{F(r)},{F(r)} 0 {largeArc} {sweepFlag} {F(ex)},{F(ey)}\" {Stroke(stroke)}/>\n");
     }
 
+    // テキストは非対応（アイコン生成に文字なし）。契約上 no-op。MeasureText は概算のみ返す。
     public void DrawText(string text, Point2D position, TextStyle style) { }
 
     public Size2D MeasureText(string text, TextStyle style)
@@ -128,9 +130,13 @@ public sealed class SvgRenderer : IRenderer
     private string Stroke(StrokeStyle s)
     {
         string w = F(s.Width * _scale);
-        string dash = s.Style == LineStyle.Dashed
-            ? $" stroke-dasharray=\"{F(s.Width * _scale * 3)},{F(s.Width * _scale * 2)}\""
-            : "";
+        // 破線は線幅倍数の比率で Win2D/PDF と揃える（DrawingTheme の Dash/Dot 定数）。
+        string dash = s.Style switch
+        {
+            LineStyle.Dashed => $" stroke-dasharray=\"{F(s.Width * _scale * DrawingTheme.DashOn)},{F(s.Width * _scale * DrawingTheme.DashOff)}\"",
+            LineStyle.Dotted => $" stroke-dasharray=\"{F(s.Width * _scale * DrawingTheme.DotOn)},{F(s.Width * _scale * DrawingTheme.DotOff)}\"",
+            _ => "",
+        };
         string cap = s.Cap switch
         {
             LineCap.Round => " stroke-linecap=\"round\"",

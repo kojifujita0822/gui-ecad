@@ -20,6 +20,13 @@ public sealed class DrawingTheme
     public static readonly Color ManualForced = new(110, 0, 80, 220);  // テストモード: 接点手動強制（半透明青）
     public static readonly Color GridGray = new(255, 210, 210, 210);
 
+    /// <summary>線幅の最小クランプ(mm)。画面(Win2D)とPDFで同一に保ち、極細線がどちらでも消えないようにする。</summary>
+    public const double MinStrokeWidthMm = 0.05;
+
+    // 破線の ON,OFF 長（線幅の倍数）。全バックエンドで同一比率にして見た目を揃える。
+    public const double DashOn = 4.0, DashOff = 2.0;   // Dashed
+    public const double DotOn = 1.0, DotOff = 2.0;     // Dotted
+
     public string FontFamily { get; init; } = "Yu Gothic UI";
 
     public StrokeStyle Get(StrokeRole role) => role switch
