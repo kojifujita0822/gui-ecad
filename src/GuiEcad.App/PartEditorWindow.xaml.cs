@@ -49,9 +49,13 @@ public sealed partial class PartEditorWindow : Window
     private Vector2 _rotCenter;
     private double _rotStartAng;
 
-    // Undo/Redo（プリミティブ＋ポートのスナップショット）
-    private readonly Stack<(List<PartPrimitive> P, List<PortDef> Q)> _undo = new();
-    private readonly Stack<(List<PartPrimitive> P, List<PortDef> Q)> _redo = new();
+    // Undo/Redo（プリミティブ・ポート・サイズ・役割のスナップショット）
+    private readonly Stack<EditorSnapshot> _undo = new();
+    private readonly Stack<EditorSnapshot> _redo = new();
+
+    // ドラッグ確定用の保留 Undo（掴んだ時点の状態。実際に変化したらリリース時に確定する＝空 Undo を積まない）
+    private EditorSnapshot? _pendingUndo;
+    private bool _dragChanged;
 
     // 画面レイアウト（OnDraw で更新・ヒットテストで共有）
     private double _cellPx = 60, _originX, _originY;
@@ -383,7 +387,7 @@ public sealed partial class PartEditorWindow : Window
                 {
                     _movingSel = true;
                     _moveLast = local;
-                    PushUndo();
+                    BeginDragUndo();
                     EditCanvas.CapturePointer(e.Pointer);
                 }
                 UpdateStatus();
@@ -400,7 +404,7 @@ public sealed partial class PartEditorWindow : Window
                     _rotCenter = Center(_rotOrig);
                     _rotStartAng = Math.Atan2(raw.Y - _rotCenter.Y, raw.X - _rotCenter.X);
                     _rotating = true;
-                    PushUndo();
+                    BeginDragUndo();
                     EditCanvas.CapturePointer(e.Pointer);
                 }
                 UpdateStatus();
@@ -450,6 +454,7 @@ public sealed partial class PartEditorWindow : Window
             double deg = (Math.Atan2(raw.Y - _rotCenter.Y, raw.X - _rotCenter.X) - _rotStartAng) * 180.0 / Math.PI;
             deg = Math.Round(deg / 15.0) * 15.0;   // 15度スナップ
             _prims[_selPrim] = RotatePrim(_rotOrig, _rotCenter, deg);
+            if (deg != 0) _dragChanged = true;
             EditCanvas.Invalidate();
             return;
         }
@@ -466,6 +471,7 @@ public sealed partial class PartEditorWindow : Window
                 if (_selPrim >= 0) _prims[_selPrim] = Translate(_prims[_selPrim], d.X, d.Y);
                 else if (_selPort >= 0) MovePort(d);
                 _moveLast = local;
+                _dragChanged = true;
                 EditCanvas.Invalidate();
             }
             return;
@@ -480,8 +486,8 @@ public sealed partial class PartEditorWindow : Window
 
         EditCanvas.ReleasePointerCapture(e.Pointer);
 
-        if (_rotating) { _rotating = false; _rotOrig = null; UpdateStatus(); return; }
-        if (_movingSel) { _movingSel = false; UpdateStatus(); return; }
+        if (_rotating) { _rotating = false; _rotOrig = null; CommitDragUndo(); UpdateStatus(); return; }
+        if (_movingSel) { _movingSel = false; CommitDragUndo(); UpdateStatus(); return; }
         if (!_dragging) return;
         _dragging = false;
 
@@ -766,32 +772,55 @@ public sealed partial class PartEditorWindow : Window
 
     // ===== Undo/Redo =====
 
+    // 図形・ポートに加えサイズ・役割も含む（LoadTemplate がこれらを変更するため Undo 復元対象にする）。
+    private readonly record struct EditorSnapshot(
+        List<PartPrimitive> Prims, List<PortDef> Ports, int W, int H, PartRole Role);
+
+    private EditorSnapshot Snapshot() => new(new(_prims), new(_ports), _w, _h, CurrentRole());
+
     private void PushUndo()
     {
-        _undo.Push((new(_prims), new(_ports)));
+        _undo.Push(Snapshot());
         _redo.Clear();
+    }
+
+    // ドラッグ開始時に掴んだ状態を保留する。実際に変化したらリリース時に確定。
+    private void BeginDragUndo()
+    {
+        _pendingUndo = Snapshot();
+        _dragChanged = false;
+    }
+
+    // ドラッグ中に変化していれば保留分を Undo スタックへ確定する（無変化なら空 Undo を積まない）。
+    private void CommitDragUndo()
+    {
+        if (_dragChanged && _pendingUndo is { } snap) { _undo.Push(snap); _redo.Clear(); }
+        _pendingUndo = null;
+        _dragChanged = false;
     }
 
     private void OnUndo(object sender, RoutedEventArgs e)
     {
         if (_undo.Count == 0) return;
-        _redo.Push((new(_prims), new(_ports)));
-        var (p, q) = _undo.Pop();
-        ReplaceAll(p, q);
+        _redo.Push(Snapshot());
+        ReplaceAll(_undo.Pop());
     }
 
     private void OnRedo(object sender, RoutedEventArgs e)
     {
         if (_redo.Count == 0) return;
-        _undo.Push((new(_prims), new(_ports)));
-        var (p, q) = _redo.Pop();
-        ReplaceAll(p, q);
+        _undo.Push(Snapshot());
+        ReplaceAll(_redo.Pop());
     }
 
-    private void ReplaceAll(List<PartPrimitive> p, List<PortDef> q)
+    private void ReplaceAll(EditorSnapshot snap)
     {
-        _prims.Clear(); _prims.AddRange(p);
-        _ports.Clear(); _ports.AddRange(q);
+        _prims.Clear(); _prims.AddRange(snap.Prims);
+        _ports.Clear(); _ports.AddRange(snap.Ports);
+        _w = snap.W; _h = snap.H;
+        if (WidthBox is not null) WidthBox.Value = _w;
+        if (HeightBox is not null) HeightBox.Value = _h;
+        SelectRole(snap.Role);
         _selPrim = _selPort = -1;
         UpdateStatus();
         EditCanvas.Invalidate();
