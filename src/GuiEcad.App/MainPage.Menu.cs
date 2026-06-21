@@ -216,6 +216,16 @@ public sealed partial class MainPage
                           pageNumber: pageNum, totalPages: totalPages, enableBorder: enableBorder);
                 surface.EndPage();
             }
+
+            // 機器表が1件以上あるとき BOM 専用ページを最後に追加する
+            var devices = _document.Devices;
+            if (devices.ByName.Count > 0)
+            {
+                int lastColumns = _document.Sheets[^1].Grid.Columns;
+                var bomRenderer = surface.BeginPage(dr.BomPageSize(lastColumns, devices.ByName.Count));
+                dr.RenderBomPage(bomRenderer, devices, lastColumns);
+                surface.EndPage();
+            }
         }
         catch (Exception ex) { await ShowErrorAsync(ex.Message); }
     }

@@ -423,6 +423,95 @@ public sealed class DiagramRenderer
             multiPage ? $"{c.PageNumber}-{c.CircuitNumber}" : c.CircuitNumber.ToString()));
     }
 
+    // ---- BOM（部品表）ページ ----
+
+    private const double BomDevColW   = 20.0;
+    private const double BomClassColW = 20.0;
+    private const double BomModelColW = 45.0;
+    private const double BomMakerColW = 45.0;
+
+    /// <summary>BOM 専用ページのサイズ。<paramref name="columns"/> は最終シートの列数。</summary>
+    public Size2D BomPageSize(int columns, int deviceCount)
+    {
+        double w = RightBusX(columns) + _opt.MarginMm;
+        double h = _opt.MarginMm + Cell * 1.5
+                 + (deviceCount + 1) * TableRowH
+                 + Cell * 0.4 + _opt.MarginMm;
+        return new Size2D(w, h);
+    }
+
+    /// <summary>BOM ページを描画する。機器が 0 件なら何もしない。</summary>
+    public void RenderBomPage(IRenderer r, DeviceTable devices, int columns)
+    {
+        var entries = devices.ByName.Values
+            .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (entries.Count == 0) return;
+
+        double rh = TableRowH;
+        double x0 = X(0);
+        double x1 = x0 + BomDevColW;
+        double x2 = x1 + BomClassColW;
+        double x3 = x2 + BomModelColW;
+        double x4 = x3 + BomMakerColW;
+        double x5 = X(columns);
+        double pad = 1.0;
+
+        var titleStyle = _theme.Text(TextRole.CrossRef) with
+        {
+            Bold = true, FontSizeMm = 3.5, HAlign = HAlign.Center, VAlign = VAlign.Middle,
+        };
+        r.DrawText("部品表", new((x0 + x5) / 2, _opt.MarginMm + Cell * 0.75), titleStyle);
+
+        double y0 = _opt.MarginMm + Cell * 1.5;
+        var outline = _theme.Get(StrokeRole.SymbolOutline) with { Width = DrawingTheme.TableLineWidth };
+        var headerText = _theme.Text(TextRole.CrossRef) with { Bold = true, FontSizeMm = 2.4, VAlign = VAlign.Middle };
+        var cellText = _theme.Text(TextRole.CrossRef) with { FontSizeMm = 2.2, VAlign = VAlign.Middle };
+
+        DrawBomRow(r, outline, x0, y0, x1, x2, x3, x4, x5, rh, fill: true);
+        DrawCellText(r, "機器名",   x0, y0, rh, pad, headerText);
+        DrawCellText(r, "種別",     x1, y0, rh, pad, headerText);
+        DrawCellText(r, "型式",     x2, y0, rh, pad, headerText);
+        DrawCellText(r, "メーカー", x3, y0, rh, pad, headerText);
+        DrawCellText(r, "数量",     x4, y0, rh, pad, headerText);
+
+        for (int i = 0; i < entries.Count; i++)
+        {
+            double yi = y0 + (i + 1) * rh;
+            var d = entries[i];
+            DrawBomRow(r, outline, x0, yi, x1, x2, x3, x4, x5, rh, fill: false);
+            DrawCellText(r, d.Name,                    x0, yi, rh, pad, cellText);
+            DrawCellText(r, DeviceClassLabel(d.Class), x1, yi, rh, pad, cellText);
+            DrawCellText(r, d.Model ?? "—",            x2, yi, rh, pad, cellText);
+            DrawCellText(r, d.Maker ?? "—",            x3, yi, rh, pad, cellText);
+            DrawCellText(r, d.Quantity.ToString(),     x4, yi, rh, pad, cellText);
+        }
+    }
+
+    private static void DrawBomRow(IRenderer r, StrokeStyle s,
+        double x0, double y, double x1, double x2, double x3, double x4, double x5, double rh, bool fill)
+    {
+        if (fill) r.FillRectangle(new(x0, y, x5 - x0, rh), DrawingTheme.TableHeaderFill);
+        r.DrawRectangle(new(x0, y, x5 - x0, rh), s);
+        r.DrawLine(new(x1, y), new(x1, y + rh), s);
+        r.DrawLine(new(x2, y), new(x2, y + rh), s);
+        r.DrawLine(new(x3, y), new(x3, y + rh), s);
+        r.DrawLine(new(x4, y), new(x4, y + rh), s);
+    }
+
+    private static string DeviceClassLabel(DeviceClass c) => c switch
+    {
+        DeviceClass.Relay        => "リレー",
+        DeviceClass.PushButton   => "押しボタン",
+        DeviceClass.SelectSwitch => "切替SW",
+        DeviceClass.Lamp         => "表示灯",
+        DeviceClass.Timer        => "タイマ",
+        DeviceClass.Counter      => "カウンタ",
+        DeviceClass.Terminal     => "端子台",
+        DeviceClass.Other        => "その他",
+        _                        => c.ToString(),
+    };
+
     // 要素記号（ローカル座標へ平行移動して描く）。energized で通電色、inputs で手動強制の青塗りを制御。
     private void DrawElement(IRenderer r, ElementInstance e, Dictionary<string, bool>? energized,
                              Dictionary<string, bool>? inputs = null)
