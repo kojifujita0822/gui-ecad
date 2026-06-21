@@ -126,6 +126,8 @@
             </MenuBarItem>
             <MenuBarItem x:Name="ShapeMenuBarItem" Title="図形(G)" />
             <MenuBarItem Title="ヘルプ(H)">
+                <MenuFlyoutItem Text="使い方..." Click="OnMenuHowTo" />
+                <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="バージョン情報..." Click="OnMenuAbout" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="再ビルドして再起動" Click="OnMenuRestart" />

@@ -134,7 +134,7 @@ public sealed partial class MainPage : Page
         InitializeComponent();
         LoadTheme();
         _document = new LadderDocument();
-        _document.Sheets.Add(BuildSampleSheet());
+        _document.Sheets.Add(CreateEmptySheet());
         _sheet = _document.Sheets[0];
         Loaded += async (_, _) =>
         {
@@ -1758,29 +1758,12 @@ public sealed partial class MainPage : Page
         Canvas.Invalidate();
     }
 
-    // ===== サンプルシート =====
+    // ===== 初期シート =====
 
-    private static Sheet BuildSampleSheet()
+    // 起動時・新規作成時の空シート（要素なし）。
+    private static Sheet CreateEmptySheet() => new()
     {
-        ElementInstance El(ElementKind k, int row, int col, string? dev = null, int w = 1)
-            => new() { Kind = k, Pos = new GridPos(row, col), CellWidth = w, DeviceName = dev };
-
-        var sheet = new Sheet
-        {
-            Grid = new GridSpec { Columns = 8, Rows = 8 },
-            Bus = new BusConfig { LeftName = "R200", RightName = "S200" },
-        };
-        sheet.Elements.Add(El(ElementKind.PushButtonNO, 0, 0, "ST"));
-        sheet.Elements.Add(El(ElementKind.PushButtonNC, 0, 2, "SP"));
-        sheet.Elements.Add(El(ElementKind.Coil, 0, 7, "CR1"));
-        sheet.Elements.Add(El(ElementKind.ContactNO, 1, 0, "CR1"));
-        sheet.Connectors.Add(new VerticalConnector { Column = 1, TopRow = 0, BottomRow = 1 });
-        sheet.Elements.Add(El(ElementKind.ContactNO, 3, 0, "CR1"));
-        sheet.Elements.Add(El(ElementKind.Lamp, 3, 7, "PL"));
-        sheet.Elements.Add(El(ElementKind.ContactNO, 5, 0, "CR1"));
-        sheet.Elements.Add(El(ElementKind.Terminal, 5, 3, "TB1"));
-        sheet.Elements.Add(El(ElementKind.Coil, 5, 5, "SOL"));
-        sheet.Elements.Add(El(ElementKind.Terminal, 5, 7, "TB2"));
-        return sheet;
-    }
+        Grid = new GridSpec { Columns = 8, Rows = 8 },
+        Bus = new BusConfig { LeftName = "R200", RightName = "S200" },
+    };
 }

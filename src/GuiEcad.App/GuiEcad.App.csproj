@@ -14,6 +14,8 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- アプリのバージョン（About 画面はここから動的取得する）。 -->
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>

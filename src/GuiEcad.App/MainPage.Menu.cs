@@ -95,11 +95,7 @@ public sealed partial class MainPage
     private void OnMenuNew(object sender, RoutedEventArgs e)
     {
         _document = new LadderDocument();
-        var sheet = new Sheet
-        {
-            Grid = new GridSpec { Columns = 8, Rows = 8 },
-            Bus = new BusConfig { LeftName = "R200", RightName = "S200" },
-        };
+        var sheet = CreateEmptySheet();
         _document.Sheets.Add(sheet);
         _sheet = sheet;
         _currentPath = null;
@@ -300,10 +296,57 @@ if ($LASTEXITCODE -eq 0) {
 
     private async void OnMenuAbout(object sender, RoutedEventArgs e)
     {
+        // バージョンは csproj の <Version> を正典とし、アセンブリから動的取得する。
+        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        string ver = v is null ? "1.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
         var dialog = new ContentDialog
         {
             Title = "GuiEcad",
-            Content = "ラダー図エディタ\nバージョン 0.1.0",
+            Content = $"ラダー図エディタ\nバージョン {ver}",
+            CloseButtonText = "OK",
+            XamlRoot = this.XamlRoot,
+        };
+        await dialog.ShowAsync();
+    }
+
+    private async void OnMenuHowTo(object sender, RoutedEventArgs e)
+    {
+        var panel = new StackPanel { Spacing = 8 };
+        void Section(string head, string body)
+        {
+            panel.Children.Add(new TextBlock
+            {
+                Text = head,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 14,
+                Margin = new Thickness(0, 4, 0, 0),
+            });
+            panel.Children.Add(new TextBlock { Text = body, TextWrapping = TextWrapping.Wrap, FontSize = 12 });
+        }
+
+        Section("モード切替",
+            "ツールバーの「テスト」ボタンで作画モードとテストモードを切り替えます。作画モードで図を描き、テストモードでは接点をクリックして動作（通電・励磁）を確認します。");
+        Section("作図",
+            "左の縦パレットでツール（接点・コイル・端子台など）を選び、作図エリアのセルをクリックして配置します。同じ行で隣り合う要素は自動で横配線され、縦の分岐は「分岐」ツールで列の交点を上から下へドラッグします。");
+        Section("機器名・コメント",
+            "要素をダブルクリック（または Enter）で機器名を編集、F2 でコメントを編集します。右母線の右側をダブルクリックすると行コメントを入力できます。");
+        Section("選択・移動・削除",
+            "「選択」ツールで要素・分岐・枠をクリックして選択し、ドラッグで移動、Del キーで削除します。Ctrl+C / Ctrl+V でコピー・貼り付けができます。");
+        Section("シート・表示",
+            "左のツリーでシートを切り替え、＋／－でシートを追加・削除します。Ctrl + ＋／－ で拡大・縮小、Ctrl+0 で全体表示、スペースキーを押しながらドラッグで画面を移動できます。");
+        Section("ファイル・出力",
+            "Ctrl+S で保存（.GCAD 形式）、Ctrl+O で開きます。メニューの「PDF出力」で全シートをベクター PDF として出力します。");
+        Section("主なショートカット",
+            "新規 Ctrl+N ／ 開く Ctrl+O ／ 保存 Ctrl+S\n" +
+            "元に戻す Ctrl+Z ／ やり直し Ctrl+Y\n" +
+            "検索・置換 Ctrl+F ／ 削除 Del\n" +
+            "行追加 Ctrl+Shift+↑ ／ 行削除 Ctrl+Shift+↓\n" +
+            "コメント編集 F2 ／ 機器名編集 Enter");
+
+        var dialog = new ContentDialog
+        {
+            Title = "使い方",
+            Content = new ScrollViewer { Content = panel, MaxHeight = 480 },
             CloseButtonText = "OK",
             XamlRoot = this.XamlRoot,
         };
