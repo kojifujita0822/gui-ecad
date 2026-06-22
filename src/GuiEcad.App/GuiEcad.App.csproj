@@ -16,6 +16,10 @@
     <Nullable>enable</Nullable>
     <!-- アプリのバージョン（About 画面はここから動的取得する）。 -->
     <Version>1.0.0</Version>
+    <!-- 配布物（exe プロパティ）に出る製品名・説明。会社名/発行者は未設定。 -->
+    <Product>GuiEcad</Product>
+    <AssemblyTitle>GuiEcad</AssemblyTitle>
+    <Description>GUI ラダー図エディタ</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -75,7 +79,8 @@
   <PropertyGroup>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
     <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <!-- WinUI3（Windows App SDK）はアセンブリトリミング非対応のため常に無効化する。
+         有効だと dotnet build -c Release が NETSDK1102 で失敗し、MSIX 配布の妨げになる。 -->
+    <PublishTrimmed>False</PublishTrimmed>
   </PropertyGroup>
 </Project>
