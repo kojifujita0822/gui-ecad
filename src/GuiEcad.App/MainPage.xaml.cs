@@ -48,10 +48,7 @@ public sealed partial class MainPage : Page
     // ズーム/パン状態と座標変換は CanvasViewport へ委譲（UI 非依存）。
     private readonly CanvasViewport _viewport = new();
 
-    // 作画状態
-    private ElementKind? _placeKind;
-    private string? _placePartId;   // 配置対象が自作パーツのとき PartLibrary の Id（組込み種別なら null）
-    private string? _placeOrient;   // 主回路記号の配置時の向き（"V"/"H"・通常記号は null）
+    // 作画状態（配置ツールは MainPage.Tools.cs の _tool / ToolState に集約）
     private ElementInstance? _selected;
     private ElementInstance? _moving;
     private GridPos _moveStartPos;
@@ -64,7 +61,6 @@ public sealed partial class MainPage : Page
     private Point _lastClickPos;
 
     // 縦コネクタ（並列分岐）配置：列境界をドラッグして TopRow〜BottomRow を作る
-    private bool _placeConnector;
     private int? _connStartRow;
     private double _connBoundary;   // 0.5 刻み（セル中央にも縦コネクタを置ける）
     private int _connCurRow;
@@ -110,7 +106,6 @@ public sealed partial class MainPage : Page
     private int _savedUndoDepth;
 
     // 設置場所枠（GroupFrame）
-    private bool _placeFrame;
     // 枠ドラッグ作成は mm 座標で自由配置（グリッドにスナップしない）
     private (double X, double Y)? _frameStartMm;
     private (double X, double Y) _frameCurMm;
@@ -121,12 +116,10 @@ public sealed partial class MainPage : Page
     private bool _showGrid;
 
     // 自由直線ツール（主回路用・mm 座標・格子点スナップ）
-    private bool _placeLine;
     private (double X, double Y)? _lineStartMm;
     private (double X, double Y) _lineCurMm;
     private FreeLine? _selectedLine;
     // 接続点（●）ツール
-    private bool _placeDot;
     private ConnectionDot? _selectedDot;
     // 自由直線のドラッグ移動
     private bool _movingLine;
@@ -490,7 +483,7 @@ public sealed partial class MainPage : Page
                 else if (_editingRungComment != null) CommitRungComment(accept: false);
                 else if (_editingFrame != null) CommitFrameLabel(accept: false);
                 else if (FindBar.Visibility == Visibility.Visible) CloseFindBar();
-                else if (_placeKind != null || _placeConnector || _placeFrame) ActivateTool("select");
+                else if (_tool.Mode != ToolMode.Select) ActivateTool("select");
                 e.Handled = true;
                 break;
 

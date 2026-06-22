@@ -27,6 +27,49 @@ namespace GuiEcad_App;
 
 public sealed partial class MainPage : Page
 {
+    // ===== 配置ツールの状態（単一の相互排他モード＋パラメータ） =====
+    // 旧 _placeKind/_placePartId/_placeOrient/_placeConnector/_placeFrame/_placeLine/_placeDot の
+    // フラグ束を 1 つの _tool に集約する。モードは enum で本質的に排他なので、複数フラグの取りこぼし
+    // （例: 直線/点ツールのまま記号配置が効かない・クリア漏れ）が構造的に起こらない。
+    private enum ToolMode { Select, PlaceElement, PlaceConnector, PlaceFrame, PlaceLine, PlaceDot }
+
+    /// <summary>現在の配置ツール。Kind/PartId/Orient は Mode==PlaceElement のときのみ意味を持つ。</summary>
+    private readonly record struct ToolState(
+        ToolMode Mode,
+        ElementKind? Kind = null,
+        string? PartId = null,
+        string? Orient = null);
+
+    private ToolState _tool = new(ToolMode.Select);
+
+    // 読み取り用ショートカット（呼び出し側の可読性維持・すべて単一の _tool から導出）。
+    private ElementKind? PlaceKind => _tool.Mode == ToolMode.PlaceElement ? _tool.Kind : null;
+    private string? PlacePartId => _tool.PartId;
+    private string? PlaceOrient => _tool.Orient;
+
+    /// <summary>パレット/メニュー共通のタグ文字列から配置ツール状態を作る。
+    /// 記号タグは "Kind"、主回路記号は向き付き "Kind#V/#H"。該当しなければ選択ツール。</summary>
+    private static ToolState ToolFromTag(string? tag) => tag switch
+    {
+        "connector" => new ToolState(ToolMode.PlaceConnector),
+        "frame" => new ToolState(ToolMode.PlaceFrame),
+        "line" => new ToolState(ToolMode.PlaceLine),
+        "dot" => new ToolState(ToolMode.PlaceDot),
+        null or "select" => new ToolState(ToolMode.Select),
+        _ => ParseSymbolTag(tag),
+    };
+
+    private static ToolState ParseSymbolTag(string tag)
+    {
+        string kindTag = tag;
+        string? orient = null;
+        int hash = tag.IndexOf('#');
+        if (hash >= 0) { orient = tag[(hash + 1)..]; kindTag = tag[..hash]; }
+        return Enum.TryParse<ElementKind>(kindTag, out var kind)
+            ? new ToolState(ToolMode.PlaceElement, kind, Orient: orient)
+            : new ToolState(ToolMode.Select);
+    }
+
     // 縦パレットの接点系ラジオボタンの選択を解除（その他部品・フォルダ図形が配置対象であることを明示）。
     private void ClearToolRadios()
     {
@@ -36,17 +79,10 @@ public sealed partial class MainPage : Page
 
     private void OnToolSelected(object sender, RoutedEventArgs e)
     {
-        var tag = (sender as RadioButton)?.Tag as string;
-        _placeConnector = tag == "connector";
-        _placeFrame = tag == "frame";
-        _placeLine = tag == "line";
-        _placeDot = tag == "dot";
+        _tool = ToolFromTag((sender as RadioButton)?.Tag as string);
         _frameStartMm = null;
         _lineStartMm = null;
         _connStartRow = null;
-        _placePartId = null;
-        _placeOrient = null;
-        _placeKind = Enum.TryParse<ElementKind>(tag, out var k) ? k : null;
         if (OtherPartButton is not null) OtherPartButton.Content = "その他部品";
     }
 
@@ -55,34 +91,20 @@ public sealed partial class MainPage : Page
     {
         if (sender is not MenuFlyoutItem item || item.Tag is not string tag) return;
 
-        // 直線/枠/コネクタの作画状態を解除（OnToolSelected と同等）。
-        // これを忘れると直前に「直線」等を選んでいた場合クリックがそちらに吸われ記号を配置できない。
-        _placeConnector = false;
-        _placeFrame = false;
-        _placeLine = false;
-        _placeDot = false;
+        // 直前に「直線」等を選んでいた場合クリックがそちらに吸われ記号を配置できなくなるため、
+        // 進行中の作画座標を解除しラジオ選択も外す（_tool 差し替えで配置モードは確定する）。
         _frameStartMm = null;
         _lineStartMm = null;
         _connStartRow = null;
-        _placeOrient = null;
         ClearToolRadios();
 
-        if (tag.StartsWith("part:", StringComparison.Ordinal))
-        {
-            // 自作パーツ（Tag = "part:<PartId>"）。Kind は PartId 指定時に無視されるが既定値を置く。
-            _placePartId = tag["part:".Length..];
-            _placeKind = ElementKind.ContactNO;
-        }
-        else
-        {
-            // 主回路記号は "Kind#V/#H" で向きを指定。配置時に Params["Orient"] へ反映。
-            string kindTag = tag;
-            int hash = tag.IndexOf('#');
-            if (hash >= 0) { _placeOrient = tag[(hash + 1)..]; kindTag = tag[..hash]; }
-            if (!Enum.TryParse<ElementKind>(kindTag, out var kind)) return;
-            _placePartId = null;
-            _placeKind = kind;
-        }
+        // 自作パーツ（Tag = "part:<PartId>"）は Kind を既定値に、それ以外は記号タグから解釈する。
+        var next = tag.StartsWith("part:", StringComparison.Ordinal)
+            ? new ToolState(ToolMode.PlaceElement, ElementKind.ContactNO, PartId: tag["part:".Length..])
+            : ToolFromTag(tag);
+        if (next.Mode == ToolMode.Select) return;   // 未対応タグなら現状維持
+
+        _tool = next;
         OtherPartButton.Content = item.Text;
         Canvas.Invalidate();
     }
@@ -132,9 +154,9 @@ public sealed partial class MainPage : Page
         if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
 
         _document.Library!.ById.Remove(id);
-        if (_placePartId == id)
+        if (_tool.PartId == id)
         {
-            _placePartId = null;
+            _tool = new ToolState(ToolMode.Select);
             if (OtherPartButton is not null) OtherPartButton.Content = "その他部品";
         }
         RebuildOtherPartMenu();

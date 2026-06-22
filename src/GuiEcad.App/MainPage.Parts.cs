@@ -150,12 +150,11 @@ public sealed partial class MainPage
         _document.Library ??= new PartLibrary();
         _document.Library.ById[entry.Definition.Id] = entry.Definition;   // 埋め込み維持
 
-        _placeConnector = false;
         _connStartRow = null;
         ClearToolRadios();
 
-        _placePartId = entry.Definition.Id;
-        _placeKind = ElementKind.ContactNO;   // PartId 指定時は無視されるが既定値を置く
+        // PartId 指定時は Kind が無視されるが既定値を置く。
+        _tool = new ToolState(ToolMode.PlaceElement, ElementKind.ContactNO, PartId: entry.Definition.Id);
         Canvas.Invalidate();
     }
 
@@ -281,33 +280,21 @@ public sealed partial class MainPage
         catch (Exception ex) { await ShowErrorAsync(ex.Message); }
     }
 
-    // 基本図形を元に、新 Id の自作図形の下書きを作る（名前はエディタで改名する想定）。
+    // タグ（キーボードショートカット等）から配置ツールを起動し、対応するパレットのラジオも同期する。
     private void ActivateTool(string tag)
     {
         ResetDragState();
         ClearMultiSelection();
-        _placeConnector = tag == "connector";
-        _placeFrame = tag == "frame";
-        _placeLine = tag == "line";
         _frameStartMm = null;
         _lineStartMm = null;
         _connStartRow = null;
-        if (tag == "select")
-        {
-            _placeKind = null;
+        _tool = ToolFromTag(tag);
+        if (_tool.Mode == ToolMode.Select)
             BtnSelect.IsChecked = true;
-        }
-        else if (Enum.TryParse<ElementKind>(tag, out var kind))
-        {
-            _placeKind = kind;
+        else if (_tool.Mode == ToolMode.PlaceElement)
             foreach (UIElement child in ToolStackPanel.Children)
                 if (child is RadioButton rb && rb.Tag?.ToString() == tag)
                 { rb.IsChecked = true; break; }
-        }
-        else
-        {
-            _placeKind = null;
-        }
         Canvas.Invalidate();
     }
 

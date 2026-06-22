@@ -137,7 +137,7 @@ public sealed partial class MainPage
         }
 
         // 作画モード：直線ツール（2点ドラッグ・格子点スナップ）
-        if (_placeLine)
+        if (_tool.Mode == ToolMode.PlaceLine)
         {
             if (xMm >= 0 && yMm >= 0)
             {
@@ -151,7 +151,7 @@ public sealed partial class MainPage
         }
 
         // 作画モード：接続点ツール（1クリックで●を配置・格子点スナップ）
-        if (_placeDot)
+        if (_tool.Mode == ToolMode.PlaceDot)
         {
             if (xMm >= 0 && yMm >= 0)
             {
@@ -163,7 +163,7 @@ public sealed partial class MainPage
         }
 
         // 作画モード：枠ツール（ドラッグ開始・mm 連続座標）
-        if (_placeFrame)
+        if (_tool.Mode == ToolMode.PlaceFrame)
         {
             if (xMm >= 0 && yMm >= 0)
             {
@@ -176,7 +176,7 @@ public sealed partial class MainPage
         }
 
         // 作画モード：縦コネクタ配置（列境界をドラッグ開始）
-        if (_placeConnector)
+        if (_tool.Mode == ToolMode.PlaceConnector)
         {
             double b = _geo.BoundaryAtHalf(xMm);   // セル中央（0.5）にもスナップ
             if (b >= 0 && b <= _sheet.Grid.Columns && row >= 0)
@@ -190,19 +190,19 @@ public sealed partial class MainPage
         }
 
         // 作画モード：配置
-        if (_placeKind is ElementKind kind)
+        if (PlaceKind is ElementKind kind)
         {
             if (row >= 0 && col >= 0 && col < _sheet.Grid.Columns && CellEmpty(row, col, null))
             {
-                var part = _document.Library?.Get(_placePartId);
+                var part = _document.Library?.Get(PlacePartId);
                 var el = new ElementInstance
                 {
                     Kind = kind,
                     Pos = new GridPos(row, col),
-                    PartId = part is not null ? _placePartId : null,
+                    PartId = part is not null ? PlacePartId : null,
                     CellWidth = part?.WidthCells ?? ElementCatalog.DefaultCellWidth(kind),
                 };
-                if (_placeOrient is not null) el.Params[ParamKeys.Orient] = _placeOrient;   // 主回路記号の向き
+                if (PlaceOrient is not null) el.Params[ParamKeys.Orient] = PlaceOrient;   // 主回路記号の向き
                 _history.Execute(new PlaceElementCommand(_sheet, el));
                 _selected = el;
                 RefreshDevicePanel();
@@ -276,7 +276,7 @@ public sealed partial class MainPage
         StatusPos.Text = $"行: {Math.Max(sRow + 1, 1)}  列: {Math.Max(sCol + 1, 1)}";
         if (sRow >= 0 && sCol >= 0) _hoverCell = new GridPos(sRow, sCol);   // ペースト基準に使用
         // 記号配置ツール選択中はマウス追従の配置プレビューを再描画する。
-        if (!_testMode && _placeKind is not null) Canvas.Invalidate();
+        if (!_testMode && _tool.Mode == ToolMode.PlaceElement) Canvas.Invalidate();
 
         if (_rangeSelecting)
         {

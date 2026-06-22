@@ -127,18 +127,18 @@ public sealed partial class MainPage : Page
 
         // 記号配置ツール選択中：マウス位置に半透明の配置プレビュー（ゴースト）を描く。
         // 配置可能なセル範囲（列内）にいるときだけ表示し、有効範囲を視認できるようにする。
-        if (!_testMode && _placeKind is ElementKind pk
+        if (!_testMode && PlaceKind is ElementKind pk
             && _hoverCell.Row >= 0 && _hoverCell.Column >= 0 && _hoverCell.Column < _sheet.Grid.Columns)
         {
             var ghost = new ElementInstance
             {
                 Kind = pk,
                 Pos = _hoverCell,
-                PartId = _placePartId,
-                CellWidth = _document.Library?.Get(_placePartId)?.WidthCells
+                PartId = PlacePartId,
+                CellWidth = _document.Library?.Get(PlacePartId)?.WidthCells
                             ?? ElementCatalog.DefaultCellWidth(pk),
             };
-            if (_placeOrient is not null) ghost.Params[ParamKeys.Orient] = _placeOrient;
+            if (PlaceOrient is not null) ghost.Params[ParamKeys.Orient] = PlaceOrient;
             dr.DrawPreview(renderer, ghost, new Color(120, 0, 120, 255));   // 半透明の青紫
         }
 
