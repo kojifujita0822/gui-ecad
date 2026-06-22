@@ -178,6 +178,9 @@ public sealed partial class MainPage : Page
         InitializeComponent();
         LoadTheme();
         LoadPaletteState();   // ツールパレットのドック/フロート状態・位置を復元
+#if !DEBUG
+        RestartMenuItem.Visibility = Visibility.Collapsed;   // 開発用「再ビルドして再起動」は配布版で隠す
+#endif
         _document = new LadderDocument();
         _document.Sheets.Add(CreateEmptySheet());
         _sheet = _document.Sheets[0];
@@ -321,6 +324,9 @@ public sealed partial class MainPage : Page
         UpdateStatusExtras();
     }
 
+    /// <summary>未保存の変更があるか（保存時の UndoDepth と現在の UndoDepth が異なる）。</summary>
+    public bool IsDirty => _history.UndoDepth != _savedUndoDepth;
+
     // Undo 履歴に乗らない変更（ドキュメント情報・シート設定・BOM 等）を確実にダーティ表示にする。
     // _savedUndoDepth=-1 は UndoDepth と決して一致しないセンチネル。次回保存でリセットされる。
     private void MarkDirty()
@@ -335,7 +341,7 @@ public sealed partial class MainPage : Page
         int total = _document.Sheets.Count;
         StatusSheet.Text = $"シート {sheetIdx} / {total}";
 
-        bool dirty = _history.UndoDepth != _savedUndoDepth;
+        bool dirty = IsDirty;
         StatusDirty.Text = "変更済み●";
         StatusDirty.Visibility = dirty ? Visibility.Visible : Visibility.Collapsed;
 
@@ -556,21 +562,13 @@ public sealed partial class MainPage : Page
         if (elem.DeviceName is null || _testSession is null) return;
         var positions = _sheet.Elements
             .Where(e => e.DeviceName == elem.DeviceName && e.Kind == ElementKind.SelectSwitch
-                     && e.Params.TryGetValue("Position", out _))
-            .Select(e => int.TryParse(e.Params["Position"], out int n) ? n : 0)
+                     && e.Params.TryGetValue(ParamKeys.Position, out _))
+            .Select(e => int.TryParse(e.Params[ParamKeys.Position], out int n) ? n : 0)
             .Distinct().OrderBy(x => x).ToList();
         if (positions.Count == 0) { _testSession.ToggleInput(elem.DeviceName); return; }
         int current = _testSession.State.Positions.TryGetValue(elem.DeviceName, out var pos) ? pos : 0;
         int idx = positions.IndexOf(current);
         _testSession.SetPosition(elem.DeviceName, positions[(idx + 1) % positions.Count]);
-    }
-
-    // %TEMP% は常に書き込み可。サンドボックス制限を受けない。
-    private static readonly string _logFile = Path.Combine(Path.GetTempPath(), "guiecad_debug.log");
-    private static void AppLog(string msg)
-    {
-        try { File.AppendAllText(_logFile, $"{DateTime.Now:HH:mm:ss.fff} {msg}\n"); }
-        catch (Exception ex) { System.Diagnostics.Trace.WriteLine($"[AppLog FAIL] {ex.Message}"); }
     }
 
     private void OnConnectivityToggle(object sender, RoutedEventArgs e)

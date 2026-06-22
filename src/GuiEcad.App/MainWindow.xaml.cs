@@ -1,4 +1,5 @@
 using System.IO;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -24,6 +25,25 @@ public sealed partial class MainWindow : Window
 
         // Navigate the root frame to the main page on startup.
         RootFrame.Navigate(typeof(MainPage));
+
+        // ×ボタンでの未保存破棄を防ぐ（一旦キャンセルして非同期確認後に閉じる）。
+        AppWindow.Closing += OnAppWindowClosing;
+    }
+
+    private bool _allowClose;
+
+    private async void OnAppWindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (_allowClose) return;
+        if (RootFrame.Content is not MainPage page || !page.IsDirty) return;
+
+        // WinUI の Closing は同期イベントのため、一旦キャンセルして非同期確認を行う。
+        args.Cancel = true;
+        if (await page.ConfirmDiscardIfDirtyAsync())
+        {
+            _allowClose = true;
+            Close();
+        }
     }
 
     /// <summary>

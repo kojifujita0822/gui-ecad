@@ -46,8 +46,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            try { System.IO.File.WriteAllText(@"C:\Users\kojif\Desktop\gui_ecad\temp\crash.log", ex.ToString()); }
-            catch { /* ログ失敗は無視 */ }
+            AppLog.Crash(ex);
             throw;
         }
     }

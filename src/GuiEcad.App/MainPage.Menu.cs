@@ -99,8 +99,9 @@ public sealed partial class MainPage
     }
     private void OnMenuFind(object sender, RoutedEventArgs e) => ToggleFindBar();
 
-    private void OnMenuNew(object sender, RoutedEventArgs e)
+    private async void OnMenuNew(object sender, RoutedEventArgs e)
     {
+        if (!await ConfirmDiscardIfDirtyAsync()) return;
         _document = new LadderDocument();
         var sheet = CreateEmptySheet();
         _document.Sheets.Add(sheet);
@@ -123,6 +124,7 @@ public sealed partial class MainPage
 
     private async void OnMenuOpen(object sender, RoutedEventArgs e)
     {
+        if (!await ConfirmDiscardIfDirtyAsync()) return;
         try
         {
             // FileTypeFilter は大文字小文字を区別しない。.gcad のみ登録すれば .GCAD も照合される。
@@ -151,24 +153,28 @@ public sealed partial class MainPage
         }
         catch (Exception ex)
         {
-            AppLog($"[OPEN-ERROR] {ex}");
-            await ShowErrorAsync(ex.ToString());
+            AppLog.Debug($"[OPEN-ERROR] {ex}");
+            await ShowErrorAsync(ex.Message);   // ユーザー表示はメッセージのみ。全文は AppLog.Debug に記録。
         }
     }
 
-    private async void OnMenuSave(object sender, RoutedEventArgs e)
-    {
-        if (_currentPath is not null)
-        {
-            try { GcadSerializer.Save(_document, _currentPath); _savedUndoDepth = _history.UndoDepth; UpdateStatusExtras(); }
-            catch (Exception ex) { await ShowErrorAsync(ex.Message); }
-        }
-        else { await SaveAsAsync(); }
-    }
+    private async void OnMenuSave(object sender, RoutedEventArgs e) => await SaveCurrentAsync();
 
     private async void OnMenuSaveAs(object sender, RoutedEventArgs e) => await SaveAsAsync();
 
-    private async Task SaveAsAsync()
+    /// <summary>現在のドキュメントを保存する。保存できたら true、ユーザーがキャンセル／失敗したら false。</summary>
+    private async Task<bool> SaveCurrentAsync()
+    {
+        if (_currentPath is not null)
+        {
+            try { GcadSerializer.Save(_document, _currentPath); _savedUndoDepth = _history.UndoDepth; UpdateStatusExtras(); return true; }
+            catch (Exception ex) { await ShowErrorAsync(ex.Message); return false; }
+        }
+        return await SaveAsAsync();
+    }
+
+    /// <summary>名前を付けて保存。保存できたら true、ピッカーをキャンセル／失敗したら false。</summary>
+    private async Task<bool> SaveAsAsync()
     {
         var picker = new FileSavePicker(GetPickerWindowId());
         picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
@@ -177,10 +183,33 @@ public sealed partial class MainPage
         picker.FileTypeChoices.Add(".GCAD ファイル", new List<string> { ".gcad" });
 
         var file = await picker.PickSaveFileAsync();
-        if (file is null) return;
+        if (file is null) return false;
 
-        try { GcadSerializer.Save(_document, file.Path); _currentPath = file.Path; _savedUndoDepth = _history.UndoDepth; UpdateStatusExtras(); }
-        catch (Exception ex) { await ShowErrorAsync(ex.Message); }
+        try { GcadSerializer.Save(_document, file.Path); _currentPath = file.Path; _savedUndoDepth = _history.UndoDepth; UpdateStatusExtras(); return true; }
+        catch (Exception ex) { await ShowErrorAsync(ex.Message); return false; }
+    }
+
+    /// <summary>未保存変更があれば保存／破棄／キャンセルを確認する。続行してよいなら true、中止なら false。
+    /// New/Open のほか、ウィンドウクローズ（MainWindow）からも呼ぶため internal。</summary>
+    internal async Task<bool> ConfirmDiscardIfDirtyAsync()
+    {
+        if (!IsDirty) return true;
+        var dialog = new ContentDialog
+        {
+            Title = "未保存の変更",
+            Content = "変更を保存しますか？",
+            PrimaryButtonText = "保存",
+            SecondaryButtonText = "破棄",
+            CloseButtonText = "キャンセル",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = this.XamlRoot,
+        };
+        return await dialog.ShowAsync() switch
+        {
+            ContentDialogResult.Primary => await SaveCurrentAsync(),   // 保存できたら続行
+            ContentDialogResult.Secondary => true,                     // 破棄して続行
+            _ => false,                                                // キャンセル＝中止
+        };
     }
 
     private async void OnMenuExportPdf(object sender, RoutedEventArgs e)
@@ -254,7 +283,9 @@ public sealed partial class MainPage
         var exe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
         if (exe is null) return;
 
-        // 開発用: ソースの csproj が見つかれば「再ビルドしてから再起動」する。
+#if DEBUG
+        // 開発用（DEBUG ビルド限定。配布版には含めない）:
+        // ソースの csproj が見つかれば「再ビルドしてから再起動」する。
         // 実行中は exe/DLL がロックされ自分自身をビルドできないため、
         // 外部 PowerShell に「終了待ち→ dotnet build →成功時のみ新 exe 起動」を委譲する。
         string? proj = FindAppProject(exe);
@@ -281,12 +312,14 @@ public sealed partial class MainPage
             }
             catch { /* 失敗時は通常再起動へフォールバック */ }
         }
+#endif
 
-        // フォールバック: 同じ exe を起動し直すだけ（再ビルドなし）
+        // フォールバック（Release はこちらのみ）: 同じ exe を起動し直すだけ（再ビルドなし）
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = true });
         Application.Current.Exit();
     }
 
+#if DEBUG
     /// <summary>exe パスから上位ディレクトリを辿り GuiEcad.App.csproj を探す（開発時のみ存在）。</summary>
     private static string? FindAppProject(string exePath)
     {
@@ -316,6 +349,7 @@ if ($LASTEXITCODE -eq 0) {
     Read-Host 'Enter キーで閉じる'
 }
 ";
+#endif
 
     private async void OnMenuAbout(object sender, RoutedEventArgs e)
     {
