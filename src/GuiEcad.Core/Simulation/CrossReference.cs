@@ -16,6 +16,8 @@ public sealed class CrossRefEntry
     public List<CircuitRef> Coils { get; } = new();
     /// <summary>接点が現れる箇所。</summary>
     public List<CircuitRef> Contacts { get; } = new();
+    /// <summary>この機器に付いたコメント（重複除去。複数要素にあれば登場順に保持）。</summary>
+    public List<string> Comments { get; } = new();
 }
 
 /// <summary>
@@ -58,9 +60,6 @@ public static class CrossReferenceBuilder
 
         foreach (var sheet in doc.Sheets.OrderBy(s => s.PageNumber))
         {
-            // Row → CircuitNumber のルックアップ
-            var circuitByRow = sheet.CircuitByRow();
-
             foreach (var elem in sheet.Elements)
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
@@ -70,14 +69,19 @@ public static class CrossReferenceBuilder
                 bool isContact = ElementCatalog.IsContact(effectiveKind);
                 if (!isLoad && !isContact) continue;
 
-                int circuitNo = circuitByRow.GetValueOrDefault(elem.Pos.Row, 0);
-                var cref = new CircuitRef(sheet.PageNumber, circuitNo);
+                // 位置番号は図面左の行番号ガイド（全行・1始まり=行インデックス+1）に一致させる。
+                // 回路番号（要素のある行だけの連番）は空行があると図面の行番号とずれるため使わない。
+                var cref = new CircuitRef(sheet.PageNumber, elem.Pos.Row + 1);
                 var entry = xref.GetOrAdd(elem.DeviceName);
 
                 if (isLoad)
                     entry.Coils.Add(cref);
                 else
                     entry.Contacts.Add(cref);
+
+                // コメントを機器単位で集約（空・重複は除外）。表の「コメント」列に出す。
+                if (!string.IsNullOrWhiteSpace(elem.Comment) && !entry.Comments.Contains(elem.Comment))
+                    entry.Comments.Add(elem.Comment);
             }
         }
 

@@ -285,7 +285,7 @@ public sealed partial class MainPage
     private void ActivateTool(string tag)
     {
         ResetDragState();
-        _selectedSet.Clear();
+        ClearMultiSelection();
         _placeConnector = tag == "connector";
         _placeFrame = tag == "frame";
         _placeLine = tag == "line";

@@ -102,6 +102,7 @@
             <KeyboardAccelerator Modifiers="Control,Shift" Key="Down" Invoked="OnDeleteRowAccelerator" />
             <KeyboardAccelerator Modifiers="Control" Key="C" Invoked="OnCopyAccelerator" />
             <KeyboardAccelerator Modifiers="Control" Key="V" Invoked="OnPasteAccelerator" />
+            <KeyboardAccelerator Modifiers="Control" Key="F" Invoked="OnFindAccelerator" />
         </Grid.KeyboardAccelerators>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />

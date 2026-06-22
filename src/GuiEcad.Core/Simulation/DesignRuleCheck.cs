@@ -24,6 +24,11 @@ public static class DesignRuleCheck
     public const string ContactWithoutCoil = "DRC-XREF-001";
     /// <summary>コイルはあるが接点が図面上に一つも無い（死にリレー）。</summary>
     public const string CoilWithoutContact = "DRC-XREF-002";
+    /// <summary>1コイルに対しリレー接点が物理上限（4個）を超えている。</summary>
+    public const string TooManyRelayContacts = "DRC-XREF-003";
+
+    /// <summary>1リレー（コイル1個）が持てる接点の物理上限。これを超えると警告する。</summary>
+    public const int MaxRelayContactsPerCoil = 4;
     /// <summary>同一機器名に励磁系接点（ContactNO/NC）と入力系接点（押釦・タイマ等）が混在（P6）。</summary>
     public const string TypeConflictEnergizedVsInput = "DRC-TYPE-001";
     /// <summary>コイルで駆動される機器の接点種別が入力系（押釦・タイマ等）になっている（P2）。</summary>
@@ -34,6 +39,8 @@ public static class DesignRuleCheck
     public const string LoadNotReachableFromLeft = "DRC-LOAD-001";
     /// <summary>負荷の出力側が右母線から到達不可（P8: 右母線への配線なし）。</summary>
     public const string LoadNotReachableFromRight = "DRC-LOAD-002";
+    /// <summary>2つ以上のコイル（負荷）が直列に接続されている（二重コイル）。</summary>
+    public const string SeriesCoils = "DRC-LOAD-003";
 
     /// <summary>
     /// クロスリファレンス完全性チェック（P3）。
@@ -88,6 +95,15 @@ public static class DesignRuleCheck
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, CoilWithoutContact, name,
                     $"機器 {name}: コイルがありますが接点が図面上に一つもありません（死にリレー）。",
                     u.Coils));
+
+            // コイル1個に対しリレー接点が物理上限（4個）を超過。
+            // リレーは構造上 4 接点までのため、5 個以上は機器選定ミスの可能性が高い。
+            // （コイルが複数ある＝直列等は接点許容数の前提が変わるので、ここでは 1 コイルの場合のみ判定）
+            if (u.Coils.Count == 1 && u.RelayContacts.Count > MaxRelayContactsPerCoil)
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, TooManyRelayContacts, name,
+                    $"機器 {name}: リレー接点が {u.RelayContacts.Count} 個あります（コイル1個）。" +
+                    $"リレーの接点は最大 {MaxRelayContactsPerCoil} 個までです。",
+                    u.RelayContacts));
         }
         return diagnostics;
     }
@@ -206,6 +222,47 @@ public static class DesignRuleCheck
                 diags.Add(new Diagnostic(DiagnosticSeverity.Error, LoadNotReachableFromRight, name,
                     $"機器 {name}: 負荷の出力側が右母線から到達不可（右母線への配線なし）。",
                     [loc]));
+        }
+        return diags;
+    }
+
+    /// <summary>
+    /// 二重コイル（コイル直列接続）チェック。
+    /// 2つ以上の負荷が共有する節点が、いずれの母線からも接点経由で到達できない場合、
+    /// その節点は負荷どうしの直列接続点＝二重コイルである（並列接続の共有節点は母線到達可能なので除外される）。
+    /// </summary>
+    public static IReadOnlyList<Diagnostic> CheckSeriesCoils(Sheet sheet, Netlist net)
+    {
+        var fromLeft = FloodContacts(net, net.LeftRailNet);
+        var fromRight = FloodContacts(net, net.RightRailNet);
+        var circuitByRow = sheet.CircuitByRow();
+        var elemCircuit = sheet.Elements.ToDictionary(e => e.Id,
+            e => circuitByRow.GetValueOrDefault(e.Pos.Row, 0));
+
+        // 節点 → その節点に端子を持つ負荷の一覧
+        var loadsByNet = new Dictionary<int, List<Component>>();
+        foreach (var c in net.Components)
+        {
+            if (c.Role != ComponentRole.Load) continue;
+            (loadsByNet.TryGetValue(c.NetA, out var la) ? la : loadsByNet[c.NetA] = new()).Add(c);
+            (loadsByNet.TryGetValue(c.NetB, out var lb) ? lb : loadsByNet[c.NetB] = new()).Add(c);
+        }
+
+        var diags = new List<Diagnostic>();
+        foreach (var (node, loads) in loadsByNet)
+        {
+            var distinct = loads.Distinct().ToList();
+            if (distinct.Count < 2) continue;
+            // 母線から接点だけで到達できる節点＝並列接続点（正常）。到達できない節点＝直列接続点。
+            if (fromLeft.Contains(node) || fromRight.Contains(node)) continue;
+
+            var names = string.Join(", ", distinct.Select(c => string.IsNullOrEmpty(c.DeviceName) ? "(無名)" : c.DeviceName));
+            var locs = distinct
+                .Select(c => new CircuitRef(sheet.PageNumber, elemCircuit.GetValueOrDefault(c.SourceElementId, 0)))
+                .Distinct().ToList();
+            diags.Add(new Diagnostic(DiagnosticSeverity.Warning, SeriesCoils, distinct[0].DeviceName ?? "",
+                $"コイル {names} が直列に接続されています（二重コイル）。各コイルは単独で母線間に接続してください。",
+                locs));
         }
         return diags;
     }

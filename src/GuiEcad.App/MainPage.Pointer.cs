@@ -86,8 +86,13 @@ public sealed partial class MainPage
                 }
                 if (HitTestFrame(xMm, yMm) is GroupFrame dframe) { ShowFrameLabelEditor(dframe, pos); return; }
                 // 右母線右側 ダブルクリック → 行コメント編集
+                // 要素配置は行数無制限で図面が下に伸びるため、行コメントも「実効描画行数」まで許可する
+                // （Grid.Rows と 要素最大行+1 の大きい方。従来は Grid.Rows=8 固定で 9 行目以降に付けられなかった）。
+                int drawnRows = _sheet.Elements.Count > 0
+                    ? Math.Max(_sheet.Grid.Rows, _sheet.Elements.Max(el => el.Pos.Row) + 1)
+                    : _sheet.Grid.Rows;
                 double rightBusEdge = _geo.X(_sheet.Grid.Columns) + _geo.CellMm * 0.5;
-                if (xMm > rightBusEdge && row >= 0 && row < _sheet.Grid.Rows)
+                if (xMm > rightBusEdge && row >= 0 && row < drawnRows)
                 {
                     var existing = _sheet.RungComments.Find(rc => rc.Row == row);
                     if (existing is null) { existing = new RungComment { Row = row }; _history.Execute(new AddRungCommentCommand(_sheet, existing)); }
@@ -226,7 +231,7 @@ public sealed partial class MainPage
         else
         {
             ClearSelection();
-            _selectedSet.Clear();
+            ClearMultiSelection();
             if (row >= 0 && col >= 0)
             {
                 _rangeSelecting = true;
@@ -351,6 +356,11 @@ public sealed partial class MainPage
             _selectedSet = new HashSet<ElementInstance>(
                 _sheet.Elements.Where(e => e.Pos.Row >= r1 && e.Pos.Row <= r2
                                         && e.Pos.Column >= c1 && e.Pos.Column <= c2));
+            // 分岐線（縦コネクタ）も範囲に完全に収まるものを選択に含める。
+            // Column は列境界（0..Columns）なので、選択列 c1..c2 の境界範囲 [c1, c2+1] で判定。
+            _selectedConnectorSet = new HashSet<VerticalConnector>(
+                _sheet.Connectors.Where(vc => vc.TopRow >= r1 && vc.BottomRow <= r2
+                                           && vc.Column >= c1 && vc.Column <= c2 + 1));
             Canvas.ReleasePointerCapture(e.Pointer);
             Canvas.Invalidate();
             return;
@@ -581,7 +591,8 @@ public sealed partial class MainPage
         double scale = DipsPerMm * _zoom;
         double cellDip = _geo.CellMm * scale;
         double x = _geo.X(elem.Pos.Column) * scale + _panX + cellDip * 0.5 - 45;
-        double y = _geo.YRow(elem.Pos.Row) * scale + _panY - 14 + 28;   // 機器名Boxの下
+        // コメント表示位置（記号の下側・やや記号寄り）に合わせて編集ボックスも出す。
+        double y = _geo.YRow(elem.Pos.Row) * scale + _panY + cellDip * 0.5 - 1;
         CommentBox.Margin = new Thickness(x, y, 0, 0);
         CommentBox.Visibility = Visibility.Visible;
         CommentBox.Focus(FocusState.Programmatic);

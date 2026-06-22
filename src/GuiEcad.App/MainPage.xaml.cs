@@ -31,7 +31,7 @@ public sealed partial class MainPage : Page
     private LadderDocument _document;
     private Sheet _sheet;
     private string? _currentPath;
-    private readonly GridGeometry _geo = new(9.0, 15.0);
+    private readonly GridGeometry _geo = new(9.0, 20.0);   // CellMm / MarginMm。RenderOptions.MarginMm と一致させる。
 
     // 図形フォルダ管理（実フォルダ「図形/」「図形/自作/」のマスター・呼び出し元）
     private PartFolderStore _folderStore = null!;
@@ -85,6 +85,24 @@ public sealed partial class MainPage : Page
     // 行コメントインライン編集
     private RungComment? _editingRungComment;
 
+    /// <summary>機器名・コメント・枠ラベル・行コメントいずれかをインライン編集中か。
+    /// 編集中は Del/BS を要素削除に使わず、テキスト編集に委ねるための判定。</summary>
+    private bool IsInlineEditing =>
+        _editingElement is not null || _editingComment is not null
+        || _editingRungComment is not null || _editingFrame is not null;
+
+    /// <summary>
+    /// テキスト入力にフォーカスがあるか（キャンバスのインライン編集・プロパティパネル・検索バー等）。
+    /// true の間は Del/BS を要素削除に使わず、テキスト編集へ委ねる。
+    /// プロパティパネルの TextBox はインライン編集フラグを立てないため、フォーカスで判定する。
+    /// NumberBox は内部 TextBox を持つので is TextBox で拾える。
+    /// </summary>
+    private bool IsTextInputFocused()
+    {
+        var focused = FocusManager.GetFocusedElement(this.XamlRoot);
+        return focused is TextBox or PasswordBox or RichEditBox;
+    }
+
     // Dirty フラグ（保存時の UndoDepth を記録して比較）
     private int _savedUndoDepth;
 
@@ -121,9 +139,14 @@ public sealed partial class MainPage : Page
     private GridPos _rangeStart;
     private GridPos _rangeEnd;
     private HashSet<ElementInstance> _selectedSet = new();
+    private HashSet<VerticalConnector> _selectedConnectorSet = new();   // 範囲選択に含まれる分岐線（縦コネクタ）
+
+    // 複数選択（要素＋分岐線）をまとめて解除する。
+    private void ClearMultiSelection() { _selectedSet.Clear(); _selectedConnectorSet.Clear(); }
 
     // コピー・ペースト
-    private sealed record ClipboardData(List<ElementInstance> Elements, int OriginRow, int OriginCol);
+    private sealed record ClipboardData(
+        List<ElementInstance> Elements, List<VerticalConnector> Connectors, int OriginRow, int OriginCol);
     private ClipboardData? _clipboard;
     private GridPos _hoverCell;   // 直近のマウス位置セル（ペースト基準・OnPointerMoved で更新）
 
@@ -292,6 +315,11 @@ public sealed partial class MainPage : Page
         var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions { ConnectivityCheck = _connectivityCheck, ShowGrid = _showGrid });
         dr.Render(renderer, _sheet, _document.Library, _testSession?.State);
 
+        // 図面枠ON時は、PDF出力1ページ分（A4縦）の範囲を仮枠ガイドで表示する。
+        // 長い図面でどこがページ境界かを作図中に把握できるようにする。
+        if (_document.Settings.EnableBorder)
+            DrawPageGuides(renderer);
+
         // 検索ハイライト（現在シートの一致のみ描画）
         for (int i = 0; i < _findResults.Count; i++)
         {
@@ -303,6 +331,10 @@ public sealed partial class MainPage : Page
         // 選択ハイライト
         foreach (var e in _selectedSet)
             DrawElementHighlight(renderer, e, new Color(80, 0, 120, 255));
+        foreach (var vc in _selectedConnectorSet)
+            renderer.DrawLine(new(_geo.X(vc.Column), _geo.YRow(vc.TopRow)),
+                              new(_geo.X(vc.Column), _geo.YRow(vc.BottomRow)),
+                              new StrokeStyle(DrawingTheme.Blue, 0.5));
 
         if (_rangeSelecting)
         {
@@ -376,6 +408,23 @@ public sealed partial class MainPage : Page
         double x = _geo.X(l) - pad, y = _geo.YRow(e.Pos.Row) - _geo.CellMm * 0.5 - pad;
         double w = (right - l) * _geo.CellMm + 2 * pad, h = _geo.CellMm + 2 * pad;
         r.FillRectangle(new(x, y, w, h), color);
+    }
+
+    // 図面枠ON時の PDF 1ページ分（A4縦 210x297mm）の境界を仮枠として描く。
+    // 内容の高さに応じて縦方向にページ境界を繰り返し、どこがページ境界か作図中に分かるようにする。
+    private void DrawPageGuides(Win2DRenderer r)
+    {
+        const double a4w = 210.0;                       // A4縦の幅 (mm)
+        int rpp = DiagramRenderer.RowsPerPage;          // 1ページの行数（PDF分割と一致）
+        double cell = _geo.CellMm, margin = _geo.MarginMm;
+        int maxRow = _sheet.Elements.Count > 0 ? _sheet.Elements.Max(e => e.Pos.Row) : 0;
+        int totalRows = Math.Max(_sheet.Grid.Rows, maxRow + 1);
+        int pages = Math.Max(1, (totalRows + rpp - 1) / rpp);
+        double bandH = rpp * cell;
+        var guide = new StrokeStyle(new Color(150, 40, 90, 200), 0.3, LineStyle.Dashed);
+        // A4幅 × 30行 の帯を縦に積み、各帯が1ページに相当することを示す。
+        for (int p = 0; p < pages; p++)
+            r.DrawRectangle(new(0, margin + p * bandH, a4w, bandH), guide);
     }
 
     // ===== ツール選択 =====
@@ -656,6 +705,7 @@ public sealed partial class MainPage : Page
             var sheetNet = NetlistBuilder.Build(_sheet, _document.Library);
             drcAll.AddRange(DesignRuleCheck.CheckVerticalCrossings(_sheet, sheetNet));
             drcAll.AddRange(DesignRuleCheck.CheckLoadReachability(_sheet, sheetNet));
+            drcAll.AddRange(DesignRuleCheck.CheckSeriesCoils(_sheet, sheetNet));
         }
         int errCnt = drcAll.Count(d => d.Severity == DiagnosticSeverity.Error);
         int warnCnt = drcAll.Count(d => d.Severity == DiagnosticSeverity.Warning);
@@ -1031,6 +1081,11 @@ public sealed partial class MainPage : Page
 
     private void RebuildNavTree()
     {
+        // ページ番号をリスト順に 1..N へ正規化（CR/PDF/DRC の位置表示が "0-1" になるのを防ぐ）。
+        // シート変更時は必ず本メソッドを通るため、ここを単一の正規化ポイントにする。
+        for (int i = 0; i < _document.Sheets.Count; i++)
+            _document.Sheets[i].PageNumber = i + 1;
+
         _suppressNavEvents = true;
         NavTree.RootNodes.Clear();
         _sheetNodeMap.Clear();
@@ -1157,19 +1212,33 @@ public sealed partial class MainPage : Page
 
     private void CopySelection()
     {
-        var targets = _selectedSet.Count > 0
+        // 要素：範囲選択 → 単一選択の順で対象を決める。
+        var elems = _selectedSet.Count > 0
             ? _selectedSet.ToList()
             : _selected is not null ? new List<ElementInstance> { _selected } : new();
-        if (targets.Count == 0) return;
+        // 分岐線（縦コネクタ）：範囲選択 → 単一選択の順。
+        var conns = _selectedConnectorSet.Count > 0
+            ? _selectedConnectorSet.ToList()
+            : _selectedConnector is not null ? new List<VerticalConnector> { _selectedConnector } : new();
+        if (elems.Count == 0 && conns.Count == 0) return;
 
-        int minRow = targets.Min(e => e.Pos.Row);
-        int minCol = targets.Min(e => e.Pos.Column);
+        // 選択全体の左上を原点として相対座標に変換する（要素・分岐線の両方を含めて最小を取る）。
+        int minRow = int.MaxValue, minCol = int.MaxValue;
+        foreach (var e in elems) { minRow = Math.Min(minRow, e.Pos.Row); minCol = Math.Min(minCol, e.Pos.Column); }
+        foreach (var c in conns) { minRow = Math.Min(minRow, c.TopRow); minCol = Math.Min(minCol, (int)Math.Floor(c.Column)); }
+
         _clipboard = new ClipboardData(
-            Elements: targets.Select(e =>
+            Elements: elems.Select(e =>
             {
                 var clone = e.DeepClone();
                 clone.Pos = new GridPos(e.Pos.Row - minRow, e.Pos.Column - minCol);
                 return clone;
+            }).ToList(),
+            Connectors: conns.Select(c => new VerticalConnector
+            {
+                Column = c.Column - minCol,        // double のまま（.5 の中央位置も維持）
+                TopRow = c.TopRow - minRow,
+                BottomRow = c.BottomRow - minRow,
             }).ToList(),
             OriginRow: minRow,
             OriginCol: minCol);
@@ -1183,7 +1252,7 @@ public sealed partial class MainPage : Page
         int baseRow = _hoverCell.Row;
         int baseCol = _hoverCell.Column;
 
-        var placedList = _clipboard.Elements
+        var placedElems = _clipboard.Elements
             .Select(e =>
             {
                 var placed = e.DeepClone();
@@ -1192,12 +1261,24 @@ public sealed partial class MainPage : Page
                 return placed;
             })
             .ToList();
+        var placedConns = _clipboard.Connectors
+            .Select(c => new VerticalConnector
+            {
+                Column = baseCol + c.Column,
+                TopRow = baseRow + c.TopRow,
+                BottomRow = baseRow + c.BottomRow,
+            })
+            .ToList();
 
-        var cmds = placedList.Select(p => (IUndoCommand)new PlaceElementCommand(_sheet, p)).ToList();
+        var cmds = placedElems.Select(p => (IUndoCommand)new PlaceElementCommand(_sheet, p))
+            .Concat(placedConns.Select(c => (IUndoCommand)new AddConnectorCommand(_sheet, c)))
+            .ToList();
+        if (cmds.Count == 0) return;
         _history.Execute(new BatchCommand(_sheet, cmds));
 
-        // 貼り付け直後は新要素を選択状態にして、続けて移動・削除できるようにする。
-        _selectedSet = new HashSet<ElementInstance>(placedList);
+        // 貼り付け直後は新要素・分岐線を選択状態にして、続けて移動・削除できるようにする。
+        _selectedSet = new HashSet<ElementInstance>(placedElems);
+        _selectedConnectorSet = new HashSet<VerticalConnector>(placedConns);
         ClearSelection();
         RefreshDevicePanel();
         Canvas.Invalidate();
@@ -1209,19 +1290,23 @@ public sealed partial class MainPage : Page
     private void OnPasteAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     { if (!_testMode) { PasteSelection(); args.Handled = true; } }
 
+    private void OnFindAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    { ToggleFindBar(); args.Handled = true; }
+
     // ===== 削除 =====
 
     private void OnDelete(object sender, RoutedEventArgs e) => DeleteSelected();
 
     private void DeleteSelected()
     {
-        if (_selectedSet.Count > 0)
+        if (_selectedSet.Count > 0 || _selectedConnectorSet.Count > 0)
         {
             var cmds = _selectedSet
                 .Select(e => (IUndoCommand)new DeleteElementCommand(_sheet, e))
+                .Concat(_selectedConnectorSet.Select(c => (IUndoCommand)new DeleteConnectorCommand(_sheet, c)))
                 .ToList();
             _history.Execute(new BatchCommand(_sheet, cmds));
-            _selectedSet.Clear();
+            ClearMultiSelection();
             _selected = null;
             RefreshDevicePanel();
             Canvas.Invalidate();
@@ -1301,15 +1386,14 @@ public sealed partial class MainPage : Page
 
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        bool ctrl = (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) &
-                     CoreVirtualKeyStates.Down) != 0;
-
-        // Ctrl+Z/Y は KeyboardAccelerator 側で処理。ここでは Ctrl+F のみ。
-        if (ctrl && e.Key == VirtualKey.F) { ToggleFindBar(); e.Handled = true; return; }
-
+        // Ctrl+Z/Y/C/V/F 等の修飾キー系は KeyboardAccelerator（RootGrid）側で処理する。
+        // CanvasControl がフォーカスを持つと Page の KeyDown が届かない場合があるため、
+        // 確実性が要るショートカットはアクセラレータに統一する。
         switch (e.Key)
         {
             case VirtualKey.Back:
+                // テキスト入力中（インライン編集・プロパティパネル・検索バー）は要素削除しない。
+                if (IsInlineEditing || IsTextInputFocused()) break;
                 DeleteSelected(); e.Handled = true; break;
 
             case VirtualKey.F5: ActivateTool("ContactNO"); e.Handled = true; break;
@@ -1318,7 +1402,7 @@ public sealed partial class MainPage : Page
             case VirtualKey.F8: ActivateTool("PushButtonNO"); e.Handled = true; break;
 
             case VirtualKey.Escape:
-                if (_rangeSelecting) { _rangeSelecting = false; _selectedSet.Clear(); Canvas.Invalidate(); e.Handled = true; break; }
+                if (_rangeSelecting) { _rangeSelecting = false; ClearMultiSelection(); Canvas.Invalidate(); e.Handled = true; break; }
                 if (_editingElement != null) CommitDeviceName(accept: false);
                 else if (_editingComment != null) CommitComment(accept: false);
                 else if (_editingRungComment != null) CommitRungComment(accept: false);
@@ -1460,6 +1544,12 @@ public sealed partial class MainPage : Page
         _lastDrcResults = DesignRuleCheck.CheckCrossReference(_document, _document.Library)
             .Concat(DesignRuleCheck.CheckDeviceTypeConsistency(_document, _document.Library))
             .ToList();
+        // 二重コイル（コイル直列）はネットリスト依存のためシート単位で検査して集約する。
+        foreach (var sh in _document.Sheets)
+        {
+            var net = NetlistBuilder.Build(sh, _document.Library);
+            _lastDrcResults.AddRange(DesignRuleCheck.CheckSeriesCoils(sh, net));
+        }
 
         int errCnt = _lastDrcResults.Count(d => d.Severity == DiagnosticSeverity.Error);
         int warnCnt = _lastDrcResults.Count(d => d.Severity == DiagnosticSeverity.Warning);
@@ -1523,6 +1613,7 @@ public sealed partial class MainPage : Page
         var sheetNet = NetlistBuilder.Build(_sheet, _document.Library);
         var issues = DesignRuleCheck.CheckVerticalCrossings(_sheet, sheetNet)
             .Concat(DesignRuleCheck.CheckLoadReachability(_sheet, sheetNet))
+            .Concat(DesignRuleCheck.CheckSeriesCoils(_sheet, sheetNet))
             .ToList();
 
         ConnectivityListView.ItemsSource = issues.Count == 0
@@ -1648,10 +1739,11 @@ public sealed partial class MainPage : Page
         var ctxElem = HitTest(row, col);
 
         // --- コピー＆貼り付け（要素上／範囲選択中はコピー、クリップボードがあればクリック位置へ貼り付け） ---
-        if (ctxElem is not null || _selectedSet.Count > 0)
+        if (ctxElem is not null || _selectedSet.Count > 0 || _selectedConnectorSet.Count > 0)
             AddItem(menu, "コピー(Ctrl+C)", () =>
             {
-                if (_selectedSet.Count == 0 && ctxElem is not null) SelectElement(ctxElem);
+                if (_selectedSet.Count == 0 && _selectedConnectorSet.Count == 0 && ctxElem is not null)
+                    SelectElement(ctxElem);
                 CopySelection();
             });
         if (_clipboard is not null && row >= 0 && col >= 0)

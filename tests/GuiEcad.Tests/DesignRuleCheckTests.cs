@@ -62,6 +62,43 @@ public sealed class DesignRuleCheckTests
     }
 
     [Fact]
+    public void Coil_With_FiveContacts_IsFlaggedAsTooManyContacts()
+    {
+        // リレーは構造上 4 接点まで。コイル1個に対し接点5個は機器選定ミスの可能性 → 警告。
+        var doc = MakeDoc(SheetWith(
+            El(ElementKind.Coil, 0, 3, "CR2"),
+            El(ElementKind.ContactNO, 0, 0, "CR2"),
+            El(ElementKind.ContactNO, 1, 0, "CR2"),
+            El(ElementKind.ContactNO, 2, 0, "CR2"),
+            El(ElementKind.ContactNO, 3, 0, "CR2"),
+            El(ElementKind.ContactNO, 4, 0, "CR2")));
+
+        var diags = DesignRuleCheck.CheckCrossReference(doc);
+
+        var d = Assert.Single(diags);
+        Assert.Equal(DesignRuleCheck.TooManyRelayContacts, d.Code);
+        Assert.Equal("CR2", d.DeviceName);
+        Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(5, d.Locations.Count);
+    }
+
+    [Fact]
+    public void Coil_With_FourContacts_IsNotFlagged()
+    {
+        // 上限ちょうど（4接点）は正常。
+        var doc = MakeDoc(SheetWith(
+            El(ElementKind.Coil, 0, 3, "CR3"),
+            El(ElementKind.ContactNO, 0, 0, "CR3"),
+            El(ElementKind.ContactNO, 1, 0, "CR3"),
+            El(ElementKind.ContactNO, 2, 0, "CR3"),
+            El(ElementKind.ContactNO, 3, 0, "CR3")));
+
+        var diags = DesignRuleCheck.CheckCrossReference(doc);
+
+        Assert.Empty(diags);
+    }
+
+    [Fact]
     public void InputControlledContact_WithoutCoil_IsNotFlagged()
     {
         // 押釦・非常停止・OL は外部入力駆動。同名コイルが無くて正常。
@@ -310,5 +347,39 @@ public sealed class DesignRuleCheckTests
         var net = NetlistBuilder.Build(sheet);
         var diags = DesignRuleCheck.CheckLoadReachability(sheet, net);
         Assert.Contains(diags, d => d.Code == DesignRuleCheck.LoadNotReachableFromLeft && d.DeviceName == "OUT2");
+    }
+
+    // ===== CheckSeriesCoils（二重コイル） =====
+
+    [Fact]
+    public void TwoCoilsInSeries_FlagsSeriesCoils()
+    {
+        // L —(Coil OUT1, col0)—(Coil OUT2, col1)— … 2つのコイルが節点を共有して直列。
+        var sheet = new Sheet { Grid = new GridSpec { Columns = 4 }, PageNumber = 1 };
+        sheet.Elements.Add(El(ElementKind.Coil, 0, 0, "OUT1"));
+        sheet.Elements.Add(El(ElementKind.Coil, 0, 1, "OUT2"));
+        var net = NetlistBuilder.Build(sheet);
+
+        var diags = DesignRuleCheck.CheckSeriesCoils(sheet, net);
+
+        var d = Assert.Single(diags);
+        Assert.Equal(DesignRuleCheck.SeriesCoils, d.Code);
+        Assert.Equal(DiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("OUT1", d.Message);
+        Assert.Contains("OUT2", d.Message);
+    }
+
+    [Fact]
+    public void NormalSingleLoad_IsNotFlaggedAsSeriesCoils()
+    {
+        // 正常: L—[CR1]—(OUT1)—R は直列コイルではない。
+        var sheet = new Sheet { Grid = new GridSpec { Columns = 3 }, PageNumber = 1 };
+        sheet.Elements.Add(El(ElementKind.ContactNO, 0, 0, "CR1"));
+        sheet.Elements.Add(El(ElementKind.Coil, 0, 2, "OUT1"));
+        var net = NetlistBuilder.Build(sheet);
+
+        var diags = DesignRuleCheck.CheckSeriesCoils(sheet, net);
+
+        Assert.Empty(diags);
     }
 }

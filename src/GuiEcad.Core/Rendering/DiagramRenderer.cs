@@ -7,7 +7,7 @@ namespace GuiEcad.Rendering;
 public sealed class RenderOptions
 {
     public double CellMm { get; init; } = 9.0;
-    public double MarginMm { get; init; } = 15.0;
+    public double MarginMm { get; init; } = 20.0;   // 上下左右の余白。A4枠の外枠線(端5mm)と母線名・電圧ラベルが重ならない値。
     public bool ShowDeviceNames { get; init; } = true;
     public bool ShowWireNumbers { get; init; } = true;
     /// <summary>左母線の左側に行番号（1 始まり）を表示する。</summary>
@@ -43,27 +43,53 @@ public sealed class DiagramRenderer
     private double BusPad => Cell * 0.5;   // 母線と端の要素列の間に設ける余白（mm）
     private double X(int boundary) => _geo.X(boundary);
     private double X(double boundary) => _geo.X(boundary);   // 0.5 刻み境界（縦コネクタ）用
-    private double YRow(int row) => _geo.YRow(row);
+
+    // 複数ページ分割時のページ先頭行（絶対行）。YRow がこれを引いてページ内ローカル座標へ変換する。
+    private int _rowBase;
+    private double YRow(int row) => _geo.YRow(row - _rowBase);
+
+    /// <summary>枠（A4縦）出力時の1ページあたり行数。これを超える図面は複数ページへ分割する。
+    /// 28行で右下の表題欄と重ならない範囲に収まる。</summary>
+    public const int RowsPerPage = 28;
+
+    /// <summary>シートが描画する総行数（グリッド行数と要素最大行+1 の大きい方）。</summary>
+    public static int TotalRows(Sheet sheet)
+    {
+        int maxRow = 0;
+        foreach (var e in sheet.Elements) maxRow = Math.Max(maxRow, e.Pos.Row);
+        return Math.Max(sheet.Grid.Rows, maxRow + 1);
+    }
+
+    /// <summary>枠出力時にこのシートが必要とする物理ページ数（行分割）。</summary>
+    public static int PageCount(Sheet sheet) =>
+        Math.Max(1, (TotalRows(sheet) + RowsPerPage - 1) / RowsPerPage);
     private double LeftBusX => X(0) - BusPad;
     private double RightBusX(int columns) => X(columns) + BusPad;
 
     private const double TitleBlockH = 14.0;   // 表題欄の高さ (mm)
     private const double RevRowH     = 7.0;    // 改定欄 データ行の高さ (mm)
     private const double RevHdrH     = 5.0;    // 改定欄 ヘッダ行の高さ (mm)
-    private const double A4W         = 297.0;  // A4横 幅 (mm)
-    private const double A4H         = 210.0;  // A4横 高さ (mm)
+    private const double A4W         = 210.0;  // A4縦 幅 (mm)
+    private const double A4H         = 297.0;  // A4縦 高さ (mm)
 
     private double RevisionBlockH(DocumentInfo info)
         => info.Revisions.Count == 0 ? 0 : RevHdrH + info.Revisions.Count * RevRowH;
 
-    /// <summary>描画に必要なページサイズ(mm)。enableBorder=true のとき A4横固定。</summary>
+    /// <summary>描画に必要なページサイズ(mm)。enableBorder=true のとき A4縦固定。</summary>
     public Size2D PageSize(Sheet sheet, CrossReference? xref = null, DocumentInfo? info = null,
                            bool enableBorder = false)
     {
         if (enableBorder) return new Size2D(A4W, A4H);
         int maxRow = 0;
         foreach (var e in sheet.Elements) maxRow = Math.Max(maxRow, e.Pos.Row);
-        double w = RightBusX(sheet.Grid.Columns) + _opt.MarginMm;
+        // 行コメント（右母線の右側）が長いとページ右にはみ出すため、その分の幅を確保する。
+        // テキスト幅は概算（行コメントのフォント 2.0mm・全角想定で 1 文字 ≒ 2.2mm）。
+        double maxRungLen = sheet.RungComments
+            .Where(rc => !string.IsNullOrEmpty(rc.Text))
+            .Select(rc => (double)rc.Text.Length)
+            .DefaultIfEmpty(0).Max();
+        double rightExtra = maxRungLen > 0 ? 2.0 + maxRungLen * 2.2 + _opt.MarginMm : _opt.MarginMm;
+        double w = RightBusX(sheet.Grid.Columns) + rightExtra;
         double diagramH = _opt.MarginMm + (maxRow + 1) * Cell + _opt.MarginMm;
         double tableH = xref is not null ? CalcTableHeight(xref) : 0.0;
         double revH = info is not null ? RevisionBlockH(info) : 0.0;
@@ -79,7 +105,8 @@ public sealed class DiagramRenderer
     /// </summary>
     public void Render(IRenderer r, Sheet sheet, PartLibrary? library = null, SimState? sim = null,
                        CrossReference? xref = null, DocumentInfo? info = null,
-                       int pageNumber = 1, int totalPages = 1, bool enableBorder = false)
+                       int pageNumber = 1, int totalPages = 1, bool enableBorder = false,
+                       int pageRowStart = 0, int pageRowCount = int.MaxValue)
     {
         _lib = library;
         var netlist = NetlistBuilder.Build(sheet, library);
@@ -99,42 +126,53 @@ public sealed class DiagramRenderer
         foreach (var c in netlist.Components) elemNet[c.SourceElementId] = (c.NetA, c.NetB);
 
         int columns = sheet.Grid.Columns;
-        int maxRow = 0;
-        foreach (var e in sheet.Elements) maxRow = Math.Max(maxRow, e.Pos.Row);
 
-        if (_opt.ShowGrid) DrawGrid(r, columns, Math.Max(sheet.Grid.Rows, maxRow + 1));
+        // ページの行ウィンドウ [rowStart, rowEnd)。pageRowCount=MaxValue なら全行（単一ページ）。
+        int totalRows = TotalRows(sheet);
+        int rowStart = Math.Clamp(pageRowStart, 0, Math.Max(0, totalRows - 1));
+        int rowEnd = pageRowCount == int.MaxValue
+            ? totalRows
+            : Math.Min(totalRows, rowStart + pageRowCount);
+        int localRows = Math.Max(1, rowEnd - rowStart);
+        _rowBase = rowStart;   // 以降の YRow はページ内ローカル座標になる
+        bool InWindow(int row) => row >= rowStart && row < rowEnd;
+
+        if (_opt.ShowGrid) DrawGrid(r, columns, localRows);
 
         // 主回路（動力回路）モードでは左右母線・母線名・自動横配線を描かない（自由直線で結線する）。
         if (!sheet.MainCircuit)
         {
-            DrawRails(r, columns, maxRow);
+            DrawRails(r, columns, localRows - 1);
             DrawBusLabels(r, sheet, columns);
         }
-        DrawRowNumbers(r, Math.Max(sheet.Grid.Rows, maxRow + 1));
+        DrawRowNumbers(r, rowStart, rowEnd);
         if (!sheet.MainCircuit)
-            DrawRungWires(r, sheet, columns, elemNet, netlist, report, powered);
-        DrawConnectors(r, sheet);
+            DrawRungWires(r, sheet, columns, elemNet, netlist, report, powered, rowStart, rowEnd);
+        DrawConnectors(r, sheet, rowStart, rowEnd);
         DrawFreeLines(r, sheet);
         DrawFrames(r, sheet);
-        foreach (var e in sheet.Elements) DrawElement(r, e, energized, sim?.Inputs);
-        DrawRungComments(r, sheet, columns);
+        foreach (var e in sheet.Elements)
+            if (InWindow(e.Pos.Row)) DrawElement(r, e, energized, sim?.Inputs);
+        DrawRungComments(r, sheet, columns, rowStart, rowEnd);
 
-        double contentBottom = _opt.MarginMm + (maxRow + 1) * Cell + _opt.MarginMm;
-        if (xref is not null)
-        {
-            DrawCrossRefTable(r, columns, contentBottom, xref);
-            contentBottom += CalcTableHeight(xref);
-        }
+        // 表題欄・改定欄: 枠ありは A4 右下に固定配置、枠なしは従来どおり内容の下に置く。
         if (info is not null)
         {
-            double revH = RevisionBlockH(info);
-            if (revH > 0)
-                DrawRevisionBlock(r, info, LeftBusX, RightBusX(columns), contentBottom);
-            DrawTitleBlock(r, info, LeftBusX, RightBusX(columns), contentBottom + revH,
-                           pageNumber, totalPages);
+            if (enableBorder)
+                DrawTitleAndRevisionBottomRight(r, info, pageNumber, totalPages);
+            else
+            {
+                double contentBottom = _opt.MarginMm + localRows * Cell + _opt.MarginMm;
+                double revH = RevisionBlockH(info);
+                if (revH > 0)
+                    DrawRevisionBlock(r, info, LeftBusX, RightBusX(columns), contentBottom);
+                DrawTitleBlock(r, info, LeftBusX, RightBusX(columns), contentBottom + revH,
+                               pageNumber, totalPages);
+            }
         }
         if (enableBorder)
             DrawBorder(r);
+        _rowBase = 0;   // 後始末（インスタンス再利用に備える）
     }
 
     // 母線（左右の縦線）
@@ -193,8 +231,8 @@ public sealed class DiagramRenderer
         r.DrawLine(new(x2, y), new(x2 - hx, y + hy), s);
     }
 
-    // 行番号（左母線の左側に 1 始まりで表示）
-    private void DrawRowNumbers(IRenderer r, int rowCount)
+    // 行番号（左母線の左側に 1 始まりで表示）。[rowStart, rowEnd) の絶対行を、ページ内ローカル位置に描く。
+    private void DrawRowNumbers(IRenderer r, int rowStart, int rowEnd)
     {
         if (!_opt.ShowRowNumbers) return;
         var style = _theme.Text(TextRole.LineNumber) with
@@ -204,13 +242,14 @@ public sealed class DiagramRenderer
             VAlign = VAlign.Middle,
         };
         double x = LeftBusX - 1.0;   // 左母線のさらに左（右寄せで左へ伸ばす）
-        for (int row = 0; row < rowCount; row++)
+        for (int row = rowStart; row < rowEnd; row++)
             r.DrawText((row + 1).ToString(), new(x, YRow(row)), style);
     }
 
     // 各行の横配線（要素間・母線端）。接続検査時はネット色（青/黒）で描く。
     private void DrawRungWires(IRenderer r, Sheet sheet, int columns,
-        Dictionary<Guid, (int A, int B)> elemNet, Netlist netlist, ConnectivityReport? report, HashSet<int>? powered)
+        Dictionary<Guid, (int A, int B)> elemNet, Netlist netlist, ConnectivityReport? report, HashSet<int>? powered,
+        int rowStart, int rowEnd)
     {
         var byRow = new Dictionary<int, List<ElementInstance>>();
         foreach (var e in sheet.Elements)
@@ -221,6 +260,7 @@ public sealed class DiagramRenderer
 
         foreach (var (row, list) in byRow)
         {
+            if (row < rowStart || row >= rowEnd) continue;   // ページ外の行はスキップ
             list.Sort((a, b) => a.Pos.Column.CompareTo(b.Pos.Column));
             double y = YRow(row);
 
@@ -284,15 +324,20 @@ public sealed class DiagramRenderer
     }
 
     // 縦コネクタ（分岐）＋接合点ドット
-    private void DrawConnectors(IRenderer r, Sheet sheet)
+    private void DrawConnectors(IRenderer r, Sheet sheet, int rowStart, int rowEnd)
     {
         var wire = _theme.Get(StrokeRole.Wire);
         foreach (var c in sheet.Connectors)
         {
+            // ページの行範囲にクリップ（ページをまたぐ縦コネクタは各ページで分断して描く）。
+            int top = Math.Max(c.TopRow, rowStart);
+            int bot = Math.Min(c.BottomRow, rowEnd - 1);
+            if (top > bot) continue;
             double x = X(c.Column);
-            r.DrawLine(new(x, YRow(c.TopRow)), new(x, YRow(c.BottomRow)), wire);
-            // 接合点ドットは横配線が通過する合流点（上端）のみ。分岐枝の起点（下端）には付けない。
-            r.FillCircle(new(x, YRow(c.TopRow)), Cell * 0.07, DrawingTheme.Black);
+            r.DrawLine(new(x, YRow(top)), new(x, YRow(bot)), wire);
+            // 接合点ドットは合流点（上端）のみ。元の上端がこのページ内にある場合だけ描く。
+            if (c.TopRow >= rowStart && c.TopRow < rowEnd)
+                r.FillCircle(new(x, YRow(c.TopRow)), Cell * 0.07, DrawingTheme.Black);
         }
     }
 
@@ -312,13 +357,16 @@ public sealed class DiagramRenderer
         }
     }
 
-    // 自由直線（主回路の母線・結線・注記線）。mm 実座標をそのまま描く。
+    // 複数ページ分割時の Y オフセット（絶対 mm 座標をページ内ローカルへ変換）。
+    private double PageY(double mmY) => mmY - _rowBase * Cell;
+
+    // 自由直線（主回路の母線・結線・注記線）。mm 実座標をページ Y 補正して描く。
     private void DrawFreeLines(IRenderer r, Sheet sheet)
     {
         foreach (var fl in sheet.FreeLines)
         {
             var s = _theme.Get(StrokeRole.Wire) with { Style = fl.Style };
-            r.DrawLine(new(fl.X1Mm, fl.Y1Mm), new(fl.X2Mm, fl.Y2Mm), s);
+            r.DrawLine(new(fl.X1Mm, PageY(fl.Y1Mm)), new(fl.X2Mm, PageY(fl.Y2Mm)), s);
         }
     }
 
@@ -336,7 +384,8 @@ public sealed class DiagramRenderer
         foreach (var f in sheet.Frames)
         {
             double x = f.VisualXMm ?? X(f.TopLeft.Column);
-            double y = f.VisualYMm ?? (YRow(f.TopLeft.Row) - Cell * 0.4);
+            // VisualYMm は絶対 mm なのでページ Y 補正。TopLeft.Row 由来は YRow が補正済み。
+            double y = f.VisualYMm is double vy ? PageY(vy) : (YRow(f.TopLeft.Row) - Cell * 0.4);
             double w = f.VisualWidthMm ?? f.Width * Cell;
             double h = f.VisualHeightMm ?? f.Height * Cell;
 
@@ -385,8 +434,9 @@ public sealed class DiagramRenderer
 
     // ---- クロスリファレンス一覧表 ----
 
-    private const double DevColW = 15.0;   // 機器名列幅 (mm)
-    private const double CoilColW = 28.0;  // コイル列幅 (mm)
+    private const double DevColW = 15.0;       // 機器名列幅 (mm)
+    private const double CoilColW = 28.0;      // コイル列幅 (mm)
+    private const double XrefCommentColW = 40.0;  // コメント列幅 (mm・右端に確保)
     // 接点列は残り幅を使う
 
     private double TableRowH => Cell * 0.65;
@@ -406,9 +456,12 @@ public sealed class DiagramRenderer
         double rh = TableRowH;
         double y0 = startY + TableGap;
         double x0 = X(0);
-        double x1 = x0 + DevColW;
-        double x2 = x1 + CoilColW;
-        double x3 = X(columns);
+        double x1 = x0 + DevColW;            // 機器 / コイル 境界
+        double x2 = x1 + CoilColW;           // コイル / 接点 境界
+        double x4 = X(columns);              // 表の右端
+        // コメント列を右端に確保。ただし接点列が 20mm 未満にならない範囲で。
+        double commentW = Math.Min(XrefCommentColW, Math.Max(0, (x4 - x2) - 20.0));
+        double x3 = x4 - commentW;           // 接点 / コメント 境界
 
         var outline = _theme.Get(StrokeRole.SymbolOutline) with { Width = DrawingTheme.TableLineWidth };
         var headerText = _theme.Text(TextRole.CrossRef) with { Bold = true, FontSizeMm = 2.4, VAlign = VAlign.Middle };
@@ -417,30 +470,33 @@ public sealed class DiagramRenderer
 
         // ヘッダ行
         double yh = y0;
-        DrawTableRow(r, outline, x0, yh, x1, x2, x3, rh, fill: true);
+        DrawTableRow(r, outline, x0, x4, yh, rh, fill: true, x1, x2, x3);
         DrawCellText(r, "機器", x0, yh, rh, pad, headerText);
         DrawCellText(r, "コイル", x1, yh, rh, pad, headerText);
         DrawCellText(r, "接点", x2, yh, rh, pad, headerText);
+        DrawCellText(r, "コメント", x3, yh, rh, pad, headerText);
 
         // データ行
         for (int i = 0; i < entries.Count; i++)
         {
             double yi = y0 + (i + 1) * rh;
-            DrawTableRow(r, outline, x0, yi, x1, x2, x3, rh, fill: false);
+            DrawTableRow(r, outline, x0, x4, yi, rh, fill: false, x1, x2, x3);
             var e = entries[i];
             DrawCellText(r, e.DeviceName, x0, yi, rh, pad, cellText);
             DrawCellText(r, FormatRefs(e.Coils), x1, yi, rh, pad, cellText);
             DrawCellText(r, FormatRefs(e.Contacts), x2, yi, rh, pad, cellText);
+            DrawCellText(r, string.Join(" / ", e.Comments), x3, yi, rh, pad, cellText);
         }
     }
 
+    // 外枠（x0..x4）＋任意の縦区切り線を描く。
     private static void DrawTableRow(IRenderer r, StrokeStyle s,
-        double x0, double y, double x1, double x2, double x3, double rh, bool fill)
+        double x0, double x4, double y, double rh, bool fill, params double[] dividers)
     {
-        if (fill) r.FillRectangle(new(x0, y, x3 - x0, rh), DrawingTheme.TableHeaderFill);
-        r.DrawRectangle(new(x0, y, x3 - x0, rh), s);
-        r.DrawLine(new(x1, y), new(x1, y + rh), s);
-        r.DrawLine(new(x2, y), new(x2, y + rh), s);
+        if (fill) r.FillRectangle(new(x0, y, x4 - x0, rh), DrawingTheme.TableHeaderFill);
+        r.DrawRectangle(new(x0, y, x4 - x0, rh), s);
+        foreach (var xd in dividers)
+            r.DrawLine(new(xd, y), new(xd, y + rh), s);
     }
 
     private static void DrawCellText(IRenderer r, string text, double cellX, double rowY, double rh,
@@ -451,11 +507,25 @@ public sealed class DiagramRenderer
     {
         var list = refs.ToList();
         if (list.Count == 0) return "—";
-        // 単一ページ図面はページ番号を省略、複数ページは "P-N" 形式
-        bool multiPage = list.Select(c => c.PageNumber).Distinct().Count() > 1
-                      || list[0].PageNumber != 1;
-        return string.Join("  ", list.Select(c =>
-            multiPage ? $"{c.PageNumber}-{c.CircuitNumber}" : c.CircuitNumber.ToString()));
+        // 常に「ページ-行番号」形式（例: 1ページ1行目 → "1-1"）。
+        return string.Join("  ", list.Select(c => $"{c.PageNumber}-{c.CircuitNumber}"));
+    }
+
+    // ---- クロスリファレンス専用ページ ----
+
+    /// <summary>クロスリファレンス専用ページのサイズ。<paramref name="columns"/> は最終シートの列数。</summary>
+    public Size2D CrossRefPageSize(CrossReference xref, int columns)
+    {
+        double w = RightBusX(columns) + _opt.MarginMm;
+        double h = _opt.MarginMm + CalcTableHeight(xref) + _opt.MarginMm;
+        return new Size2D(w, h);
+    }
+
+    /// <summary>クロスリファレンス一覧表を専用ページの上部に描画する。エントリ0なら何もしない。</summary>
+    public void RenderCrossRefPage(IRenderer r, CrossReference xref, int columns)
+    {
+        if (!xref.CoilEntries.Any()) return;
+        DrawCrossRefTable(r, columns, _opt.MarginMm, xref);
     }
 
     // ---- BOM（部品表）ページ ----
@@ -584,14 +654,13 @@ public sealed class DiagramRenderer
         DrawElementLabel(r, e, lb, rb, width);
     }
 
-    // 機器名ラベル＋コメントを記号の上・中央に描く。
+    // 機器名ラベルを記号の上・中央に描く。
     // Params["LabelDy"] (mm, 正で上へ) で要素ごとに高さオフセットを調整できる（密集時の重なり回避）。
+    // コメントは図面には描かない（PDF の機器欄に記載する）。
     private void DrawElementLabel(IRenderer r, ElementInstance e, int lb, int rb, double width)
     {
         if (!_opt.ShowDeviceNames) return;
-        bool hasName = !string.IsNullOrEmpty(e.DeviceName);
-        bool hasComment = !string.IsNullOrEmpty(e.Comment);
-        if (!hasName && !hasComment) return;
+        if (string.IsNullOrEmpty(e.DeviceName)) return;
 
         double cx = X(lb) + width / 2;
         // 個別の LabelDy があればそれ、無ければ種別の既定オフセット。
@@ -600,21 +669,35 @@ public sealed class DiagramRenderer
                 System.Globalization.CultureInfo.InvariantCulture, out double v)
             ? v : ElementCatalog.DefaultLabelDy(e.Kind);
 
-        double yn = YRow(e.Pos.Row) - Cell * 0.50 - dy;   // dy>0 で上へ
-        var nameStyle = _theme.Text(TextRole.DeviceName);
-        if (hasName) r.DrawText(e.DeviceName!, new(cx, yn), nameStyle);
-        if (hasComment) r.DrawText(e.Comment!, new(cx, yn + 2.2), nameStyle with { FontSizeMm = 1.7 });
+        double yn = YRow(e.Pos.Row) - Cell * 0.50 - dy;   // dy>0 で上へ（機器名は記号の上）
+        r.DrawText(e.DeviceName!, new(cx, yn), _theme.Text(TextRole.DeviceName));
     }
 
-    // 右母線の右側コメント
-    private void DrawRungComments(IRenderer r, Sheet sheet, int columns)
+    // 右母線の右側コメント（ページの行範囲のみ）
+    private void DrawRungComments(IRenderer r, Sheet sheet, int columns, int rowStart, int rowEnd)
     {
         if (sheet.RungComments.Count == 0) return;
         double x = RightBusX(columns) + 2.0;
         var style = _theme.Text(TextRole.DeviceName) with { HAlign = HAlign.Left, FontSizeMm = 2.0 };
         foreach (var rc in sheet.RungComments)
-            if (!string.IsNullOrEmpty(rc.Text))
+            if (!string.IsNullOrEmpty(rc.Text) && rc.Row >= rowStart && rc.Row < rowEnd)
                 r.DrawText(rc.Text, new(x, YRow(rc.Row)), style);
+    }
+
+    private const double TitleBlockW = 95.0;   // 右下表題欄の幅 (mm)
+
+    // 表題欄（＋その上に改定欄）を A4 縦ページの右下に固定配置する（枠あり出力時）。
+    // 絶対座標で描くため _rowBase（ページ行オフセット）の影響は受けない。
+    private void DrawTitleAndRevisionBottomRight(IRenderer r, DocumentInfo info, int pageNumber, int totalPages)
+    {
+        const double pageMargin = 5.0;   // 外枠線と同じ用紙端余白
+        double x0 = A4W - pageMargin - TitleBlockW;
+        double x1 = A4W - pageMargin;
+        double titleStartY = A4H - pageMargin - TitleBlockH;
+        DrawTitleBlock(r, info, x0, x1, titleStartY, pageNumber, totalPages);
+        double revH = RevisionBlockH(info);
+        if (revH > 0)
+            DrawRevisionBlock(r, info, x0, x1, titleStartY - revH);
     }
 
     // 表題欄（タイトルブロック）を startY 位置に描画する。
@@ -663,7 +746,7 @@ public sealed class DiagramRenderer
         r.DrawText(value, new(x + pad, y + h * 0.65), dataStyle);
     }
 
-    // A4横用紙の図面枠（外枠線）を描画する。
+    // A4縦用紙の図面枠（外枠線）を描画する。
     private void DrawBorder(IRenderer r)
     {
         const double margin = 5.0;   // 用紙端からの余白

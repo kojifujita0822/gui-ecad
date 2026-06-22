@@ -76,6 +76,23 @@ public class CrossReferenceTests
     }
 
     [Fact]
+    public void Ref_UsesVisualRowNumber_NotSkippingEmptyRows()
+    {
+        // 行0・1は空、要素は行2と行4にある。CR番号は図面左の行番号（行+1=3, 5）に一致すべき。
+        // 旧仕様（要素のある行だけの連番）だと 1, 2 になりずれていた。
+        var sheet = new Sheet { PageNumber = 1, Grid = new GridSpec { Columns = 4 } };
+        sheet.Elements.Add(El(ElementKind.Coil, 2, 3, "CR1"));
+        sheet.Elements.Add(El(ElementKind.ContactNO, 4, 0, "CR1"));
+        var doc = MakeDoc(sheet);
+
+        var xref = CrossReferenceBuilder.Build(doc);
+
+        xref.TryGet("CR1", out var cr1);
+        Assert.Equal(3, cr1.Coils[0].CircuitNumber);     // 行2 → 行番号3
+        Assert.Equal(5, cr1.Contacts[0].CircuitNumber);  // 行4 → 行番号5
+    }
+
+    [Fact]
     public void NoDeviceName_ElementIsIgnored()
     {
         var sheet = new Sheet { PageNumber = 1, Grid = new GridSpec { Columns = 4 } };
@@ -104,15 +121,15 @@ public class CrossReferenceTests
         var xref = CrossReferenceBuilder.Build(doc);
 
         xref.TryGet("CR11", out var cr11);
-        // 接点: シート1 回路1
+        // 接点: シート1 行1（行番号は図面左ガイド＝行インデックス+1・各シート1始まり）
         Assert.Single(cr11.Contacts);
         Assert.Equal(1, cr11.Contacts[0].PageNumber);
         Assert.Equal(1, cr11.Contacts[0].CircuitNumber);
 
-        // コイル: シート2 回路2（シート1が回路1を占有、シート2は継続連番）
+        // コイル: シート2 行1（各シートで行番号は1始まり。ページ番号で区別）
         Assert.Single(cr11.Coils);
         Assert.Equal(2, cr11.Coils[0].PageNumber);
-        Assert.Equal(2, cr11.Coils[0].CircuitNumber);
+        Assert.Equal(1, cr11.Coils[0].CircuitNumber);
     }
 
     // ---- CoilEntries / 一覧表 ----

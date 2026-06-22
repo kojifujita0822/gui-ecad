@@ -40,9 +40,16 @@ public sealed partial class MainPage
     private void OnRedoAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     { DoRedo(); args.Handled = true; }
 
-    // Delete もフォーカス非依存に（ツール選択中・要素/縦コネクタ選択後でも効く）
+    // Delete もフォーカス非依存に（ツール選択中・要素/縦コネクタ選択後でも効く）。
+    // ただしインライン編集中・検索バー入力中はテキスト編集に委ね、要素を消さない
+    // （args.Handled を立てずに return し、TextBox に Delete を処理させる）。
     private void OnDeleteAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    { DeleteSelected(); args.Handled = true; }
+    {
+        // テキスト入力中（インライン編集・プロパティパネル・検索バー）は要素を消さず、テキスト編集に委ねる。
+        if (IsInlineEditing || IsTextInputFocused()) return;
+        DeleteSelected();
+        args.Handled = true;
+    }
 
     // 配置直後・選択中の要素を Enter で機器名インライン編集（Canvas のフォーカス有無に依らず確実に拾う）
     private void OnEnterAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
@@ -197,19 +204,37 @@ public sealed partial class MainPage
 
             var info = _document.Info;
             bool enableBorder = _document.Settings.EnableBorder;
-            int totalPages = _document.Sheets.Count;
             var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions());
             using var surface = new PdfRenderSurface(file.Path);
-            for (int pi = 0; pi < _document.Sheets.Count; pi++)
+
+            // 物理ページ総数（枠あり時は長い図面を RowsPerPage 行ごとに複数ページへ分割する）。
+            int totalPages = enableBorder
+                ? _document.Sheets.Sum(DiagramRenderer.PageCount)
+                : _document.Sheets.Count;
+
+            int physical = 0;
+            foreach (var sheet in _document.Sheets)
             {
-                var sheet = _document.Sheets[pi];
-                // 最終シートにのみクロスリファレンス一覧表を追加
-                bool isLast = pi == _document.Sheets.Count - 1;
-                var pageXref = isLast ? xref : null;
-                int pageNum = sheet.PageNumber > 0 ? sheet.PageNumber : pi + 1;
-                var renderer = surface.BeginPage(dr.PageSize(sheet, pageXref, info, enableBorder));
-                dr.Render(renderer, sheet, _document.Library, xref: pageXref, info: info,
-                          pageNumber: pageNum, totalPages: totalPages, enableBorder: enableBorder);
+                // クロスリファレンス表はシート図面には描かず、専用ページに分ける（最小2ページ）。
+                int pages = enableBorder ? DiagramRenderer.PageCount(sheet) : 1;
+                for (int p = 0; p < pages; p++)
+                {
+                    physical++;
+                    var renderer = surface.BeginPage(dr.PageSize(sheet, null, info, enableBorder));
+                    dr.Render(renderer, sheet, _document.Library, xref: null, info: info,
+                              pageNumber: physical, totalPages: totalPages, enableBorder: enableBorder,
+                              pageRowStart: p * DiagramRenderer.RowsPerPage,
+                              pageRowCount: enableBorder ? DiagramRenderer.RowsPerPage : int.MaxValue);
+                    surface.EndPage();
+                }
+            }
+
+            // クロスリファレンス一覧表を専用ページとして追加する
+            if (xref.CoilEntries.Any())
+            {
+                int lastColumns = _document.Sheets[^1].Grid.Columns;
+                var crRenderer = surface.BeginPage(dr.CrossRefPageSize(xref, lastColumns));
+                dr.RenderCrossRefPage(crRenderer, xref, lastColumns);
                 surface.EndPage();
             }
 
