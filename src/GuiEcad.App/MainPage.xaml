@@ -152,7 +152,7 @@
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="バージョン情報..." Click="OnMenuAbout" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="再ビルドして再起動" Click="OnMenuRestart" />
+                <MenuFlyoutItem x:Name="RestartMenuItem" Text="再ビルドして再起動" Click="OnMenuRestart" />
             </MenuBarItem>
         </MenuBar>
 
@@ -234,22 +234,38 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="ToolDockColumn" Width="Auto" />
                 <ColumnDefinition Width="180" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <!-- 縦ツールパレット (P1) -->
+            <!-- 縦ツールパレット (P1)：ドックホスト。フロート時は中身(ToolScroll)を ToolPaletteFloat へ移動 -->
             <Border
+                x:Name="ToolDockHost"
                 Grid.Row="0"
                 Grid.RowSpan="3"
                 Grid.Column="0"
                 Background="{ThemeResource AppPaletteBackgroundBrush}"
                 BorderBrush="{ThemeResource AppDividerBrush}"
                 BorderThickness="0,0,1,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <!-- ドック時ヘッダ（切り離しボタン） -->
+                    <Border Grid.Row="0" Background="{ThemeResource AppPanelHeaderBrush}">
+                        <Grid>
+                            <TextBlock Text="ツール" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="5,0" />
+                            <Button HorizontalAlignment="Right" Padding="4,0" Margin="0,1" FontSize="11"
+                                    Click="OnPaletteDockToggle" Content="&#x21F1;"
+                                    ToolTipService.ToolTip="パレットを切り離す（フロート）" />
+                        </Grid>
+                    </Border>
+                    <Border x:Name="ToolDockContent" Grid.Row="1">
+                <ScrollViewer x:Name="ToolScroll" VerticalScrollBarVisibility="Visible" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel x:Name="ToolStackPanel" Orientation="Vertical" Padding="2" Spacing="1" Width="64">
                         <!-- 選択ツール -->
                         <RadioButton
@@ -367,6 +383,8 @@
                         </DropDownButton>
                     </StackPanel>
                 </ScrollViewer>
+                    </Border>
+                </Grid>
             </Border>
 
             <!-- ナビゲーションツリー (P2) -->
@@ -436,10 +454,37 @@
                 </StackPanel>
             </Border>
 
-            <!-- Canvas + インラインテキストオーバーレイ -->
+            <!-- Canvas + インラインテキストオーバーレイ。上下端ドック帯（横ツールバー）でキャンバスを押し下げる -->
             <Grid Grid.Row="1" Grid.Column="2" Background="{ThemeResource AppCanvasBackgroundBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <!-- 上端ドック帯（横並びツールバー） -->
+                <Border
+                    x:Name="ToolTopDock"
+                    Grid.Row="0"
+                    Visibility="Collapsed"
+                    Background="{ThemeResource AppPaletteBackgroundBrush}"
+                    BorderBrush="{ThemeResource AppDividerBrush}"
+                    BorderThickness="0,0,0,1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" VerticalAlignment="Center" Padding="4,0" Margin="2,0" FontSize="11"
+                                Click="OnPaletteDockToggle" Content="&#x21F2;"
+                                ToolTipService.ToolTip="切り離す（フロート）" />
+                        <Border x:Name="ToolTopDockContent" Grid.Column="1" />
+                    </Grid>
+                </Border>
+
                 <canvas:CanvasControl
                     x:Name="Canvas"
+                    Grid.Row="1"
                     Draw="OnDraw"
                     PointerMoved="OnPointerMoved"
                     PointerPressed="OnPointerPressed"
@@ -450,6 +495,7 @@
                 <!-- 機器名インライン入力 -->
                 <TextBox
                     x:Name="DeviceNameBox"
+                    Grid.Row="1"
                     Visibility="Collapsed"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Top"
@@ -461,6 +507,7 @@
                 <!-- 枠ラベルインライン入力 -->
                 <TextBox
                     x:Name="FrameLabelBox"
+                    Grid.Row="1"
                     Visibility="Collapsed"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Top"
@@ -473,6 +520,7 @@
                 <!-- コメントインライン入力 (F2) -->
                 <TextBox
                     x:Name="CommentBox"
+                    Grid.Row="1"
                     Visibility="Collapsed"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Top"
@@ -485,6 +533,7 @@
                 <!-- 行コメントインライン入力（右母線右側ダブルクリック） -->
                 <TextBox
                     x:Name="RungCommentBox"
+                    Grid.Row="1"
                     Visibility="Collapsed"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Top"
@@ -494,6 +543,69 @@
                     PlaceholderText="行コメント"
                     KeyDown="OnRungCommentBoxKeyDown"
                     LostFocus="OnRungCommentBoxLostFocus" />
+
+                <!-- 下端ドック帯（横並びツールバー） -->
+                <Border
+                    x:Name="ToolBottomDock"
+                    Grid.Row="2"
+                    Visibility="Collapsed"
+                    Background="{ThemeResource AppPaletteBackgroundBrush}"
+                    BorderBrush="{ThemeResource AppDividerBrush}"
+                    BorderThickness="0,1,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" VerticalAlignment="Center" Padding="4,0" Margin="2,0" FontSize="11"
+                                Click="OnPaletteDockToggle" Content="&#x21F2;"
+                                ToolTipService.ToolTip="切り離す（フロート）" />
+                        <Border x:Name="ToolBottomDockContent" Grid.Column="1" />
+                    </Grid>
+                </Border>
+
+                <!-- フロートツールパレット用オーバーレイ（Background は x:Null：空き領域でポインタを奪わない） -->
+                <Canvas x:Name="ToolOverlay" Grid.Row="1" Background="{x:Null}" SizeChanged="OnToolOverlaySizeChanged">
+                    <!-- 上下端吸着プレビュー（ドラッグ中に吸着先を半透明帯で表示・ポインタ透過） -->
+                    <Border
+                        x:Name="ToolSnapPreview"
+                        Canvas.Left="0"
+                        Canvas.Top="0"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False"
+                        Opacity="0.30"
+                        Background="{ThemeResource AppStatusBarBackgroundBrush}"
+                        BorderBrush="{ThemeResource AppStatusBarBackgroundBrush}"
+                        BorderThickness="0,2" />
+                    <Border
+                        x:Name="ToolPaletteFloat"
+                        Canvas.Left="4"
+                        Canvas.Top="4"
+                        Visibility="Collapsed"
+                        Background="{ThemeResource AppPaletteBackgroundBrush}"
+                        BorderBrush="{ThemeResource AppDividerBrush}"
+                        BorderThickness="1"
+                        CornerRadius="3">
+                        <StackPanel Orientation="Vertical">
+                            <!-- ドラッグ用タイトルバー -->
+                            <Border
+                                x:Name="ToolPaletteHandle"
+                                Background="{ThemeResource AppToolbarBackgroundBrush}"
+                                PointerPressed="OnPalettePressed"
+                                PointerMoved="OnPaletteMoved"
+                                PointerReleased="OnPaletteReleased">
+                                <Grid>
+                                    <TextBlock Text="ツール" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" Margin="5,2" />
+                                    <Button HorizontalAlignment="Right" Padding="4,0" Margin="0,1" FontSize="11"
+                                            Click="OnPaletteDockToggle" Content="&#x21F2;"
+                                            ToolTipService.ToolTip="パレットを左にドック" />
+                                </Grid>
+                            </Border>
+                            <!-- フロート時はここに ToolScroll が入る -->
+                            <Border x:Name="ToolFloatContent" MaxHeight="640" />
+                        </StackPanel>
+                    </Border>
+                </Canvas>
             </Grid>
 
             <!-- 下部出力パネル (P3) -->

@@ -67,6 +67,7 @@ public sealed partial class MainPage : Page
         XamlCanvas.SetLeft(ToolPaletteFloat, left);
         XamlCanvas.SetTop(ToolPaletteFloat, top);
         SetPaletteDock(dock);
+        UpdateFloatMaxHeight();
     }
 
     private void SavePaletteState()
@@ -129,8 +130,9 @@ public sealed partial class MainPage : Page
     {
         ToolStackPanel.Orientation = horizontal ? Orientation.Horizontal : Orientation.Vertical;
         ToolStackPanel.Width = horizontal ? double.NaN : 64;
-        ToolScroll.HorizontalScrollBarVisibility = horizontal ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
-        ToolScroll.VerticalScrollBarVisibility = horizontal ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Auto;
+        // スクロールバーは常時表示（一番下の「その他▼」へ確実に到達できるよう）。
+        ToolScroll.HorizontalScrollBarVisibility = horizontal ? ScrollBarVisibility.Visible : ScrollBarVisibility.Disabled;
+        ToolScroll.VerticalScrollBarVisibility = horizontal ? ScrollBarVisibility.Disabled : ScrollBarVisibility.Visible;
 
         foreach (var child in ToolStackPanel.Children)
         {
@@ -158,8 +160,27 @@ public sealed partial class MainPage : Page
     // ドック⇄フロートのトグル。フロート以外 → フロート、フロート → 左ドック。
     private void OnPaletteDockToggle(object sender, RoutedEventArgs e)
     {
-        SetPaletteDock(_paletteDock == PaletteDock.Float ? PaletteDock.Left : PaletteDock.Float);
+        bool wasHorizontal = _paletteDock is PaletteDock.Top or PaletteDock.Bottom;
+        var next = _paletteDock == PaletteDock.Float ? PaletteDock.Left : PaletteDock.Float;
+        // 上下端ドックから切り離すと旧フロート位置が画面外/ゼロサイズで残り「消える」ことがある。
+        // 横ドック → フロート時は必ず作図エリア左上の見える位置へ戻す。
+        if (next == PaletteDock.Float && wasHorizontal)
+        {
+            XamlCanvas.SetLeft(ToolPaletteFloat, 4);
+            XamlCanvas.SetTop(ToolPaletteFloat, 4);
+        }
+        SetPaletteDock(next);
+        if (next == PaletteDock.Float) UpdateFloatMaxHeight();
         SavePaletteState();
+    }
+
+    // フロートパレットの高さを作図エリアに連動させ、はみ出しを防ぐ（一回り小さめに収める）。
+    // 収まらない分はスクロールバー（常時表示）で送る。
+    private void UpdateFloatMaxHeight()
+    {
+        double avail = ToolOverlay.ActualHeight;
+        if (avail <= 0) return;
+        ToolFloatContent.MaxHeight = Math.Max(120, avail - 24);
     }
 
     private void OnPalettePressed(object sender, PointerRoutedEventArgs e)
@@ -225,7 +246,10 @@ public sealed partial class MainPage : Page
     }
 
     private void OnToolOverlaySizeChanged(object sender, SizeChangedEventArgs e)
-        => ClampPaletteIntoView();
+    {
+        UpdateFloatMaxHeight();
+        ClampPaletteIntoView();
+    }
 
     private void OnPaletteReleased(object sender, PointerRoutedEventArgs e)
     {
