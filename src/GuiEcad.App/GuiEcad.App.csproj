@@ -16,10 +16,13 @@
     <Nullable>enable</Nullable>
     <!-- アプリのバージョン（About 画面はここから動的取得する）。 -->
     <Version>1.0.0</Version>
-    <!-- 配布物（exe プロパティ）に出る製品名・説明。会社名/発行者は未設定。 -->
+    <!-- 配布物（exe プロパティ）に出る製品名・発行者・説明。 -->
     <Product>GuiEcad</Product>
     <AssemblyTitle>GuiEcad</AssemblyTitle>
     <Description>GUI ラダー図エディタ</Description>
+    <Company>FK TEQUNO</Company>
+    <Authors>FK TEQUNO</Authors>
+    <Copyright>Copyright © 2026 FK TEQUNO</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

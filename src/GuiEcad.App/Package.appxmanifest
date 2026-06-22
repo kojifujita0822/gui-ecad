@@ -10,14 +10,14 @@
 
   <Identity
     Name="541A00D6-2BED-4336-B5C2-A31C1EEDB525"
-    Publisher="CN=AppPublisher"
-    Version="1.0.1.0" />
+    Publisher="CN=FK TEQUNO"
+    Version="1.0.0.0" />
 
   <mp:PhoneIdentity PhoneProductId="541A00D6-2BED-4336-B5C2-A31C1EEDB525" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
   <Properties>
-    <DisplayName>GuiEcad.App</DisplayName>
-    <PublisherDisplayName>AppPublisher</PublisherDisplayName>
+    <DisplayName>GuiEcad</DisplayName>
+    <PublisherDisplayName>FK TEQUNO</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -35,8 +35,8 @@
       Executable="$targetnametoken$.exe"
       EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="GuiEcad.App"
-        Description="GuiEcad.App"
+        DisplayName="GuiEcad"
+        Description="GUI ラダー図エディタ"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">

@@ -82,7 +82,7 @@ src/GuiEcad.App/bin/Release/net8.0-windows10.0.26100.0/win-x64/publish/
 - **トリミング不可**: `PublishTrimmed=True` にしてサイズ削減を狙うと WinUI 3 では `NETSDK1102` で失敗する。やらない。
 - **SmartScreen**: 署名なし EXE は初回起動時に Windows SmartScreen 警告が出ることがある（「詳細情報」→「実行」で起動可）。
   署名が必要になった段階で MSIX or Authenticode 署名を別途検討する。
-- **アイコン/メタ情報**: 製品名 `GuiEcad`・説明はファイルプロパティに反映済み。会社名/発行者は未設定（配布要件が固まり次第追加）。
+- **アイコン/メタ情報**: 製品名 `GuiEcad`・説明・発行者（Company/Authors=`FK TEQUNO`）・著作権（`Copyright © 2026 FK TEQUNO`）を csproj に設定済みでファイルプロパティへ反映される。MSIX 用 `Package.appxmanifest` も PublisherDisplayName=`FK TEQUNO`・Publisher=`CN=FK TEQUNO`・DisplayName=`GuiEcad`・Version=`1.0.0.0` に整備済み（Identity Name は既定 GUID のまま。実署名時に証明書の Subject と一致させる）。
 
 ---
 
