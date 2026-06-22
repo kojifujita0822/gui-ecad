@@ -16,6 +16,8 @@
     <Nullable>enable</Nullable>
     <!-- アプリのバージョン（About 画面はここから動的取得する）。 -->
     <Version>1.0.0</Version>
+    <!-- exe ファイル自体のアイコン（エクスプローラ/タスクバー表示）。 -->
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <!-- 配布物（exe プロパティ）に出る製品名・発行者・説明。 -->
     <Product>GuiEcad</Product>
     <AssemblyTitle>GuiEcad</AssemblyTitle>
@@ -33,7 +35,10 @@
     <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
     <Content Include="Assets\Square44x44Logo.targetsize-48_altform-lightunplated.png" />
     <Content Include="Assets\StoreLogo.png" />
-    <Content Include="Assets\AppIcon.ico" />
+    <!-- 実行時の AppWindow.SetIcon("Assets/AppIcon.ico") 用に出力へコピーする。 -->
+    <Content Include="Assets\AppIcon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
   </ItemGroup>
 
