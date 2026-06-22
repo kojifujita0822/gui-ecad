@@ -202,7 +202,7 @@ public sealed partial class MainPage
                     PartId = part is not null ? _placePartId : null,
                     CellWidth = part?.WidthCells ?? ElementCatalog.DefaultCellWidth(kind),
                 };
-                if (_placeOrient is not null) el.Params["Orient"] = _placeOrient;   // 主回路記号の向き
+                if (_placeOrient is not null) el.Params[ParamKeys.Orient] = _placeOrient;   // 主回路記号の向き
                 _history.Execute(new PlaceElementCommand(_sheet, el));
                 _selected = el;
                 RefreshDevicePanel();

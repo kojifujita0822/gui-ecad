@@ -665,17 +665,17 @@ public sealed class DiagramRenderer
 
         var part = _lib?.Get(e.PartId);
         r.PushTransform(X(lb), YRow(e.Pos.Row));
-        string? orient = e.Params.GetValueOrDefault("Orient");
+        string? orient = e.Params.GetValueOrDefault(ParamKeys.Orient);
         if (part is not null) PartDrawing.Draw(r, _theme, part, Cell, stroke);
         else SymbolGlyphs.Draw(r, stroke, e.Kind, width, Cell, fill,
-                               e.Params.GetValueOrDefault("Type"), orient);
+                               e.Params.GetValueOrDefault(ParamKeys.Type), orient);
         r.PopTransform();
 
         // 主回路ブレーカは Params["Type"]（NFB/MCCB/ELB、既定 NFB）を記号脇に小さく記す。
         // 縦向きは記号右・中央、横向きは記号上に置く（横向きは縦に背が高いため）。
         if (e.Kind == ElementKind.Breaker3P)
         {
-            var typ = e.Params.TryGetValue("Type", out var t) && !string.IsNullOrEmpty(t) ? t : "NFB";
+            var typ = e.Params.TryGetValue(ParamKeys.Type, out var t) && !string.IsNullOrEmpty(t) ? t : "NFB";
             bool horiz = orient == "H";
             var ts = _theme.Text(TextRole.DeviceName) with
             {
@@ -691,7 +691,7 @@ public sealed class DiagramRenderer
 
         // 表示灯の中央にランプ色（色記号）を記入
         if (e.Kind == ElementKind.Lamp &&
-            e.Params.TryGetValue("LampColor", out var lampColor) && !string.IsNullOrEmpty(lampColor))
+            e.Params.TryGetValue(ParamKeys.LampColor, out var lampColor) && !string.IsNullOrEmpty(lampColor))
         {
             var cs = _theme.Text(TextRole.DeviceName) with
             {
@@ -714,7 +714,7 @@ public sealed class DiagramRenderer
         r.PushTransform(X(lb), YRow(e.Pos.Row));
         if (part is not null) PartDrawing.Draw(r, _theme, part, Cell, stroke);
         else SymbolGlyphs.Draw(r, stroke, e.Kind, width, Cell, null,
-                               e.Params.GetValueOrDefault("Type"), e.Params.GetValueOrDefault("Orient"));
+                               e.Params.GetValueOrDefault(ParamKeys.Type), e.Params.GetValueOrDefault(ParamKeys.Orient));
         r.PopTransform();
     }
 
@@ -728,7 +728,7 @@ public sealed class DiagramRenderer
 
         double cx = X(lb) + width / 2;
         // 個別の LabelDy があればそれ、無ければ種別の既定オフセット。
-        double dy = e.Params.TryGetValue("LabelDy", out var s) &&
+        double dy = e.Params.TryGetValue(ParamKeys.LabelDy, out var s) &&
             double.TryParse(s, System.Globalization.NumberStyles.Any,
                 System.Globalization.CultureInfo.InvariantCulture, out double v)
             ? v : ElementCatalog.DefaultLabelDy(e.Kind);

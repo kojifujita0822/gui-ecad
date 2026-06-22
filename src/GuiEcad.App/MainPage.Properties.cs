@@ -151,7 +151,7 @@ public sealed partial class MainPage : Page
 
         if (_selected.Kind == ElementKind.SelectSwitch)
         {
-            int pos = _selected.Params.TryGetValue("Position", out var ps) &&
+            int pos = _selected.Params.TryGetValue(ParamKeys.Position, out var ps) &&
                       int.TryParse(ps, out int n) ? n : 0;
             PropertiesPanel.Children.Add(new TextBlock { Text = "ノッチ位置", FontSize = 11, Margin = new Thickness(0, 8, 0, 2) });
             var nb = new NumberBox
@@ -176,7 +176,7 @@ public sealed partial class MainPage : Page
         }
         else if (_selected.Kind == ElementKind.Timer)
         {
-            double setpoint = _selected.Params.TryGetValue("Setpoint", out var sp) &&
+            double setpoint = _selected.Params.TryGetValue(ParamKeys.Setpoint, out var sp) &&
                 double.TryParse(sp, System.Globalization.NumberStyles.Any,
                     System.Globalization.CultureInfo.InvariantCulture, out double d) ? d : 0;
             PropertiesPanel.Children.Add(new TextBlock { Text = "設定時間 (秒)", FontSize = 11, Margin = new Thickness(0, 8, 0, 2) });
@@ -195,7 +195,7 @@ public sealed partial class MainPage : Page
         else if (_selected.Kind == ElementKind.Lamp)
         {
             var lampElem = _selected;
-            string color = lampElem.Params.TryGetValue("LampColor", out var c) ? c : "";
+            string color = lampElem.Params.TryGetValue(ParamKeys.LampColor, out var c) ? c : "";
             PropertiesPanel.Children.Add(new TextBlock { Text = "ランプ色（中央表示）", FontSize = 11, Margin = new Thickness(0, 8, 0, 2) });
             var tb = new TextBox
             {
@@ -215,7 +215,7 @@ public sealed partial class MainPage : Page
         else if (_selected.Kind == ElementKind.Breaker3P)
         {
             var breakerElem = _selected;
-            string cur = breakerElem.Params.TryGetValue("Type", out var t) && !string.IsNullOrEmpty(t)
+            string cur = breakerElem.Params.TryGetValue(ParamKeys.Type, out var t) && !string.IsNullOrEmpty(t)
                 ? t : "NFB";
             PropertiesPanel.Children.Add(new TextBlock { Text = "ブレーカ種別", FontSize = 11, Margin = new Thickness(0, 8, 0, 2) });
             var combo = new ComboBox
@@ -252,14 +252,14 @@ public sealed partial class MainPage : Page
     private void OnPositionBoxChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
         if (_refreshingProps || _selected is null || double.IsNaN(args.NewValue)) return;
-        _history.Execute(new SetParamCommand(_sheet, _selected, "Position", ((int)args.NewValue).ToString()));
+        _history.Execute(new SetParamCommand(_sheet, _selected, ParamKeys.Position, ((int)args.NewValue).ToString()));
         Canvas.Invalidate();
     }
 
     private void OnSetpointBoxChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
         if (_refreshingProps || _selected is null || double.IsNaN(args.NewValue)) return;
-        _history.Execute(new SetParamCommand(_sheet, _selected, "Setpoint",
+        _history.Execute(new SetParamCommand(_sheet, _selected, ParamKeys.Setpoint,
             args.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         Canvas.Invalidate();
     }
@@ -268,9 +268,9 @@ public sealed partial class MainPage : Page
     {
         if (_refreshingProps) return;
         string val = text.Trim();
-        string cur = elem.Params.TryGetValue("LampColor", out var c) ? c : "";
+        string cur = elem.Params.TryGetValue(ParamKeys.LampColor, out var c) ? c : "";
         if (val == cur) return;
-        _history.Execute(new SetParamCommand(_sheet, elem, "LampColor", val));
+        _history.Execute(new SetParamCommand(_sheet, elem, ParamKeys.LampColor, val));
         Canvas.Invalidate();
     }
 
@@ -280,9 +280,9 @@ public sealed partial class MainPage : Page
     private void CommitBreakerType(ElementInstance elem, string type)
     {
         if (_refreshingProps) return;
-        string cur = elem.Params.TryGetValue("Type", out var t) && !string.IsNullOrEmpty(t) ? t : "NFB";
+        string cur = elem.Params.TryGetValue(ParamKeys.Type, out var t) && !string.IsNullOrEmpty(t) ? t : "NFB";
         if (type == cur) return;
-        _history.Execute(new SetParamCommand(_sheet, elem, "Type", type));
+        _history.Execute(new SetParamCommand(_sheet, elem, ParamKeys.Type, type));
         Canvas.Invalidate();
     }
 
@@ -345,7 +345,7 @@ public sealed partial class MainPage : Page
     /// <summary>ラベル（機器名・コメント）の高さオフセット調整を追加する（正で上へ、密集時の重なり回避）。</summary>
     private void AddLabelPositionSelector(ElementInstance elem)
     {
-        double dy = elem.Params.TryGetValue("LabelDy", out var v) &&
+        double dy = elem.Params.TryGetValue(ParamKeys.LabelDy, out var v) &&
             double.TryParse(v, System.Globalization.NumberStyles.Any,
                 System.Globalization.CultureInfo.InvariantCulture, out double d)
             ? d : ElementCatalog.DefaultLabelDy(elem.Kind);   // 未設定は種別既定値を表示
@@ -366,7 +366,7 @@ public sealed partial class MainPage : Page
     private void OnLabelDyChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
     {
         if (_refreshingProps || _selected is null || double.IsNaN(args.NewValue)) return;
-        _history.Execute(new SetParamCommand(_sheet, _selected, "LabelDy",
+        _history.Execute(new SetParamCommand(_sheet, _selected, ParamKeys.LabelDy,
             args.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         Canvas.Invalidate();
     }

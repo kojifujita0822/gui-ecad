@@ -138,7 +138,7 @@ public sealed partial class MainPage : Page
                 CellWidth = _document.Library?.Get(_placePartId)?.WidthCells
                             ?? ElementCatalog.DefaultCellWidth(pk),
             };
-            if (_placeOrient is not null) ghost.Params["Orient"] = _placeOrient;
+            if (_placeOrient is not null) ghost.Params[ParamKeys.Orient] = _placeOrient;
             dr.DrawPreview(renderer, ghost, new Color(120, 0, 120, 255));   // 半透明の青紫
         }
 

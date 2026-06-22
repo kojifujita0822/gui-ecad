@@ -260,10 +260,10 @@ public static class NetlistBuilder
                      : ComponentRole.Contact;
             int switchPos = 0;
             if (kind == ElementKind.SelectSwitch &&
-                e.Params.TryGetValue("Position", out var ps)) int.TryParse(ps, out switchPos);
+                e.Params.TryGetValue(ParamKeys.Position, out var ps)) int.TryParse(ps, out switchPos);
             // タイマコイル: 設定時間（秒）を Params["Setpoint"] から読む
             if (kind == ElementKind.Timer && !string.IsNullOrEmpty(e.DeviceName) &&
-                e.Params.TryGetValue("Setpoint", out var sp) &&
+                e.Params.TryGetValue(ParamKeys.Setpoint, out var sp) &&
                 double.TryParse(sp, System.Globalization.NumberStyles.Any,
                     System.Globalization.CultureInfo.InvariantCulture, out double setpoint))
             {
