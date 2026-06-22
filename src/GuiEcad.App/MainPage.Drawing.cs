@@ -1,0 +1,193 @@
+using System.Numerics;
+using System.Text;
+using GuiEcad.Model;
+using GuiEcad.Pdf;
+using GuiEcad.Persistence;
+using GuiEcad.Rendering;
+using GuiEcad.Simulation;
+using GuiEcad_App.Commands;
+using Microsoft.Graphics.Canvas.UI.Xaml;
+using Microsoft.UI.Input;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Animation;
+using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.Foundation;
+using Microsoft.Windows.Storage.Pickers;
+using Windows.Storage;
+using Windows.Storage.Streams;
+using Windows.System;
+using Windows.UI.Core;
+using WinRT.Interop;
+// x:Name="Canvas"（CanvasControl）と型名 Canvas が衝突するため、添付プロパティ用に別名を使う。
+using XamlCanvas = Microsoft.UI.Xaml.Controls.Canvas;
+
+namespace GuiEcad_App;
+
+public sealed partial class MainPage : Page
+{
+    // ===== 描画 =====
+
+    // 自由直線のスナップ細かさ: セルを何分割した格子に吸着するか（4=約2.25mm刻み）。
+    // 整数分割なので列境界(セル境界)・行中心も格子点に含まれ、記号端子に合わせつつ微調整もできる。
+    private const double LineSnapDiv = 4.0;
+
+    // ポインタ mm を細分格子に吸着する。
+    private (double X, double Y) SnapLine(double xMm, double yMm)
+    {
+        double step = _geo.CellMm / LineSnapDiv;
+        double x = Math.Round((xMm - _geo.MarginMm) / step) * step + _geo.MarginMm;
+        double y = Math.Round((yMm - _geo.MarginMm) / step) * step + _geo.MarginMm;
+        return (x, y);
+    }
+
+    private void OnDraw(CanvasControl sender, CanvasDrawEventArgs args)
+    {
+        double scale = DipsPerMm * _viewport.Zoom;
+        var transform = Matrix3x2.CreateScale((float)scale) * Matrix3x2.CreateTranslation((float)_viewport.PanX, (float)_viewport.PanY);
+
+        var renderer = new Win2DRenderer(args.DrawingSession, transform);
+        var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions { ConnectivityCheck = _connectivityCheck, ShowGrid = _showGrid });
+        dr.Render(renderer, _sheet, _document.Library, _testSession?.State);
+
+        // 図面枠ON時は、PDF出力1ページ分（A4縦）の範囲を仮枠ガイドで表示する。
+        // 長い図面でどこがページ境界かを作図中に把握できるようにする。
+        if (_document.Settings.EnableBorder)
+            DrawPageGuides(renderer);
+
+        // 検索ハイライト（現在シートの一致のみ描画）
+        for (int i = 0; i < _find.Results.Count; i++)
+        {
+            if (_find.Results[i].Sheet != _sheet) continue;
+            DrawElementHighlight(renderer, _find.Results[i].El,
+                i == _find.Index ? new Color(200, 255, 140, 0) : new Color(100, 255, 220, 0));
+        }
+
+        // 選択ハイライト
+        foreach (var e in _selectedSet)
+            DrawElementHighlight(renderer, e, new Color(80, 0, 120, 255));
+        foreach (var vc in _selectedConnectorSet)
+            renderer.DrawLine(new(_geo.X(vc.Column), _geo.YRow(vc.TopRow)),
+                              new(_geo.X(vc.Column), _geo.YRow(vc.BottomRow)),
+                              new StrokeStyle(DrawingTheme.Blue, 0.5));
+        foreach (var fl in _selectedLineSet)
+            renderer.DrawLine(new(fl.X1Mm, fl.Y1Mm), new(fl.X2Mm, fl.Y2Mm),
+                              new StrokeStyle(DrawingTheme.Blue, 0.5));
+
+        if (_rangeSelecting)
+        {
+            int r1 = Math.Min(_rangeStart.Row, _rangeEnd.Row);
+            int r2 = Math.Max(_rangeStart.Row, _rangeEnd.Row);
+            int c1 = Math.Min(_rangeStart.Column, _rangeEnd.Column);
+            int c2 = Math.Max(_rangeStart.Column, _rangeEnd.Column);
+            double rx = _geo.X(c1), ry = _geo.YRow(r1) - _geo.CellMm * 0.5;
+            double rw = (c2 - c1 + 1) * _geo.CellMm, rh = (r2 - r1 + 1) * _geo.CellMm;
+            renderer.DrawRectangle(new(rx, ry, rw, rh),
+                new StrokeStyle(DrawingTheme.Blue, 0.2, LineStyle.Dashed));
+        }
+
+        if (_selected is not null) DrawSelection(renderer, _selected);
+        if (_selectedConnector is VerticalConnector sc)
+            renderer.DrawLine(new(_geo.X(sc.Column), _geo.YRow(sc.TopRow)),
+                              new(_geo.X(sc.Column), _geo.YRow(sc.BottomRow)),
+                              new StrokeStyle(DrawingTheme.Blue, 0.5));
+
+        // 縦コネクタ配置プレビュー（ドラッグ中の仮線）
+        if (_connStartRow is int cs)
+        {
+            double x = _geo.X(_connBoundary);
+            int top = Math.Min(cs, _connCurRow), bot = Math.Max(cs, _connCurRow);
+            renderer.DrawLine(new(x, _geo.YRow(top)), new(x, _geo.YRow(bot)),
+                new StrokeStyle(DrawingTheme.Blue, 0.3));
+        }
+
+        // 直線ドラッグ中のプレビュー
+        if (_lineStartMm is (double lsx, double lsy))
+            renderer.DrawLine(new(lsx, lsy), new(_lineCurMm.X, _lineCurMm.Y),
+                              new StrokeStyle(DrawingTheme.Blue, 0.3));
+
+        // 枠ドラッグ中のプレビュー（mm 連続座標）
+        if (_frameStartMm is (double sx, double sy))
+        {
+            double fx = Math.Min(sx, _frameCurMm.X), fy = Math.Min(sy, _frameCurMm.Y);
+            double fw = Math.Abs(_frameCurMm.X - sx), fh = Math.Abs(_frameCurMm.Y - sy);
+            renderer.DrawRectangle(new(fx, fy, fw, fh), new StrokeStyle(DrawingTheme.Blue, 0.25, LineStyle.Dashed));
+        }
+
+        // 選択中の自由直線ハイライト
+        if (_selectedLine is FreeLine sl)
+            renderer.DrawLine(new(sl.X1Mm, sl.Y1Mm), new(sl.X2Mm, sl.Y2Mm),
+                              new StrokeStyle(new Color(160, 0, 120, 220), 0.8));
+
+        // 選択中の接続点ハイライト（青い輪）
+        if (_selectedDot is ConnectionDot sd)
+            renderer.DrawCircle(new(sd.XMm, sd.YMm), _geo.CellMm * 0.22,
+                                new StrokeStyle(DrawingTheme.Blue, 0.3));
+
+        // 記号配置ツール選択中：マウス位置に半透明の配置プレビュー（ゴースト）を描く。
+        // 配置可能なセル範囲（列内）にいるときだけ表示し、有効範囲を視認できるようにする。
+        if (!_testMode && _placeKind is ElementKind pk
+            && _hoverCell.Row >= 0 && _hoverCell.Column >= 0 && _hoverCell.Column < _sheet.Grid.Columns)
+        {
+            var ghost = new ElementInstance
+            {
+                Kind = pk,
+                Pos = _hoverCell,
+                PartId = _placePartId,
+                CellWidth = _document.Library?.Get(_placePartId)?.WidthCells
+                            ?? ElementCatalog.DefaultCellWidth(pk),
+            };
+            if (_placeOrient is not null) ghost.Params["Orient"] = _placeOrient;
+            dr.DrawPreview(renderer, ghost, new Color(120, 0, 120, 255));   // 半透明の青紫
+        }
+
+        // 選択中の枠ハイライト
+        if (_selectedFrame is GroupFrame sf)
+        {
+            double fx = sf.VisualXMm ?? _geo.X(sf.TopLeft.Column);
+            double fy = sf.VisualYMm ?? (_geo.YRow(sf.TopLeft.Row) - _geo.CellMm * 0.4);
+            double fw = sf.VisualWidthMm ?? sf.Width * _geo.CellMm;
+            double fh = sf.VisualHeightMm ?? sf.Height * _geo.CellMm;
+            renderer.DrawRectangle(new(fx, fy, fw, fh), new StrokeStyle(DrawingTheme.Blue, 0.4));
+        }
+    }
+
+    private void DrawSelection(Win2DRenderer r, ElementInstance e)
+    {
+        var (l, right) = PartResolver.BoundarySpan(e, _document.Library);
+        double pad = _geo.CellMm * 0.12;
+        double x = _geo.X(l) - pad, y = _geo.YRow(e.Pos.Row) - _geo.CellMm * 0.5 - pad;
+        double w = (right - l) * _geo.CellMm + 2 * pad, h = _geo.CellMm + 2 * pad;
+        r.DrawRectangle(new(x, y, w, h), new StrokeStyle(DrawingTheme.Blue, 0.3));
+    }
+
+    private void DrawElementHighlight(Win2DRenderer r, ElementInstance e, Color color)
+    {
+        var (l, right) = PartResolver.BoundarySpan(e, _document.Library);
+        double pad = _geo.CellMm * 0.1;
+        double x = _geo.X(l) - pad, y = _geo.YRow(e.Pos.Row) - _geo.CellMm * 0.5 - pad;
+        double w = (right - l) * _geo.CellMm + 2 * pad, h = _geo.CellMm + 2 * pad;
+        r.FillRectangle(new(x, y, w, h), color);
+    }
+
+    // 図面枠ON時の PDF 1ページ分（A4縦 210x297mm）の境界を仮枠として描く。
+    // 内容の高さに応じて縦方向にページ境界を繰り返し、どこがページ境界か作図中に分かるようにする。
+    private void DrawPageGuides(Win2DRenderer r)
+    {
+        const double a4w = 210.0;                       // A4縦の幅 (mm)
+        int rpp = DiagramRenderer.RowsPerPage;          // 1ページの行数（PDF分割と一致）
+        double cell = _geo.CellMm, margin = _geo.MarginMm;
+        int maxRow = _sheet.Elements.Count > 0 ? _sheet.Elements.Max(e => e.Pos.Row) : 0;
+        int totalRows = Math.Max(_sheet.Grid.Rows, maxRow + 1);
+        int pages = Math.Max(1, (totalRows + rpp - 1) / rpp);
+        double bandH = rpp * cell;
+        var guide = new StrokeStyle(new Color(150, 40, 90, 200), 0.3, LineStyle.Dashed);
+        // A4幅 × 30行 の帯を縦に積み、各帯が1ページに相当することを示す。
+        for (int p = 0; p < pages; p++)
+            r.DrawRectangle(new(0, margin + p * bandH, a4w, bandH), guide);
+    }
+
+    // ===== ツール選択 =====
+
+}

@@ -357,8 +357,8 @@ public sealed partial class MainPage
 
         if (_panning)
         {
-            _panX += pos.X - _lastPointer.X;
-            _panY += pos.Y - _lastPointer.Y;
+            _viewport.PanX += pos.X - _lastPointer.X;
+            _viewport.PanY += pos.Y - _lastPointer.Y;
             _lastPointer = pos;
             Canvas.Invalidate();
         }
@@ -526,9 +526,9 @@ public sealed partial class MainPage
     {
         _editingFrame = frame;
         FrameLabelBox.Text = frame.Label ?? string.Empty;
-        double scale = DipsPerMm * _zoom;
-        double x = _geo.X(frame.TopLeft.Column) * scale + _panX;
-        double y = (_geo.YRow(frame.TopLeft.Row) - _geo.CellMm * 0.4) * scale + _panY - 18;
+        double scale = DipsPerMm * _viewport.Zoom;
+        double x = _geo.X(frame.TopLeft.Column) * scale + _viewport.PanX;
+        double y = (_geo.YRow(frame.TopLeft.Row) - _geo.CellMm * 0.4) * scale + _viewport.PanY - 18;
         FrameLabelBox.Margin = new Thickness(x, Math.Max(0, y), 0, 0);
         FrameLabelBox.Visibility = Visibility.Visible;
         FrameLabelBox.Focus(FocusState.Programmatic);
@@ -568,10 +568,10 @@ public sealed partial class MainPage
         _editingElement = elem;
         DeviceNameBox.Text = elem.DeviceName ?? string.Empty;
 
-        double scale = DipsPerMm * _zoom;
+        double scale = DipsPerMm * _viewport.Zoom;
         double cellDip = _geo.CellMm * scale;
-        double x = _geo.X(elem.Pos.Column) * scale + _panX + cellDip * 0.5 - 45;
-        double y = _geo.YRow(elem.Pos.Row) * scale + _panY - 14;
+        double x = _geo.X(elem.Pos.Column) * scale + _viewport.PanX + cellDip * 0.5 - 45;
+        double y = _geo.YRow(elem.Pos.Row) * scale + _viewport.PanY - 14;
         DeviceNameBox.Margin = new Thickness(x, y, 0, 0);
         DeviceNameBox.Visibility = Visibility.Visible;
         DeviceNameBox.Focus(FocusState.Programmatic);
@@ -615,11 +615,11 @@ public sealed partial class MainPage
         _editingComment = elem;
         CommentBox.Text = elem.Comment ?? string.Empty;
 
-        double scale = DipsPerMm * _zoom;
+        double scale = DipsPerMm * _viewport.Zoom;
         double cellDip = _geo.CellMm * scale;
-        double x = _geo.X(elem.Pos.Column) * scale + _panX + cellDip * 0.5 - 45;
+        double x = _geo.X(elem.Pos.Column) * scale + _viewport.PanX + cellDip * 0.5 - 45;
         // コメント表示位置（記号の下側・やや記号寄り）に合わせて編集ボックスも出す。
-        double y = _geo.YRow(elem.Pos.Row) * scale + _panY + cellDip * 0.5 - 1;
+        double y = _geo.YRow(elem.Pos.Row) * scale + _viewport.PanY + cellDip * 0.5 - 1;
         CommentBox.Margin = new Thickness(x, y, 0, 0);
         CommentBox.Visibility = Visibility.Visible;
         CommentBox.Focus(FocusState.Programmatic);
@@ -664,9 +664,9 @@ public sealed partial class MainPage
         _editingRungComment = rc;
         RungCommentBox.Text = rc.Text;
 
-        double scale = DipsPerMm * _zoom;
-        double rightEdgeDip = (_geo.X(_sheet.Grid.Columns) + _geo.CellMm * 0.5) * scale + _panX + 4;
-        double y = _geo.YRow(rc.Row) * scale + _panY - 14;
+        double scale = DipsPerMm * _viewport.Zoom;
+        double rightEdgeDip = (_geo.X(_sheet.Grid.Columns) + _geo.CellMm * 0.5) * scale + _viewport.PanX + 4;
+        double y = _geo.YRow(rc.Row) * scale + _viewport.PanY - 14;
         RungCommentBox.Margin = new Thickness(rightEdgeDip, y, 0, 0);
         RungCommentBox.Visibility = Visibility.Visible;
         RungCommentBox.Focus(FocusState.Programmatic);

@@ -114,8 +114,7 @@ public sealed partial class MainPage
         _testMode = false;
         TestModeBtn.IsChecked = false;
         StatusMode.Text = "作画モード";
-        _findResults.Clear();
-        _findIndex = -1;
+        _find.Clear();
         RebuildNavTree();
         RebuildOtherPartMenu();
         RefreshDevicePanel();
@@ -144,8 +143,7 @@ public sealed partial class MainPage
             _savedUndoDepth = 0;
             _testSessions.Clear();
             _testSession = _testMode ? GetOrCreateTestSession(_sheet) : null;
-            _findResults.Clear();
-            _findIndex = -1;
+            _find.Clear();
             RebuildNavTree();
             RebuildOtherPartMenu();
             RefreshDevicePanel();
