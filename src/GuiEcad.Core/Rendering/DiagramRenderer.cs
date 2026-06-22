@@ -149,7 +149,8 @@ public sealed class DiagramRenderer
         if (!sheet.MainCircuit)
             DrawRungWires(r, sheet, columns, elemNet, netlist, report, powered, rowStart, rowEnd);
         DrawConnectors(r, sheet, rowStart, rowEnd);
-        DrawFreeLines(r, sheet);
+        DrawFreeLines(r, sheet, rowStart, rowEnd, totalRows);
+        DrawDots(r, sheet, rowStart, rowEnd);
         DrawFrames(r, sheet);
         foreach (var e in sheet.Elements)
             if (InWindow(e.Pos.Row)) DrawElement(r, e, energized, sim?.Inputs);
@@ -342,17 +343,19 @@ public sealed class DiagramRenderer
     }
 
     // 設置場所グルーピング枠（点線矩形＋左上ラベル）
-    // 作図ガイドの薄いグリッド（列境界・行境界の格子）。背面に描く。
+    // 作図ガイドの薄いグリッド。背面に描く。
+    // 縦線=列境界（要素の左右ポート位置）、横線=行中心（行番号・要素中心・横向き記号の極と一致）。
     private void DrawGrid(IRenderer r, int columns, int rows)
     {
         var s = _theme.Get(StrokeRole.Grid);
-        double yTop = _opt.MarginMm, yBot = _opt.MarginMm + rows * Cell;
+        // 縦線は行中心の上下半セルまで張る（横線が行中心にあるため枠が閉じるように）。
+        double yTop = _opt.MarginMm + 0.5 * Cell, yBot = _opt.MarginMm + (rows - 0.5) * Cell;
         for (int c = 0; c <= columns; c++)
             r.DrawLine(new(X(c), yTop), new(X(c), yBot), s);
         double xL = X(0), xR = X(columns);
-        for (int rw = 0; rw <= rows; rw++)
+        for (int rw = 0; rw < rows; rw++)
         {
-            double y = _opt.MarginMm + rw * Cell;
+            double y = _opt.MarginMm + (rw + 0.5) * Cell;   // 行中心（行番号と同じ位置）
             r.DrawLine(new(xL, y), new(xR, y), s);
         }
     }
@@ -361,13 +364,39 @@ public sealed class DiagramRenderer
     private double PageY(double mmY) => mmY - _rowBase * Cell;
 
     // 自由直線（主回路の母線・結線・注記線）。mm 実座標をページ Y 補正して描く。
-    private void DrawFreeLines(IRenderer r, Sheet sheet)
+    // 複数ページ分割時のみ、当該ページの行ウィンドウへ縦クリップして余白・表題欄へのはみ出しを防ぐ
+    // （要素・コネクタは InWindow で行クリップ済みだが、自由直線は mm 座標のため別途クリップが要る）。
+    private void DrawFreeLines(IRenderer r, Sheet sheet, int rowStart, int rowEnd, int totalRows)
     {
+        if (sheet.FreeLines.Count == 0) return;
+
+        bool partialPage = rowStart > 0 || rowEnd < totalRows;
+        if (partialPage)
+        {
+            double bandTop = _opt.MarginMm;
+            double bandH = Math.Max(1, rowEnd - rowStart) * Cell;
+            // 横方向は十分広く取り（横はみ出しは元々問題にならない）、縦のみページバンドに制限する。
+            r.PushClip(new Rect2D(-1000, bandTop, 100000, bandH));
+        }
+
         foreach (var fl in sheet.FreeLines)
         {
             var s = _theme.Get(StrokeRole.Wire) with { Style = fl.Style };
             r.DrawLine(new(fl.X1Mm, PageY(fl.Y1Mm)), new(fl.X2Mm, PageY(fl.Y2Mm)), s);
         }
+
+        if (partialPage) r.PopClip();
+    }
+
+    // 手動接続点（●）。mm 実座標をページ Y 補正して描く。ページ行ウィンドウ外の点は描かない。
+    private void DrawDots(IRenderer r, Sheet sheet, int rowStart, int rowEnd)
+    {
+        if (sheet.ConnectionDots.Count == 0) return;
+        double bandTop = _opt.MarginMm + rowStart * Cell, bandBot = _opt.MarginMm + rowEnd * Cell;
+        var col = _theme.Get(StrokeRole.Wire).Color;
+        foreach (var d in sheet.ConnectionDots)
+            if (d.YMm >= bandTop && d.YMm <= bandBot)
+                r.FillCircle(new(d.XMm, PageY(d.YMm)), Cell * 0.10, col);
     }
 
     private void DrawFrames(IRenderer r, Sheet sheet)
@@ -636,9 +665,29 @@ public sealed class DiagramRenderer
 
         var part = _lib?.Get(e.PartId);
         r.PushTransform(X(lb), YRow(e.Pos.Row));
+        string? orient = e.Params.GetValueOrDefault("Orient");
         if (part is not null) PartDrawing.Draw(r, _theme, part, Cell, stroke);
-        else SymbolGlyphs.Draw(r, stroke, e.Kind, width, Cell, fill);
+        else SymbolGlyphs.Draw(r, stroke, e.Kind, width, Cell, fill,
+                               e.Params.GetValueOrDefault("Type"), orient);
         r.PopTransform();
+
+        // 主回路ブレーカは Params["Type"]（NFB/MCCB/ELB、既定 NFB）を記号脇に小さく記す。
+        // 縦向きは記号右・中央、横向きは記号上に置く（横向きは縦に背が高いため）。
+        if (e.Kind == ElementKind.Breaker3P)
+        {
+            var typ = e.Params.TryGetValue("Type", out var t) && !string.IsNullOrEmpty(t) ? t : "NFB";
+            bool horiz = orient == "H";
+            var ts = _theme.Text(TextRole.DeviceName) with
+            {
+                FontSizeMm = 2.2,
+                HAlign = horiz ? HAlign.Center : HAlign.Left,
+                VAlign = horiz ? VAlign.Bottom : VAlign.Middle,
+            };
+            var at = horiz
+                ? new Point2D(X(lb) + width / 2, YRow(e.Pos.Row) - Cell * 1.05)
+                : new Point2D(X(rb) + 1.0, YRow(e.Pos.Row));
+            r.DrawText(typ, at, ts);
+        }
 
         // 表示灯の中央にランプ色（色記号）を記入
         if (e.Kind == ElementKind.Lamp &&
@@ -652,6 +701,21 @@ public sealed class DiagramRenderer
         }
 
         DrawElementLabel(r, e, lb, rb, width);
+    }
+
+    /// <summary>配置プレビュー用に1要素を指定色（半透明可）で描く。Render の後に呼ぶこと
+    /// （_lib・_rowBase=0 などの描画状態を再利用する）。グリッド座標 e.Pos に従う。</summary>
+    public void DrawPreview(IRenderer r, ElementInstance e, Color color)
+    {
+        int lb = LeftBoundary(e);
+        double width = e.CellWidth * Cell;
+        var stroke = _theme.Get(StrokeRole.SymbolOutline) with { Color = color };
+        var part = _lib?.Get(e.PartId);
+        r.PushTransform(X(lb), YRow(e.Pos.Row));
+        if (part is not null) PartDrawing.Draw(r, _theme, part, Cell, stroke);
+        else SymbolGlyphs.Draw(r, stroke, e.Kind, width, Cell, null,
+                               e.Params.GetValueOrDefault("Type"), e.Params.GetValueOrDefault("Orient"));
+        r.PopTransform();
     }
 
     // 機器名ラベルを記号の上・中央に描く。

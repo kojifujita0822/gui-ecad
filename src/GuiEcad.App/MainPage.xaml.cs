@@ -49,6 +49,7 @@ public sealed partial class MainPage : Page
     // 作画状態
     private ElementKind? _placeKind;
     private string? _placePartId;   // 配置対象が自作パーツのとき PartLibrary の Id（組込み種別なら null）
+    private string? _placeOrient;   // 主回路記号の配置時の向き（"V"/"H"・通常記号は null）
     private ElementInstance? _selected;
     private ElementInstance? _moving;
     private GridPos _moveStartPos;
@@ -122,6 +123,9 @@ public sealed partial class MainPage : Page
     private (double X, double Y)? _lineStartMm;
     private (double X, double Y) _lineCurMm;
     private FreeLine? _selectedLine;
+    // 接続点（●）ツール
+    private bool _placeDot;
+    private ConnectionDot? _selectedDot;
     // 自由直線のドラッグ移動
     private bool _movingLine;
     private (double X, double Y) _lineMoveClick;
@@ -140,13 +144,15 @@ public sealed partial class MainPage : Page
     private GridPos _rangeEnd;
     private HashSet<ElementInstance> _selectedSet = new();
     private HashSet<VerticalConnector> _selectedConnectorSet = new();   // 範囲選択に含まれる分岐線（縦コネクタ）
+    private HashSet<FreeLine> _selectedLineSet = new();                 // 範囲選択に含まれる自由直線
 
-    // 複数選択（要素＋分岐線）をまとめて解除する。
-    private void ClearMultiSelection() { _selectedSet.Clear(); _selectedConnectorSet.Clear(); }
+    // 複数選択（要素＋分岐線＋自由直線）をまとめて解除する。
+    private void ClearMultiSelection() { _selectedSet.Clear(); _selectedConnectorSet.Clear(); _selectedLineSet.Clear(); }
 
     // コピー・ペースト
     private sealed record ClipboardData(
-        List<ElementInstance> Elements, List<VerticalConnector> Connectors, int OriginRow, int OriginCol);
+        List<ElementInstance> Elements, List<VerticalConnector> Connectors,
+        List<FreeLine> FreeLines, int OriginRow, int OriginCol);
     private ClipboardData? _clipboard;
     private GridPos _hoverCell;   // 直近のマウス位置セル（ペースト基準・OnPointerMoved で更新）
 
@@ -335,6 +341,9 @@ public sealed partial class MainPage : Page
             renderer.DrawLine(new(_geo.X(vc.Column), _geo.YRow(vc.TopRow)),
                               new(_geo.X(vc.Column), _geo.YRow(vc.BottomRow)),
                               new StrokeStyle(DrawingTheme.Blue, 0.5));
+        foreach (var fl in _selectedLineSet)
+            renderer.DrawLine(new(fl.X1Mm, fl.Y1Mm), new(fl.X2Mm, fl.Y2Mm),
+                              new StrokeStyle(DrawingTheme.Blue, 0.5));
 
         if (_rangeSelecting)
         {
@@ -380,6 +389,28 @@ public sealed partial class MainPage : Page
         if (_selectedLine is FreeLine sl)
             renderer.DrawLine(new(sl.X1Mm, sl.Y1Mm), new(sl.X2Mm, sl.Y2Mm),
                               new StrokeStyle(new Color(160, 0, 120, 220), 0.8));
+
+        // 選択中の接続点ハイライト（青い輪）
+        if (_selectedDot is ConnectionDot sd)
+            renderer.DrawCircle(new(sd.XMm, sd.YMm), _geo.CellMm * 0.22,
+                                new StrokeStyle(DrawingTheme.Blue, 0.3));
+
+        // 記号配置ツール選択中：マウス位置に半透明の配置プレビュー（ゴースト）を描く。
+        // 配置可能なセル範囲（列内）にいるときだけ表示し、有効範囲を視認できるようにする。
+        if (!_testMode && _placeKind is ElementKind pk
+            && _hoverCell.Row >= 0 && _hoverCell.Column >= 0 && _hoverCell.Column < _sheet.Grid.Columns)
+        {
+            var ghost = new ElementInstance
+            {
+                Kind = pk,
+                Pos = _hoverCell,
+                PartId = _placePartId,
+                CellWidth = _document.Library?.Get(_placePartId)?.WidthCells
+                            ?? ElementCatalog.DefaultCellWidth(pk),
+            };
+            if (_placeOrient is not null) ghost.Params["Orient"] = _placeOrient;
+            dr.DrawPreview(renderer, ghost, new Color(120, 0, 120, 255));   // 半透明の青紫
+        }
 
         // 選択中の枠ハイライト
         if (_selectedFrame is GroupFrame sf)
@@ -442,10 +473,12 @@ public sealed partial class MainPage : Page
         _placeConnector = tag == "connector";
         _placeFrame = tag == "frame";
         _placeLine = tag == "line";
+        _placeDot = tag == "dot";
         _frameStartMm = null;
         _lineStartMm = null;
         _connStartRow = null;
         _placePartId = null;
+        _placeOrient = null;
         _placeKind = Enum.TryParse<ElementKind>(tag, out var k) ? k : null;
         if (OtherPartButton is not null) OtherPartButton.Content = "その他部品";
     }
@@ -455,8 +488,16 @@ public sealed partial class MainPage : Page
     {
         if (sender is not MenuFlyoutItem item || item.Tag is not string tag) return;
 
+        // 直線/枠/コネクタの作画状態を解除（OnToolSelected と同等）。
+        // これを忘れると直前に「直線」等を選んでいた場合クリックがそちらに吸われ記号を配置できない。
         _placeConnector = false;
+        _placeFrame = false;
+        _placeLine = false;
+        _placeDot = false;
+        _frameStartMm = null;
+        _lineStartMm = null;
         _connStartRow = null;
+        _placeOrient = null;
         ClearToolRadios();
 
         if (tag.StartsWith("part:", StringComparison.Ordinal))
@@ -467,7 +508,11 @@ public sealed partial class MainPage : Page
         }
         else
         {
-            if (!Enum.TryParse<ElementKind>(tag, out var kind)) return;
+            // 主回路記号は "Kind#V/#H" で向きを指定。配置時に Params["Orient"] へ反映。
+            string kindTag = tag;
+            int hash = tag.IndexOf('#');
+            if (hash >= 0) { _placeOrient = tag[(hash + 1)..]; kindTag = tag[..hash]; }
+            if (!Enum.TryParse<ElementKind>(kindTag, out var kind)) return;
             _placePartId = null;
             _placeKind = kind;
         }
@@ -621,6 +666,14 @@ public sealed partial class MainPage : Page
         ("サーマル(OL)", "ThermalOverload"),
         ("非常停止", "EmergencyStop"),
         ("三相モータ", "Motor"),
+        // 主回路（三相動力）用の3極記号。タグ "Kind#V/#H" で配置時に向きを確定（切替不可）。
+        // 型(NFB/MCCB/ELB)はブレーカ配置後にプロパティパネルで切替。
+        ("ブレーカ(NFB/MCCB/ELB) 縦", "Breaker3P#V"),
+        ("ブレーカ(NFB/MCCB/ELB) 横", "Breaker3P#H"),
+        ("電磁接触器 主接点 縦", "ContactorMain3P#V"),
+        ("電磁接触器 主接点 横", "ContactorMain3P#H"),
+        ("サーマル(OL) 2極 縦", "ThermalOverload3P#V"),
+        ("サーマル(OL) 2極 横", "ThermalOverload3P#H"),
     };
 
     private void AddOtherBuiltins(IList<MenuFlyoutItemBase> items)
@@ -935,6 +988,36 @@ public sealed partial class MainPage : Page
             };
             PropertiesPanel.Children.Add(tb);
         }
+        else if (_selected.Kind == ElementKind.Breaker3P)
+        {
+            var breakerElem = _selected;
+            string cur = breakerElem.Params.TryGetValue("Type", out var t) && !string.IsNullOrEmpty(t)
+                ? t : "NFB";
+            PropertiesPanel.Children.Add(new TextBlock { Text = "ブレーカ種別", FontSize = 11, Margin = new Thickness(0, 8, 0, 2) });
+            var combo = new ComboBox
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                FontSize = 12,
+            };
+            foreach (var name in BreakerTypes)
+                combo.Items.Add(new ComboBoxItem { Content = name });
+            int idx = Array.IndexOf(BreakerTypes, cur);
+            combo.SelectedIndex = idx >= 0 ? idx : 0;
+            combo.SelectionChanged += (_, _) =>
+            {
+                if ((combo.SelectedItem as ComboBoxItem)?.Content is string sel)
+                    CommitBreakerType(breakerElem, sel);
+            };
+            PropertiesPanel.Children.Add(combo);
+            PropertiesPanel.Children.Add(new TextBlock
+            {
+                Text = "NFB/MCCB は同形・ELB は漏電テストボタン印付き。記号脇にラベル表示。",
+                FontSize = 10,
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.6,
+                Margin = new Thickness(0, 4, 0, 0),
+            });
+        }
 
         // 要素を選択したら右パネルを表示しプロパティタブへ切替（プロパティ編集をすぐ可能に）
         ShowPropertiesPanel();
@@ -966,6 +1049,19 @@ public sealed partial class MainPage : Page
         _history.Execute(new SetParamCommand(_sheet, elem, "LampColor", val));
         Canvas.Invalidate();
     }
+
+    // 主回路ブレーカの種別（記号は同形・ELB のみテストボタン印。Params["Type"] 未設定時は NFB 扱い）。
+    private static readonly string[] BreakerTypes = { "NFB", "MCCB", "ELB" };
+
+    private void CommitBreakerType(ElementInstance elem, string type)
+    {
+        if (_refreshingProps) return;
+        string cur = elem.Params.TryGetValue("Type", out var t) && !string.IsNullOrEmpty(t) ? t : "NFB";
+        if (type == cur) return;
+        _history.Execute(new SetParamCommand(_sheet, elem, "Type", type));
+        Canvas.Invalidate();
+    }
+
 
     /// <summary>機器名・コメントの一般属性編集欄をプロパティパネルへ追加する（全要素共通）。</summary>
     private void AddGeneralAttributes(ElementInstance elem)
@@ -1074,6 +1170,9 @@ public sealed partial class MainPage : Page
         ElementKind.Lamp => "表示灯",
         ElementKind.Terminal => "端子",
         ElementKind.Motor => "モータ",
+        ElementKind.Breaker3P => "ブレーカ",
+        ElementKind.ContactorMain3P => "MC主接点",
+        ElementKind.ThermalOverload3P => "OL(3P)",
         _ => "?",
     };
 
@@ -1220,12 +1319,23 @@ public sealed partial class MainPage : Page
         var conns = _selectedConnectorSet.Count > 0
             ? _selectedConnectorSet.ToList()
             : _selectedConnector is not null ? new List<VerticalConnector> { _selectedConnector } : new();
-        if (elems.Count == 0 && conns.Count == 0) return;
+        // 自由直線：範囲選択 → 単一選択の順。
+        var lines = _selectedLineSet.Count > 0
+            ? _selectedLineSet.ToList()
+            : _selectedLine is not null ? new List<FreeLine> { _selectedLine } : new();
+        if (elems.Count == 0 && conns.Count == 0 && lines.Count == 0) return;
 
-        // 選択全体の左上を原点として相対座標に変換する（要素・分岐線の両方を含めて最小を取る）。
+        // 選択全体の左上を原点として相対座標に変換する（要素・分岐線・自由直線を含めて最小を取る）。
         int minRow = int.MaxValue, minCol = int.MaxValue;
         foreach (var e in elems) { minRow = Math.Min(minRow, e.Pos.Row); minCol = Math.Min(minCol, e.Pos.Column); }
         foreach (var c in conns) { minRow = Math.Min(minRow, c.TopRow); minCol = Math.Min(minCol, (int)Math.Floor(c.Column)); }
+        foreach (var l in lines)
+        {
+            minRow = Math.Min(minRow, _geo.RowAt(Math.Min(l.Y1Mm, l.Y2Mm)));
+            minCol = Math.Min(minCol, _geo.ColAt(Math.Min(l.X1Mm, l.X2Mm)));
+        }
+        // 自由直線は mm 座標なので、原点セルの mm 位置を引いて相対化する。
+        double oxMm = _geo.X(minCol), oyMm = _geo.YRow(minRow) - _geo.CellMm * 0.5;
 
         _clipboard = new ClipboardData(
             Elements: elems.Select(e =>
@@ -1239,6 +1349,12 @@ public sealed partial class MainPage : Page
                 Column = c.Column - minCol,        // double のまま（.5 の中央位置も維持）
                 TopRow = c.TopRow - minRow,
                 BottomRow = c.BottomRow - minRow,
+            }).ToList(),
+            FreeLines: lines.Select(l => new FreeLine
+            {
+                X1Mm = l.X1Mm - oxMm, Y1Mm = l.Y1Mm - oyMm,
+                X2Mm = l.X2Mm - oxMm, Y2Mm = l.Y2Mm - oyMm,
+                Style = l.Style,
             }).ToList(),
             OriginRow: minRow,
             OriginCol: minCol);
@@ -1269,16 +1385,28 @@ public sealed partial class MainPage : Page
                 BottomRow = baseRow + c.BottomRow,
             })
             .ToList();
+        // 自由直線：原点セルの mm 位置を足して貼り付け位置へ平行移動。
+        double bxMm = _geo.X(baseCol), byMm = _geo.YRow(baseRow) - _geo.CellMm * 0.5;
+        var placedLines = _clipboard.FreeLines
+            .Select(l => new FreeLine
+            {
+                X1Mm = bxMm + l.X1Mm, Y1Mm = byMm + l.Y1Mm,
+                X2Mm = bxMm + l.X2Mm, Y2Mm = byMm + l.Y2Mm,
+                Style = l.Style,
+            })
+            .ToList();
 
         var cmds = placedElems.Select(p => (IUndoCommand)new PlaceElementCommand(_sheet, p))
             .Concat(placedConns.Select(c => (IUndoCommand)new AddConnectorCommand(_sheet, c)))
+            .Concat(placedLines.Select(l => (IUndoCommand)new PlaceFreeLineCommand(_sheet, l)))
             .ToList();
         if (cmds.Count == 0) return;
         _history.Execute(new BatchCommand(_sheet, cmds));
 
-        // 貼り付け直後は新要素・分岐線を選択状態にして、続けて移動・削除できるようにする。
+        // 貼り付け直後は新要素・分岐線・自由直線を選択状態にして、続けて移動・削除できるようにする。
         _selectedSet = new HashSet<ElementInstance>(placedElems);
         _selectedConnectorSet = new HashSet<VerticalConnector>(placedConns);
+        _selectedLineSet = new HashSet<FreeLine>(placedLines);
         ClearSelection();
         RefreshDevicePanel();
         Canvas.Invalidate();
@@ -1299,11 +1427,12 @@ public sealed partial class MainPage : Page
 
     private void DeleteSelected()
     {
-        if (_selectedSet.Count > 0 || _selectedConnectorSet.Count > 0)
+        if (_selectedSet.Count > 0 || _selectedConnectorSet.Count > 0 || _selectedLineSet.Count > 0)
         {
             var cmds = _selectedSet
                 .Select(e => (IUndoCommand)new DeleteElementCommand(_sheet, e))
                 .Concat(_selectedConnectorSet.Select(c => (IUndoCommand)new DeleteConnectorCommand(_sheet, c)))
+                .Concat(_selectedLineSet.Select(l => (IUndoCommand)new DeleteFreeLineCommand(_sheet, l)))
                 .ToList();
             _history.Execute(new BatchCommand(_sheet, cmds));
             ClearMultiSelection();
@@ -1337,6 +1466,25 @@ public sealed partial class MainPage : Page
             _selectedLine = null;
             Canvas.Invalidate();
         }
+        else if (_selectedDot is not null)
+        {
+            _history.Execute(new DeleteDotCommand(_sheet, _selectedDot));
+            _selectedDot = null;
+            Canvas.Invalidate();
+        }
+    }
+
+    // 点(xMm,yMm)に最も近い接続点を当たり判定半径内で返す。
+    private ConnectionDot? HitTestDot(double xMm, double yMm)
+    {
+        double best = _geo.CellMm * 0.25;   // 当たり判定半径(mm)
+        ConnectionDot? hit = null;
+        foreach (var d in _sheet.ConnectionDots)
+        {
+            double dist = Math.Sqrt((d.XMm - xMm) * (d.XMm - xMm) + (d.YMm - yMm) * (d.YMm - yMm));
+            if (dist <= best) { best = dist; hit = d; }
+        }
+        return hit;
     }
 
     // 点(xMm,yMm)に最も近い自由直線を当たり判定半径内で返す。
@@ -1739,10 +1887,10 @@ public sealed partial class MainPage : Page
         var ctxElem = HitTest(row, col);
 
         // --- コピー＆貼り付け（要素上／範囲選択中はコピー、クリップボードがあればクリック位置へ貼り付け） ---
-        if (ctxElem is not null || _selectedSet.Count > 0 || _selectedConnectorSet.Count > 0)
+        if (ctxElem is not null || _selectedSet.Count > 0 || _selectedConnectorSet.Count > 0 || _selectedLineSet.Count > 0)
             AddItem(menu, "コピー(Ctrl+C)", () =>
             {
-                if (_selectedSet.Count == 0 && _selectedConnectorSet.Count == 0 && ctxElem is not null)
+                if (_selectedSet.Count == 0 && _selectedConnectorSet.Count == 0 && _selectedLineSet.Count == 0 && ctxElem is not null)
                     SelectElement(ctxElem);
                 CopySelection();
             });

@@ -58,6 +58,30 @@ internal sealed class DeleteFreeLineCommand : IUndoCommand
     public void Undo() => _sheet.FreeLines.Add(_line);
 }
 
+internal sealed class PlaceDotCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly ConnectionDot _dot;
+
+    public PlaceDotCommand(Sheet sheet, ConnectionDot dot) { _sheet = sheet; _dot = dot; }
+
+    public Sheet Target => _sheet;
+    public void Execute() => _sheet.ConnectionDots.Add(_dot);
+    public void Undo() => _sheet.ConnectionDots.Remove(_dot);
+}
+
+internal sealed class DeleteDotCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly ConnectionDot _dot;
+
+    public DeleteDotCommand(Sheet sheet, ConnectionDot dot) { _sheet = sheet; _dot = dot; }
+
+    public Sheet Target => _sheet;
+    public void Execute() => _sheet.ConnectionDots.Remove(_dot);
+    public void Undo() => _sheet.ConnectionDots.Add(_dot);
+}
+
 internal sealed class MoveFreeLineCommand : IUndoCommand
 {
     private readonly Sheet _sheet;

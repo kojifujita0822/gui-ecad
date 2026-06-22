@@ -28,11 +28,12 @@ public sealed partial class MainPage
     // ===== ポインタ =====
 
     // 要素／縦コネクタ／枠／自由直線の選択は相互排他。選んだ1種以外を null にする（分岐ごとの重複クリアを集約）。
-    private void SelectElement(ElementInstance e) { _selected = e; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; }
-    private void SelectConnector(VerticalConnector c) { _selectedConnector = c; _selected = null; _selectedFrame = null; _selectedLine = null; }
-    private void SelectFrame(GroupFrame f) { _selectedFrame = f; _selected = null; _selectedConnector = null; _selectedLine = null; }
-    private void SelectLine(FreeLine l) { _selectedLine = l; _selected = null; _selectedConnector = null; _selectedFrame = null; }
-    private void ClearSelection() { _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; }
+    private void SelectElement(ElementInstance e) { _selected = e; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; }
+    private void SelectConnector(VerticalConnector c) { _selectedConnector = c; _selected = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; }
+    private void SelectFrame(GroupFrame f) { _selectedFrame = f; _selected = null; _selectedConnector = null; _selectedLine = null; _selectedDot = null; }
+    private void SelectLine(FreeLine l) { _selectedLine = l; _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedDot = null; }
+    private void SelectDot(ConnectionDot d) { _selectedDot = d; _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; }
+    private void ClearSelection() { _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; }
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
@@ -149,6 +150,18 @@ public sealed partial class MainPage
             return;
         }
 
+        // 作画モード：接続点ツール（1クリックで●を配置・格子点スナップ）
+        if (_placeDot)
+        {
+            if (xMm >= 0 && yMm >= 0)
+            {
+                var (dx, dy) = SnapLine(xMm, yMm);
+                _history.Execute(new PlaceDotCommand(_sheet, new ConnectionDot { XMm = dx, YMm = dy }));
+                Canvas.Invalidate();
+            }
+            return;
+        }
+
         // 作画モード：枠ツール（ドラッグ開始・mm 連続座標）
         if (_placeFrame)
         {
@@ -189,6 +202,7 @@ public sealed partial class MainPage
                     PartId = part is not null ? _placePartId : null,
                     CellWidth = part?.WidthCells ?? ElementCatalog.DefaultCellWidth(kind),
                 };
+                if (_placeOrient is not null) el.Params["Orient"] = _placeOrient;   // 主回路記号の向き
                 _history.Execute(new PlaceElementCommand(_sheet, el));
                 _selected = el;
                 RefreshDevicePanel();
@@ -220,6 +234,10 @@ public sealed partial class MainPage
             _moveFrameOriginY = hitFrame.VisualYMm ?? (_geo.YRow(hitFrame.TopLeft.Row) - _geo.CellMm * 0.4);
             _moveFrameClickX = xMm;
             _moveFrameClickY = yMm;
+        }
+        else if (HitTestDot(xMm, yMm) is ConnectionDot hitDot)
+        {
+            SelectDot(hitDot);   // 線の交点上に置かれるため自由直線より先に判定
         }
         else if (HitTestFreeLine(xMm, yMm) is FreeLine hitLine)
         {
@@ -257,6 +275,8 @@ public sealed partial class MainPage
         int sRow = _geo.RowAt(syMm), sCol = _geo.ColAt(sxMm);
         StatusPos.Text = $"行: {Math.Max(sRow + 1, 1)}  列: {Math.Max(sCol + 1, 1)}";
         if (sRow >= 0 && sCol >= 0) _hoverCell = new GridPos(sRow, sCol);   // ペースト基準に使用
+        // 記号配置ツール選択中はマウス追従の配置プレビューを再描画する。
+        if (!_testMode && _placeKind is not null) Canvas.Invalidate();
 
         if (_rangeSelecting)
         {
@@ -361,6 +381,13 @@ public sealed partial class MainPage
             _selectedConnectorSet = new HashSet<VerticalConnector>(
                 _sheet.Connectors.Where(vc => vc.TopRow >= r1 && vc.BottomRow <= r2
                                            && vc.Column >= c1 && vc.Column <= c2 + 1));
+            // 自由直線：両端が選択範囲（mm 換算）に完全に収まるものを含める。
+            double rxL = _geo.X(c1), rxR = _geo.X(c2 + 1);
+            double ryT = _geo.YRow(r1) - _geo.CellMm * 0.5, ryB = _geo.YRow(r2) + _geo.CellMm * 0.5;
+            _selectedLineSet = new HashSet<FreeLine>(
+                _sheet.FreeLines.Where(fl =>
+                    Math.Min(fl.X1Mm, fl.X2Mm) >= rxL - 0.01 && Math.Max(fl.X1Mm, fl.X2Mm) <= rxR + 0.01 &&
+                    Math.Min(fl.Y1Mm, fl.Y2Mm) >= ryT - 0.01 && Math.Max(fl.Y1Mm, fl.Y2Mm) <= ryB + 0.01));
             Canvas.ReleasePointerCapture(e.Pointer);
             Canvas.Invalidate();
             return;

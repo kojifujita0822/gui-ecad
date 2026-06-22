@@ -18,6 +18,8 @@ public static class PartResolver
     public static (int Left, int Right) BoundarySpan(ElementInstance e, PartLibrary? lib)
     {
         var ports = Ports(e, lib);
+        // 接続点を持たない記号（主回路3極記号・ゼロポート自作パーツ）は CellWidth で占有幅を決める。
+        if (ports.Count == 0) return (e.Pos.Column, e.Pos.Column + Math.Max(1, e.CellWidth));
         int min = ports[0].BoundaryOffset, max = ports[0].BoundaryOffset;
         foreach (var p in ports) { min = Math.Min(min, p.BoundaryOffset); max = Math.Max(max, p.BoundaryOffset); }
         return (e.Pos.Column + min, e.Pos.Column + max);

@@ -345,6 +345,13 @@
                                 <TextBlock FontSize="10" HorizontalAlignment="Center" Text="直線" />
                             </StackPanel>
                         </RadioButton>
+                        <RadioButton GroupName="Tools" Style="{StaticResource ToolBtnStyle}" Tag="dot"
+                                     Checked="OnToolSelected" ToolTipService.ToolTip="接続点（●）。縦横の線の交点などに1クリックで配置（格子点に吸着）">
+                            <StackPanel>
+                                <TextBlock Width="44" Height="32" FontSize="20" HorizontalAlignment="Center" TextAlignment="Center" Text="&#x25CF;" />
+                                <TextBlock FontSize="10" HorizontalAlignment="Center" Text="点" />
+                            </StackPanel>
+                        </RadioButton>
                         <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource AppDividerBrush}" />
                         <!-- その他 -->
                         <DropDownButton x:Name="OtherPartButton" HorizontalAlignment="Center" FontSize="11" Content="その他▼"

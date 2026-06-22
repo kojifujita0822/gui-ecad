@@ -9,7 +9,10 @@ public enum ElementKind
     // サンプル凡例の追加パーツ（2端子）。タイマ接点・OL は初期は手動入力（docs/simulation.md）。
     TimerContactNO, TimerContactNC, EmergencyStop, ThermalOverload,
     // 三相モータ（多端子）。三相動力回路は制御回路と別系統のため初期は記号のみ・非シミュレート。
-    Motor
+    Motor,
+    // 主回路（三相動力）用の3極記号。すべて非シミュレート・3セル幅・縦流れ（上→下）。
+    // Breaker3P は Params["Type"]=NFB/MCCB/ELB でラベル・付加印を出し分ける。
+    Breaker3P, ContactorMain3P, ThermalOverload3P
 }
 
 /// <summary>グリッド座標（行・列）。Row はデータ上の内部座標（ステップ番号ではない）。
@@ -69,6 +72,15 @@ public sealed class FreeLine
     {
         X1Mm = X1Mm, Y1Mm = Y1Mm, X2Mm = X2Mm, Y2Mm = Y2Mm, Style = Style,
     };
+}
+
+/// <summary>手動で配置する接続点（●）。主回路で縦横の自由直線の交点などに記入する。座標は mm 実座標。</summary>
+public sealed class ConnectionDot
+{
+    public double XMm { get; set; }
+    public double YMm { get; set; }
+
+    public ConnectionDot DeepClone() => new() { XMm = XMm, YMm = YMm };
 }
 
 /// <summary>同一列で複数行をつなぐ縦渡り（分岐）。接点に黒ドット● を描画して明示。</summary>

@@ -8,6 +8,8 @@ public static class ElementCatalog
     {
         // セレクトSWはノッチ毎の2端子接点（1セル）。位置は ElementInstance.Params["Position"]。
         ElementKind.Motor => 3,   // 三相 U/V/W の3端子を横並びに確保（暫定レイアウト）
+        // 主回路3極記号は 2×2 セル（sample.png 準拠）。
+        ElementKind.Breaker3P or ElementKind.ContactorMain3P or ElementKind.ThermalOverload3P => 2,
         _ => 1,
     };
 
@@ -25,6 +27,9 @@ public static class ElementCatalog
             new PortDef("V", 0, 1),
             new PortDef("W", 0, 2),
         },
+        // 主回路3極記号は自由配線（FreeLine）で結線するため接続点を持たない（ネットリスト非関与）。
+        ElementKind.Breaker3P or ElementKind.ContactorMain3P or ElementKind.ThermalOverload3P
+            => System.Array.Empty<PortDef>(),
         _ => new[]
         {
             new PortDef("L", 0, 0),

@@ -11,8 +11,9 @@ namespace GuiEcad.Rendering;
 internal static class SymbolGlyphs
 {
     public static void Draw(IRenderer r, StrokeStyle s, ElementKind kind, double width, double cell,
-                            Color? manualFill = null)
+                            Color? manualFill = null, string? variant = null, string? orient = null)
     {
+        bool horiz = orient == "H";   // 主回路3極記号の向き（既定=縦流れ V）。
         double cx = width / 2;
 
         switch (kind)
@@ -36,6 +37,10 @@ internal static class SymbolGlyphs
             case ElementKind.Lamp: Lamp(r, s, cx, width, cell); break;
             case ElementKind.Terminal: Terminal(r, s, cx, width, cell); break;
             case ElementKind.Motor: Motor(r, s, width, cell); break;
+
+            case ElementKind.Breaker3P: Breaker3P(r, s, width, variant, horiz); break;
+            case ElementKind.ContactorMain3P: ContactorMain3P(r, s, width, horiz); break;
+            case ElementKind.ThermalOverload3P: ThermalOverload3P(r, s, width, horiz); break;
 
             default:
                 Leads(r, s, cx, width, cell, 0.3);
@@ -205,25 +210,138 @@ internal static class SymbolGlyphs
         L(r, s, cx, cell, -0.17, 0.17, 0.17, -0.17);
     }
 
-    // 三相モータ: 大円＋左に縦3端子(∅)＋リード。ユーザー提供DXFを3セル幅に正規化。
-    // 座標は「3セル幅基準・原点=最左ポート・+y下」。width に比例スケール（k = width/3）。
+    // 三相モータ: 大円＋左に縦3端子(⊘)＋リード。U/V/W 端子は 1セル間隔（y=-1/0/1・グリッド線上）に
+    // 揃え、上流の主回路記号（接触器・サーマル等）の極とまっすぐつながるようにする。k = width/3 = 1セル。
     private static void Motor(IRenderer r, StrokeStyle s, double width, double cell)
     {
         double k = width / 3.0;
         void M(double x1, double y1, double x2, double y2) => r.DrawLine(new(x1 * k, y1 * k), new(x2 * k, y2 * k), s);
         void O(double x, double y, double rad) => r.DrawCircle(new(x * k, y * k), rad * k, s);
 
-        O(2.009, 0, 0.991);                 // 本体大円
-        O(0.224, -1.189, 0.198);            // 端子 U
-        O(0.224, 0, 0.198);                 // 端子 V
-        O(0.224, 1.190, 0.198);             // 端子 W
-        M(0, -0.965, 0.449, -1.414);        // ∅斜線 U
-        M(0, 0.224, 0.449, -0.224);         // ∅斜線 V
-        M(0, 1.414, 0.449, 0.965);          // ∅斜線 W
-        M(0.423, 0, 1.017, 0);              // リード V→本体
-        M(0.423, -1.189, 0.819, -1.189);    // リード U（水平）
-        M(1.308, -0.701, 0.819, -1.189);    // リード U（斜め）→本体
-        M(0.423, 1.190, 0.819, 1.190);      // リード W（水平）
-        M(1.308, 0.701, 0.819, 1.190);      // リード W（斜め）→本体
+        const double xT = 0.30, rT = 0.18;   // 端子 ⊘ の x 位置・半径
+        const double xC = 2.05, rB = 0.92;   // 本体大円の中心 x・半径
+
+        O(xC, 0, rB);                        // 本体大円
+        foreach (var y in new[] { -1.0, 0.0, 1.0 })
+        {
+            M(0, y, xT - rT, y);                       // 入線（左境界→端子）
+            O(xT, y, rT);                              // 端子 ○
+            M(xT - rT, y + rT, xT + rT, y - rT);       // ⊘ 斜線
+        }
+        M(xT + rT, 0, xC - rB, 0);           // リード V→本体（水平直結）
+        M(xT + rT, -1, 1.25, -0.46);         // リード U（斜め）→本体上左
+        M(xT + rT, 1, 1.25, 0.46);           // リード W（斜め）→本体下左
+    }
+
+    // ===== 主回路（三相動力）用 3極記号（sample.png 準拠・2×2セル）=====
+    // 原点=左境界・行中心 y0、+x右・+y下。1 単位 = k = width/2（CellWidth=2）＝1セル。
+    // 極の間隔はグリッドピッチ（1セル）に一致させ、母線（自由直線）がグリッド線上で極に重なるようにする。
+    // 向きは配置時に確定（縦流れ V / 横流れ H・切替不可）。「流れ軸 f」と「極の並び軸」を入れ替える。
+    //   縦(V): 極は x=0/1/2（列境界＝縦グリッド線上）、流れは y∈[-1,1]（上→下）。
+    //   横(H): 極は y=-1/0/1（1セル間隔・アンカー行中心）、流れは x∈[0,2]（左→右、実図面準拠）。
+    private static readonly double[] PoleAcrossV = { 0.0, 1.0, 2.0 };
+    private static readonly double[] PoleAcrossH = { -1.0, 0.0, 1.0 };
+
+    // 1極ぶんの座標マッパ。(f=流れ位置, g=流れに直交する極中心からのオフセット) を実 mm へ写す。
+    private readonly struct Pole
+    {
+        private readonly IRenderer _r; private readonly StrokeStyle _s;
+        private readonly bool _h; private readonly double _k; private readonly double _c;
+        public Pole(IRenderer r, StrokeStyle s, bool h, double k, double c)
+        { _r = r; _s = s; _h = h; _k = k; _c = c; }
+        private Point2D P(double f, double g) => _h ? new(f * _k, (_c + g) * _k) : new((_c + g) * _k, f * _k);
+        public void L(double f1, double g1, double f2, double g2) => _r.DrawLine(P(f1, g1), P(f2, g2), _s);
+        public void Circ(double f, double g, double rad) => _r.DrawCircle(P(f, g), rad * _k, _s);
+        public void Rect(double f1, double g1, double f2, double g2)
+        {
+            var a = P(f1, g1); var b = P(f2, g2);
+            _r.DrawRectangle(new(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y),
+                                 Math.Abs(b.X - a.X), Math.Abs(b.Y - a.Y)), _s);
+        }
+        // 上に膨らむ弧（端子間をまたぐ ∩）をポリラインで近似。頂点は g = -ha。
+        public void Arc(double fL, double fR, double ha, int n = 10)
+        {
+            double fc = (fL + fR) / 2, d = (fR - fL) / 2;
+            double pf = fL, pg = 0;
+            for (int i = 1; i <= n; i++)
+            {
+                double th = Math.PI * i / n;
+                double f = fc - d * Math.Cos(th), g = -ha * Math.Sin(th);
+                L(pf, pg, f, g); pf = f; pg = g;
+            }
+        }
+    }
+
+    // 連動（ガング）線を3極の across 軸方向に1本引く（f 固定・極中心+gのライン）。
+    private static void Gang(IRenderer r, StrokeStyle s, bool h, double k, double[] poles, double f, double g)
+    {
+        Point2D Pt(double c) => h ? new(f * k, (c + g) * k) : new((c + g) * k, f * k);
+        r.DrawLine(Pt(poles[0]), Pt(poles[2]), s);
+    }
+
+    // 配線用遮断器（NFB/MCCB/ELB）: 各極=左右の端子○＋上をまたぐ弧、3極の弧頂点を縦線で連動。
+    // ELB はテストボタン印付き。
+    private static void Breaker3P(IRenderer r, StrokeStyle s, double width, string? variant, bool h)
+    {
+        double k = width / 2.0;
+        var poles = h ? PoleAcrossH : PoleAcrossV;
+        double fMin = h ? 0 : -1, fMax = h ? 2 : 1, fMid = (fMin + fMax) / 2;
+        const double d = 0.40, rc = 0.12, ha = 0.42;
+
+        foreach (var c in poles)
+        {
+            var p = new Pole(r, s, h, k, c);
+            p.L(fMin, 0, fMid - d - rc, 0);   // 入線
+            p.Circ(fMid - d, 0, rc);          // 端子○（左）
+            p.Circ(fMid + d, 0, rc);          // 端子○（右）
+            p.L(fMid + d + rc, 0, fMax, 0);   // 出線
+            p.Arc(fMid - d, fMid + d, ha);    // 端子上をまたぐ弧 ∩
+        }
+        // 連動（実線）：3極の弧頂点（f=fMid, g=-ha）を横断
+        Gang(r, s, h, k, poles, fMid, -ha);
+
+        if (variant == "ELB")
+            // 漏電遮断器：最外極の外側にテストボタン（小四角）
+            new Pole(r, s, h, k, poles[2] + 0.55).Rect(fMid - 0.13, -0.13, fMid + 0.13, 0.13);
+    }
+
+    // 電磁接触器 主接点(3P): 各極=線のギャップ＋向かい合う2本の縦バー（─┤ ├─）。連動線なし。
+    private static void ContactorMain3P(IRenderer r, StrokeStyle s, double width, bool h)
+    {
+        double k = width / 2.0;
+        var poles = h ? PoleAcrossH : PoleAcrossV;
+        double fMin = h ? 0 : -1, fMax = h ? 2 : 1, fMid = (fMin + fMax) / 2;
+        const double gap = 0.16, tb = 0.26;
+
+        foreach (var c in poles)
+        {
+            var p = new Pole(r, s, h, k, c);
+            p.L(fMin, 0, fMid - gap, 0);            // 入線
+            p.L(fMid - gap, -tb, fMid - gap, tb);   // 左バー │
+            p.L(fMid + gap, -tb, fMid + gap, tb);   // 右バー │
+            p.L(fMid + gap, 0, fMax, 0);            // 出線
+        }
+    }
+
+    // サーマルリレー(OL): 2極（外側2線）に Z字段のヒータ素子、中央(S)は素通り。連動線なし。
+    private static void ThermalOverload3P(IRenderer r, StrokeStyle s, double width, bool h)
+    {
+        double k = width / 2.0;
+        var poles = h ? PoleAcrossH : PoleAcrossV;
+        double fMin = h ? 0 : -1, fMax = h ? 2 : 1, fMid = (fMin + fMax) / 2;
+        const double W = 0.22, hh = 0.18;
+
+        for (int i = 0; i < 3; i++)
+        {
+            var p = new Pole(r, s, h, k, poles[i]);
+            if (i == 1) { p.L(fMin, 0, fMax, 0); continue; }   // 中央(S)は素通り
+            p.L(fMin, 0, fMid - W, 0);          // 入線
+            p.L(fMid - W, 0, fMid - W, -hh);    // 上へ
+            p.L(fMid - W, -hh, fMid, -hh);      // 上段
+            p.L(fMid, -hh, fMid, hh);           // 基線をまたいで下へ
+            p.L(fMid, hh, fMid + W, hh);        // 下段
+            p.L(fMid + W, hh, fMid + W, 0);     // 基線へ戻る
+            p.L(fMid + W, 0, fMax, 0);          // 出線
+        }
     }
 }
