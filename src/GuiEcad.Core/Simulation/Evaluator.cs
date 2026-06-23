@@ -136,7 +136,15 @@ public sealed class Evaluator
             return c.DeviceName is not null
                 && s.Positions.TryGetValue(c.DeviceName, out var pos) && pos == c.SwitchPosition;
 
-        // タイマ接点: タイマコイル励磁 AND 経過時間 >= 設定時間
+        // タイマ瞬時接点: タイマコイル励磁の瞬間に開閉（経過時間に依存しない）。
+        if (c.Kind is ElementKind.TimerInstantContactNO or ElementKind.TimerInstantContactNC)
+        {
+            bool coilOn = c.DeviceName is not null &&
+                          s.Energized.TryGetValue(c.DeviceName, out var ie) && ie;
+            return c.Kind == ElementKind.TimerInstantContactNO ? coilOn : !coilOn;
+        }
+
+        // タイマ限時接点: タイマコイル励磁 AND 経過時間 >= 設定時間
         if (c.Kind is ElementKind.TimerContactNO or ElementKind.TimerContactNC)
         {
             bool coilOn = c.DeviceName is not null &&

@@ -10,6 +10,21 @@
 
 ---
 
+## [1.0.3] - 2026-06-23
+
+### 追加
+- タイマ瞬時接点（限時とは別に、コイル通電の瞬間に開閉する瞬時 a接点/b接点）を追加
+- タイマ接点に種別ミニラベル（限時=「限」/ 瞬時=「瞬」）を機器名横に表示
+- テストモードのタイマ計時を実時間カウントに変更（手動 Tick を廃止・一時停止トグル付き）
+- テストモードで作動中の限時接点の上に「残り時間」を小窓表示
+- 配線分断ツール：同一行の横配線をノード間で削除し、別ネットに分ける（短絡回避・線番分割）
+- タイマ設定時間をプロパティの数値入力／スライダー（0〜10秒・1秒刻み）で設定（接点側からも設定可能）
+
+### 修正
+- 行の先頭要素が縦コネクタ（分岐）から給電される回路で、左母線へ誤って短絡していた不具合を修正（母線終端ロジックを描画と整合）
+
+---
+
 ## [1.0.2] - 2026-06-23
 
 ### 追加
@@ -59,7 +74,8 @@
 ---
 
 <!-- リンク定義 -->
-[Unreleased]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/kojifujita0822/gui-ecad/releases/tag/v1.0.0

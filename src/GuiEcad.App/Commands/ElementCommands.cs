@@ -154,6 +154,26 @@ internal sealed class DeleteConnectorCommand : IUndoCommand
     public void Undo() => _sheet.Connectors.Add(_connector);
 }
 
+internal sealed class AddWireBreakCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly WireBreak _break;
+    public AddWireBreakCommand(Sheet sheet, WireBreak wireBreak) { _sheet = sheet; _break = wireBreak; }
+    public Sheet Target => _sheet;
+    public void Execute() => _sheet.WireBreaks.Add(_break);
+    public void Undo() => _sheet.WireBreaks.Remove(_break);
+}
+
+internal sealed class DeleteWireBreakCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly WireBreak _break;
+    public DeleteWireBreakCommand(Sheet sheet, WireBreak wireBreak) { _sheet = sheet; _break = wireBreak; }
+    public Sheet Target => _sheet;
+    public void Execute() => _sheet.WireBreaks.Remove(_break);
+    public void Undo() => _sheet.WireBreaks.Add(_break);
+}
+
 internal sealed class RenameDeviceCommand : IUndoCommand
 {
     private readonly Sheet _sheet;
@@ -241,6 +261,7 @@ internal sealed class DeleteLastRowCommand : IUndoCommand
     private readonly Sheet _sheet;
     private List<ElementInstance> _removedElements = new();
     private List<VerticalConnector> _removedConnectors = new();
+    private List<WireBreak> _removedBreaks = new();
     private List<(GroupFrame Frame, int OldHeight)> _shrunkFrames = new();
     private List<GroupFrame> _removedFrames = new();
     private List<RungComment> _removedComments = new();
@@ -256,6 +277,8 @@ internal sealed class DeleteLastRowCommand : IUndoCommand
         _removedConnectors = _sheet.Connectors
             .Where(c => c.TopRow == lastRow || c.BottomRow == lastRow).ToList();
         foreach (var c in _removedConnectors) _sheet.Connectors.Remove(c);
+        _removedBreaks = _sheet.WireBreaks.Where(b => b.Row == lastRow).ToList();
+        foreach (var b in _removedBreaks) _sheet.WireBreaks.Remove(b);
         _removedComments = _sheet.RungComments.Where(rc => rc.Row == lastRow).ToList();
         foreach (var rc in _removedComments) _sheet.RungComments.Remove(rc);
         _shrunkFrames = new();
@@ -362,6 +385,8 @@ internal static class RowOps
         }
         foreach (var rc in sheet.RungComments)
             if (Hit(rc.Row)) rc.Row += delta;
+        foreach (var wb in sheet.WireBreaks)
+            if (Hit(wb.Row)) wb.Row += delta;
     }
 }
 
@@ -397,6 +422,7 @@ internal sealed class DeleteRowCommand : IUndoCommand
     private readonly int _targetRow;
     private List<ElementInstance> _removedElements = new();
     private List<VerticalConnector> _removedConnectors = new();
+    private List<WireBreak> _removedBreaks = new();
     private List<(GroupFrame Frame, int OldHeight)> _shrunkFrames = new();
     private List<GroupFrame> _removedFrames = new();
     private List<RungComment> _removedComments = new();
@@ -411,6 +437,8 @@ internal sealed class DeleteRowCommand : IUndoCommand
         _removedConnectors = _sheet.Connectors
             .Where(c => c.TopRow == _targetRow || c.BottomRow == _targetRow).ToList();
         foreach (var c in _removedConnectors) _sheet.Connectors.Remove(c);
+        _removedBreaks = _sheet.WireBreaks.Where(b => b.Row == _targetRow).ToList();
+        foreach (var b in _removedBreaks) _sheet.WireBreaks.Remove(b);
         _removedComments = _sheet.RungComments.Where(rc => rc.Row == _targetRow).ToList();
         foreach (var rc in _removedComments) _sheet.RungComments.Remove(rc);
         _shrunkFrames = new();
@@ -435,11 +463,13 @@ internal sealed class DeleteRowCommand : IUndoCommand
             if (f.TopLeft.Row >= _targetRow) f.TopLeft = f.TopLeft with { Row = f.TopLeft.Row + 1 };
         foreach (var e in _removedElements) _sheet.Elements.Add(e);
         foreach (var c in _removedConnectors) _sheet.Connectors.Add(c);
+        foreach (var b in _removedBreaks) _sheet.WireBreaks.Add(b);
         foreach (var rc in _removedComments) _sheet.RungComments.Add(rc);
         foreach (var (frame, oldH) in _shrunkFrames) frame.Height = oldH;
         foreach (var f in _removedFrames) _sheet.Frames.Add(f);
         _removedElements = new();
         _removedConnectors = new();
+        _removedBreaks = new();
         _removedComments = new();
         _shrunkFrames = new();
         _removedFrames = new();

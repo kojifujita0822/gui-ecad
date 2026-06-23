@@ -114,6 +114,8 @@ public sealed partial class MainPage
         _testSession = null;
         _testMode = false;
         TestModeBtn.IsChecked = false;
+        StopRealtimeTimer();
+        TimerTickPanel.Visibility = Visibility.Collapsed;
         StatusMode.Text = "作画モード";
         _find.Clear();
         RebuildNavTree();
@@ -355,12 +357,80 @@ if ($LASTEXITCODE -eq 0) {
     private async void OnMenuAbout(object sender, RoutedEventArgs e)
     {
         // バージョンは csproj の <Version> を正典とし、アセンブリから動的取得する。
-        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        var asm = System.Reflection.Assembly.GetExecutingAssembly();
+        var v = asm.GetName().Version;
         string ver = v is null ? "1.0.0" : $"{v.Major}.{v.Minor}.{v.Build}";
+
+        // CHANGELOG.md を埋め込みリソースから読み込む（[Unreleased] セクションは除外）。
+        string changelog = "";
+        using (var stream = asm.GetManifestResourceStream("CHANGELOG.md"))
+        {
+            if (stream is not null)
+            {
+                using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8);
+                var raw = reader.ReadToEnd();
+                // [Unreleased] と区切り行を除いて実リリース部分だけ残す。
+                var sb = new System.Text.StringBuilder();
+                bool skip = false;
+                foreach (var line in raw.Split('\n'))
+                {
+                    var trimmed = line.TrimEnd();
+                    if (trimmed.StartsWith("## [Unreleased]")) { skip = true; continue; }
+                    if (trimmed.StartsWith("## [") && trimmed != "## [Unreleased]") skip = false;
+                    if (skip || trimmed.StartsWith("<!-- ") || trimmed.StartsWith("[Unreleased]:")
+                             || trimmed.StartsWith("[1.") || trimmed == "---") continue;
+                    sb.AppendLine(trimmed);
+                }
+                changelog = sb.ToString().Trim();
+            }
+        }
+
+        var scroll = new ScrollViewer
+        {
+            MaxHeight = 480,
+            Content = new TextBlock
+            {
+                Text = changelog,
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12,
+                IsTextSelectionEnabled = true,
+            },
+        };
+
+        var panel = new StackPanel { Spacing = 6 };
+        panel.Children.Add(new TextBlock
+        {
+            Text = $"ラダー図エディタ  バージョン {ver}",
+            FontSize = 14,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = "© 2026 FK TEQUNO",
+            FontSize = 12,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+        });
+        if (!string.IsNullOrEmpty(changelog))
+        {
+            panel.Children.Add(new Microsoft.UI.Xaml.Shapes.Rectangle
+            {
+                Height = 1,
+                Margin = new Thickness(0, 4, 0, 4),
+                Fill = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"],
+            });
+            panel.Children.Add(new TextBlock
+            {
+                Text = "リリースノート",
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 12,
+            });
+            panel.Children.Add(scroll);
+        }
+
         var dialog = new ContentDialog
         {
             Title = "GuiEcad",
-            Content = $"ラダー図エディタ\nバージョン {ver}",
+            Content = panel,
             CloseButtonText = "OK",
             XamlRoot = this.XamlRoot,
         };

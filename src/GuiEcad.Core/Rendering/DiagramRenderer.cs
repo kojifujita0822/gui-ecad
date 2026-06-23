@@ -281,26 +281,28 @@ public sealed class DiagramRenderer
                 if (k == 0)
                 {
                     double? lt = LeftTerminator(sheet, row, lb);
+                    // 母線側(左)・要素側(右)のネットを渡す。分断が無ければ要素は母線へ union 済みで両者同一IDのため挙動不変。
                     if (lt is null)
-                        DrawWire(r, LeftBusX, y, X(lb), y, leftNet, netlist, report, powered, isTerminal);
+                        DrawRungSegment(r, sheet, row, LeftBusX, X(lb), y, netlist.LeftRailNet, leftNet, netlist, report, powered, isTerminal);
                     else if (lt.Value < lb)
-                        DrawWire(r, X(lt.Value), y, X(lb), y, leftNet, netlist, report, powered, isTerminal);
+                        DrawRungSegment(r, sheet, row, X(lt.Value), X(lb), y, leftNet, leftNet, netlist, report, powered, isTerminal);
                     // lt == lb: 要素端が分岐点 → 母線へ延ばさない
                 }
                 else
                 {
                     int prevRb = RightBoundary(list[k - 1]);
+                    int? prevRightNet = elemNet.TryGetValue(list[k - 1].Id, out var pn) ? pn.B : null;
                     // 前要素が端子台の場合もこのセグメントは端子台の右隣接配線なので線番を抑制する。
-                    DrawWire(r, X(prevRb), y, X(lb), y, leftNet, netlist, report, powered, isTerminal || prevIsTerminal);
+                    DrawRungSegment(r, sheet, row, X(prevRb), X(lb), y, prevRightNet, leftNet, netlist, report, powered, isTerminal || prevIsTerminal);
                 }
                 // 末尾要素は右母線へ。延長区間に縦コネクタ(分岐点)があればそこで終端する。
                 if (k == list.Count - 1)
                 {
                     double? rt = RightTerminator(sheet, row, rb, columns);
                     if (rt is null)
-                        DrawWire(r, X(rb), y, RightBusX(columns), y, rightNet, netlist, report, powered, isTerminal);
+                        DrawRungSegment(r, sheet, row, X(rb), RightBusX(columns), y, rightNet, netlist.RightRailNet, netlist, report, powered, isTerminal);
                     else if (rt.Value > rb)
-                        DrawWire(r, X(rb), y, X(rt.Value), y, rightNet, netlist, report, powered, isTerminal);
+                        DrawRungSegment(r, sheet, row, X(rb), X(rt.Value), y, rightNet, rightNet, netlist, report, powered, isTerminal);
                     // rt == rb: 要素端が分岐点 → 母線へ延ばさない
                 }
 
@@ -435,6 +437,66 @@ public sealed class DiagramRenderer
             r.DrawRectangle(new(x, y, w, h), stroke);
             if (!string.IsNullOrEmpty(f.Label))
                 r.DrawText(f.Label, new(x + 1.0, y - labelOffY), labelStyle);
+        }
+    }
+
+    // 横配線セグメント。区間内に配線分断(WireBreak)があれば、その分断点を含む「ノード間セグメント」
+    // （両隣の連結点＝要素端子・縦コネクタ・セグメント端）を丸ごと削除して空けにする（マーク無し・提出品質）。
+    // 分断が無い通常時は netLeft==netRight（隣接要素は母線/相互に union 済みで同一ネットID）のため挙動は従来と不変。
+    private void DrawRungSegment(IRenderer r, Sheet sheet, int row, double xL, double xR, double y,
+        int? netLeft, int? netRight, Netlist netlist, ConnectivityReport? report, HashSet<int>? powered,
+        bool suppressWireNumber)
+    {
+        if (xR <= xL) return;
+
+        List<double>? cuts = null;
+        foreach (var b in sheet.WireBreaks)
+        {
+            if (b.Row != row) continue;
+            double bx = X(b.Boundary);
+            if (bx > xL + 0.001 && bx < xR - 0.001) (cuts ??= new()).Add(bx);
+        }
+        if (cuts is null)
+        {
+            DrawWire(r, xL, y, xR, y, netLeft, netlist, report, powered, suppressWireNumber);
+            return;
+        }
+
+        // 連結点（節）= セグメント両端＋この行を通る縦コネクタ列。分断点を含む節間を削除レンジにする。
+        var junctions = new List<double> { xL, xR };
+        foreach (var c in sheet.Connectors)
+            if (c.TopRow == row || c.BottomRow == row)
+            {
+                double jx = X(c.Column);
+                if (jx > xL + 0.001 && jx < xR - 0.001) junctions.Add(jx);
+            }
+        junctions.Sort();
+
+        var deleted = new List<(double A, double B)>();
+        foreach (var cx in cuts)
+        {
+            double jL = xL, jR = xR;
+            foreach (var j in junctions) { if (j <= cx) jL = j; else { jR = j; break; } }
+            deleted.Add((jL, jR));
+        }
+        deleted.Sort((p, q) => p.A.CompareTo(q.A));
+
+        // 削除レンジを除いた区間だけ描く。ネットは削除位置を境に左右へ割り当てる。
+        double mid = (xL + xR) / 2;
+        double cursor = xL;
+        foreach (var (da, db) in deleted)
+        {
+            if (da > cursor)
+            {
+                int? segNet = (cursor + da) / 2 <= mid ? netLeft : netRight;
+                DrawWire(r, cursor, y, da, y, segNet, netlist, report, powered, suppressWireNumber);
+            }
+            cursor = Math.Max(cursor, db);
+        }
+        if (cursor < xR)
+        {
+            int? segNet = (cursor + xR) / 2 <= mid ? netLeft : netRight;
+            DrawWire(r, cursor, y, xR, y, segNet, netlist, report, powered, suppressWireNumber);
         }
     }
 
@@ -789,7 +851,21 @@ public sealed class DiagramRenderer
 
         double yn = YRow(e.Pos.Row) - Cell * 0.50 - dy;   // dy>0 で上へ（機器名は記号の上）
         r.DrawText(e.DeviceName!, new(cx, yn), _theme.Text(TextRole.DeviceName));
+
+        // タイマ接点は機器名の右肩に種別ミニラベル（限時=「限」/ 瞬時=「瞬」）を出して区別する。
+        // 瞬時接点は素の接点と同形のため、記号だけでは判別しにくいのを補う。
+        if (TimerContactMark(e.Kind) is string mark)
+            r.DrawText(mark, new(X(rb) + 0.3, yn),
+                _theme.Text(TextRole.DeviceName) with { FontSizeMm = 1.7, HAlign = HAlign.Left });
     }
+
+    // タイマ接点の種別ミニラベル。タイマ以外の接点・要素は null（ラベル無し）。
+    private static string? TimerContactMark(ElementKind k) => k switch
+    {
+        ElementKind.TimerContactNO or ElementKind.TimerContactNC => "限",
+        ElementKind.TimerInstantContactNO or ElementKind.TimerInstantContactNC => "瞬",
+        _ => null,
+    };
 
     // 右母線の右側コメント（ページの行範囲のみ）
     private void DrawRungComments(IRenderer r, Sheet sheet, int columns, int rowStart, int rowEnd)

@@ -30,6 +30,10 @@ internal static class SymbolGlyphs
             case ElementKind.TimerContactNO: TimerContactNO(r, s, cx, width, cell); break;
             case ElementKind.TimerContactNC: TimerContactNC(r, s, cx, width, cell); break;
 
+            // タイマ瞬時接点: 記号は通常接点と同形（JIS慣行）。機器名 TIM で判別。
+            case ElementKind.TimerInstantContactNO: ContactNO(r, s, cx, width, cell, manualFill); break;
+            case ElementKind.TimerInstantContactNC: ContactNC(r, s, cx, width, cell, manualFill); break;
+
             case ElementKind.ThermalOverload: Thermal(r, s, cx, width, cell); break;
 
             case ElementKind.Coil: Coil(r, s, cx, width, cell); break;

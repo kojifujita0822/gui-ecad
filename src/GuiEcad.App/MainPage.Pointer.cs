@@ -162,6 +162,23 @@ public sealed partial class MainPage
             return;
         }
 
+        // 作画モード：配線分断ツール（クリックしたセルの中央境界にトグル配置）。
+        // 同一行の自動横配線を断ち切り、別ネットに分ける（短絡回避・線番分割）。
+        if (_tool.Mode == ToolMode.PlaceWireBreak)
+        {
+            if (row >= 0 && col >= 0 && col < _sheet.Grid.Columns)
+            {
+                double boundary = col + 0.5;   // セル中央（整数ポート境界を避ける）
+                var existing = _sheet.WireBreaks.Find(b => b.Row == row && Math.Abs(b.Boundary - boundary) < 0.01);
+                if (existing is not null)
+                    _history.Execute(new DeleteWireBreakCommand(_sheet, existing));
+                else
+                    _history.Execute(new AddWireBreakCommand(_sheet, new WireBreak { Row = row, Boundary = boundary }));
+                Canvas.Invalidate();
+            }
+            return;
+        }
+
         // 作画モード：枠ツール（ドラッグ開始・mm 連続座標）
         if (_tool.Mode == ToolMode.PlaceFrame)
         {

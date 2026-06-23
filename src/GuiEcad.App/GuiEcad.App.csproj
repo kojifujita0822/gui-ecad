@@ -15,7 +15,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- アプリのバージョン（About 画面はここから動的取得する）。 -->
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <!-- exe ファイル自体のアイコン（エクスプローラ/タスクバー表示）。 -->
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <!-- 配布物（exe プロパティ）に出る製品名・発行者・説明。 -->
@@ -26,6 +26,13 @@
     <Authors>FK TEQUNO</Authors>
     <Copyright>Copyright © 2026 FK TEQUNO</Copyright>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- CHANGELOG をアセンブリ埋め込みリソースにする（バージョン情報ダイアログで使用）。 -->
+    <EmbeddedResource Include="..\..\CHANGELOG.md">
+      <LogicalName>CHANGELOG.md</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
 
   <ItemGroup>
     <Content Include="Assets\SplashScreen.scale-200.png" />

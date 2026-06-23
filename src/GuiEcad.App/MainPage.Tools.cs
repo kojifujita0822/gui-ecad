@@ -31,7 +31,7 @@ public sealed partial class MainPage : Page
     // 旧 _placeKind/_placePartId/_placeOrient/_placeConnector/_placeFrame/_placeLine/_placeDot の
     // フラグ束を 1 つの _tool に集約する。モードは enum で本質的に排他なので、複数フラグの取りこぼし
     // （例: 直線/点ツールのまま記号配置が効かない・クリア漏れ）が構造的に起こらない。
-    private enum ToolMode { Select, PlaceElement, PlaceConnector, PlaceFrame, PlaceLine, PlaceDot }
+    private enum ToolMode { Select, PlaceElement, PlaceConnector, PlaceFrame, PlaceLine, PlaceDot, PlaceWireBreak }
 
     /// <summary>現在の配置ツール。Kind/PartId/Orient は Mode==PlaceElement のときのみ意味を持つ。</summary>
     private readonly record struct ToolState(
@@ -52,6 +52,7 @@ public sealed partial class MainPage : Page
     private static ToolState ToolFromTag(string? tag) => tag switch
     {
         "connector" => new ToolState(ToolMode.PlaceConnector),
+        "wirebreak" => new ToolState(ToolMode.PlaceWireBreak),
         "frame" => new ToolState(ToolMode.PlaceFrame),
         "line" => new ToolState(ToolMode.PlaceLine),
         "dot" => new ToolState(ToolMode.PlaceDot),

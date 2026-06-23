@@ -20,6 +20,8 @@ public enum ElementKind
     PushButtonNO, PushButtonNC, SelectSwitch, Terminal, Timer, Counter,
     // サンプル凡例の追加パーツ（2端子）。タイマ接点・OL は初期は手動入力（docs/simulation.md）。
     TimerContactNO, TimerContactNC, EmergencyStop, ThermalOverload,
+    // タイマ瞬時接点（コイル通電の瞬間に開閉。限時のような経過時間判定なし）。記号は通常接点と同形（JIS慣行）。
+    TimerInstantContactNO, TimerInstantContactNC,
     // 三相モータ（多端子）。三相動力回路は制御回路と別系統のため初期は記号のみ・非シミュレート。
     Motor,
     // 主回路（三相動力）用の3極記号。すべて非シミュレート・3セル幅・縦流れ（上→下）。
@@ -102,6 +104,18 @@ public sealed class VerticalConnector
     public double Column { get; set; }
     public int TopRow { get; set; }
     public int BottomRow { get; set; }
+}
+
+/// <summary>同一行の自動横配線を任意位置で断ち切る分断（非接続）マーク。
+/// 同一行内で別ネットに分けたいとき（例: 自己保持枝と別負荷枝を縦コネクタで分岐しつつ短絡を避ける）に置く。
+/// <see cref="Boundary"/> はセル中央（X.5 値）を基本とし、整数ポート境界には重ねない（採番不定を避けるため）。</summary>
+public sealed class WireBreak
+{
+    /// <summary>分断の水平位置（列境界）。セル中央＝X.5。この位置を跨ぐ横配線が電気的に切れる。</summary>
+    public double Boundary { get; set; }
+    public int Row { get; set; }
+
+    public WireBreak DeepClone() => new() { Boundary = Boundary, Row = Row };
 }
 
 /// <summary>設置場所のグルーピング枠（点線）。中継ボックス・MR盤 等。</summary>

@@ -10,6 +10,8 @@ public sealed class Sheet
     public BusConfig Bus { get; set; } = new();
     public List<ElementInstance> Elements { get; set; } = new();
     public List<VerticalConnector> Connectors { get; set; } = new();
+    /// <summary>同一行の自動横配線を断ち切る分断マーク（同一行内で別ネットを作る）。</summary>
+    public List<WireBreak> WireBreaks { get; set; } = new();
     public List<GroupFrame> Frames { get; set; } = new();
     public List<CircuitLine> Lines { get; set; } = new();
     /// <summary>右母線の右側に表示する行コメント一覧。</summary>

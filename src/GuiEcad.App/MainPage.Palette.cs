@@ -278,6 +278,8 @@ public sealed partial class MainPage : Page
             (ElementKind.PushButtonNC,   IconPushButtonNC),
             (ElementKind.TimerContactNO, IconTimerContactNO),
             (ElementKind.TimerContactNC, IconTimerContactNC),
+            (ElementKind.TimerInstantContactNO, IconTimerInstantContactNO),
+            (ElementKind.TimerInstantContactNC, IconTimerInstantContactNC),
             (ElementKind.Coil,           IconCoil),
             (ElementKind.Lamp,           IconLamp),
             (ElementKind.Terminal,       IconTerminal),

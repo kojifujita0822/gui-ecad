@@ -325,7 +325,8 @@ public sealed partial class MainPage
             or ElementKind.EmergencyStop => DeviceClass.PushButton,
         ElementKind.SelectSwitch => DeviceClass.SelectSwitch,
         ElementKind.Lamp => DeviceClass.Lamp,
-        ElementKind.TimerContactNO or ElementKind.TimerContactNC => DeviceClass.Timer,
+        ElementKind.TimerContactNO or ElementKind.TimerContactNC
+            or ElementKind.TimerInstantContactNO or ElementKind.TimerInstantContactNC => DeviceClass.Timer,
         ElementKind.Terminal => DeviceClass.Terminal,
         _ => DeviceClass.Other,
     };

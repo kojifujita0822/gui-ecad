@@ -159,6 +159,58 @@ public sealed partial class MainPage : Page
             double fh = sf.VisualHeightMm ?? sf.Height * _geo.CellMm;
             renderer.DrawRectangle(new(fx, fy, fw, fh), new StrokeStyle(DrawingTheme.Blue, 0.4));
         }
+
+        // テストモード: 作動中（計時中）の限時タイマ接点の上に残り時間を小窓表示。
+        DrawTimerCountdowns(renderer);
+    }
+
+    // 作動中の限時タイマ接点の上に「残り秒数」を小窓（淡色バッジ）で表示する。ユーザーが時限を体感できるように。
+    private void DrawTimerCountdowns(Win2DRenderer r)
+    {
+        if (!_testMode || _testSession is null) return;
+        var st = _testSession.State;
+
+        // デバイス→設定時間（秒）。同名のコイル/接点いずれかの Setpoint。コイル優先。
+        var setpoints = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var el in _sheet.Elements)
+        {
+            if (string.IsNullOrEmpty(el.DeviceName)) continue;
+            if (!el.Params.TryGetValue(ParamKeys.Setpoint, out var sp)) continue;
+            if (!double.TryParse(sp, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out var v)) continue;
+            if (el.Kind == ElementKind.Timer || !setpoints.ContainsKey(el.DeviceName))
+                setpoints[el.DeviceName] = v;
+        }
+        if (setpoints.Count == 0) return;
+
+        double cell = _geo.CellMm;
+        var textStyle = DrawingTheme.Default.Text(TextRole.LineNumber) with
+        {
+            FontSizeMm = 2.4, Bold = true, HAlign = HAlign.Center, VAlign = VAlign.Middle,
+            Color = new Color(255, 30, 30, 30),
+        };
+
+        foreach (var el in _sheet.Elements)
+        {
+            if (el.Kind is not (ElementKind.TimerContactNO or ElementKind.TimerContactNC)) continue;  // 限時接点のみ
+            var dev = el.DeviceName;
+            if (string.IsNullOrEmpty(dev)) continue;
+            if (!setpoints.TryGetValue(dev, out var sp) || sp <= 0) continue;
+            bool on = st.Energized.TryGetValue(dev, out var e) && e;          // タイマ励磁＝計時中
+            if (!on) continue;
+            double elapsed = st.TimerElapsed.TryGetValue(dev, out var t) ? t : 0;
+            double remaining = Math.Max(0, sp - elapsed);
+            if (remaining <= 0) continue;     // 時限到達後は非表示（接点はすでに動作）
+
+            var (l, right) = PartResolver.BoundarySpan(el, _document.Library);
+            double cx = (_geo.X(l) + _geo.X(right)) / 2;
+            double cy = _geo.YRow(el.Pos.Row) - cell * 1.15;   // 記号の上
+            double w = cell * 1.15, h = cell * 0.55;
+            var rect = new Rect2D(cx - w / 2, cy - h / 2, w, h);
+            r.FillRectangle(rect, new Color(230, 255, 246, 200));               // 淡黄の小窓
+            r.DrawRectangle(rect, new StrokeStyle(new Color(255, 235, 170, 70), 0.25));
+            r.DrawText(remaining.ToString("0.0") + "s", new(cx, cy), textStyle);
+        }
     }
 
     private void DrawSelection(Win2DRenderer r, ElementInstance e)

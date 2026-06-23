@@ -63,7 +63,7 @@ public static class DesignRuleCheck
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
                 if (!PartResolver.CreatesComponent(elem, lib)) continue;
                 var kind = PartResolver.ComponentKind(elem, lib);
-                // リレー接点＝接点のうち外部入力駆動でないもの（ContactNO/NC・TimerContactNO/NC）
+                // リレー接点＝接点のうち外部入力駆動でないもの（ContactNO/NC・タイマ限時/瞬時接点）
                 bool isRelayContact = ElementCatalog.IsContact(kind) && !ElementCatalog.IsInputControlled(kind);
                 // リレーコイル＝Coil または Timer（Lamp は接点を持たない表示負荷のため対象外）
                 bool isRelayCoil = kind is ElementKind.Coil or ElementKind.Timer;

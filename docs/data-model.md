@@ -91,6 +91,8 @@ public sealed class ElementInstance {
 }
 public readonly record struct GridPos(int Row, int Column);
 public sealed class VerticalConnector { public int Column; public int TopRow; public int BottomRow; }
+// 配線分断: 同一行の自動横配線を Boundary(セル中央=X.5) で断ち切り、別ネットに分ける（短絡回避・線番分割）。
+public sealed class WireBreak { public double Boundary; public int Row; }
 public sealed class GroupFrame { public string Label; public GridPos TopLeft; public int Width; public int Height; }
 
 public enum DeviceClass { Relay, PushButton, SelectSwitch, Lamp, Timer, Counter, Terminal, Other }

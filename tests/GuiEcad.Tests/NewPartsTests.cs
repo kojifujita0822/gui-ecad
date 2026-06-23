@@ -66,6 +66,50 @@ public class NewPartsTests
     }
 
     [Fact]
+    public void TimerInstantContactNO_ConductsImmediatelyWhenCoilOn_NoTimeDependence()
+    {
+        var session = new TestSession(MakeTimerSheet(ElementKind.TimerInstantContactNO, setpoint: 5.0));
+        session.Evaluate();
+
+        // PB未押下 → TLR1消磁 → 瞬時a接点 開放
+        Assert.False(session.IsEnergized("C"));
+
+        // PB押下 → TLR1励磁の瞬間に閉路（経過時間 0 でも導通）
+        session.SetInput("PB1", true);
+        Assert.True(session.IsEnergized("C"));
+
+        // 時間を進めても挙動は変わらない（限時ではない）
+        session.Tick(10.0);
+        Assert.True(session.IsEnergized("C"));
+
+        // PB離す → 消磁の瞬間に開放
+        session.SetInput("PB1", false);
+        Assert.False(session.IsEnergized("C"));
+    }
+
+    [Fact]
+    public void TimerInstantContactNC_OpensImmediatelyWhenCoilOn_NoTimeDependence()
+    {
+        var session = new TestSession(MakeTimerSheet(ElementKind.TimerInstantContactNC, setpoint: 5.0));
+        session.Evaluate();
+
+        // PB未押下 → 消磁 → 瞬時b接点 閉路 → C通電
+        Assert.True(session.IsEnergized("C"));
+
+        // PB押下 → 励磁の瞬間に開放（経過時間不問）
+        session.SetInput("PB1", true);
+        Assert.False(session.IsEnergized("C"));
+
+        // 時間を進めても変わらない
+        session.Tick(10.0);
+        Assert.False(session.IsEnergized("C"));
+
+        // PB離す → 閉路に戻る
+        session.SetInput("PB1", false);
+        Assert.True(session.IsEnergized("C"));
+    }
+
+    [Fact]
     public void TimerContactNC_OpenOnlyWhenCoilOnAndTimedOut()
     {
         var session = new TestSession(MakeTimerSheet(ElementKind.TimerContactNC, setpoint: 5.0));

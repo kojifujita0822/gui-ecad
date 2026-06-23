@@ -73,6 +73,10 @@ public sealed partial class MainPage : Page
     private TestSession? _testSession;
     private readonly Dictionary<Sheet, TestSession> _testSessions = new();
     private string? _testPressedDevice;
+    // タイマの実時間計時（テストモード中に DispatcherTimer で経過実時間を Tick へ流す）。
+    private DispatcherTimer? _realtimeTimer;
+    private readonly System.Diagnostics.Stopwatch _realtimeClock = new();
+    private long _lastTickMs;
 
     // 機器名インライン編集
     private ElementInstance? _editingElement;
@@ -249,17 +253,53 @@ public sealed partial class MainPage : Page
         ResetDragState();
         Canvas.ReleasePointerCaptures();
         TimerTickPanel.Visibility = _testMode ? Visibility.Visible : Visibility.Collapsed;
+        if (_testMode) StartRealtimeTimer(); else StopRealtimeTimer();
         UpdateTestStatus();
         Canvas.Invalidate();
     }
 
-    private void OnTimerTick(object sender, RoutedEventArgs e)
+    // テストモード中、タイマ経過を実時間で進める（手動 Tick 廃止）。
+    private void StartRealtimeTimer()
     {
-        if (_testSession is null) return;
-        double dt = double.IsNaN(TickValueBox.Value) ? 0.5 : Math.Max(0.01, TickValueBox.Value);
+        if (TimerPauseBtn is not null) TimerPauseBtn.IsChecked = false;
+        _realtimeClock.Restart();
+        _lastTickMs = 0;
+        _realtimeTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _realtimeTimer.Tick -= OnRealtimeTick;
+        _realtimeTimer.Tick += OnRealtimeTick;
+        _realtimeTimer.Start();
+    }
+
+    private void StopRealtimeTimer()
+    {
+        _realtimeTimer?.Stop();
+        _realtimeClock.Stop();
+    }
+
+    private void OnRealtimeTick(object? sender, object e)
+    {
+        if (!_testMode || _testSession is null) return;
+        long now = _realtimeClock.ElapsedMilliseconds;
+        double dt = (now - _lastTickMs) / 1000.0;
+        _lastTickMs = now;
+        if (dt <= 0) return;
         _testSession.Tick(dt);
         UpdateTestStatus();
         Canvas.Invalidate();
+    }
+
+    // 一時停止/再開: 実時間カウントを止める。再開時は経過の起点をリセットして飛びを防ぐ。
+    private void OnTimerPauseToggle(object sender, RoutedEventArgs e)
+    {
+        if (TimerPauseBtn.IsChecked == true)
+        {
+            _realtimeTimer?.Stop();
+        }
+        else if (_testMode)
+        {
+            _lastTickMs = _realtimeClock.ElapsedMilliseconds;
+            _realtimeTimer?.Start();
+        }
     }
 
     /// <summary>シートに対応するテストセッションを取得（無ければ生成し状態を保持）。</summary>

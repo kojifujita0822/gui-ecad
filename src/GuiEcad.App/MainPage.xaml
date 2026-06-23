@@ -208,19 +208,13 @@
                         <TextBlock Text="PDF" VerticalAlignment="Center" FontSize="11" />
                     </StackPanel>
                 </Button>
-                <!-- タイマ時限（テストモード時のみ有効） -->
+                <!-- タイマ時限（テストモード時のみ有効・実時間で自動カウント） -->
                 <StackPanel x:Name="TimerTickPanel" Orientation="Horizontal" Spacing="4"
                             VerticalAlignment="Center" Visibility="Collapsed">
                     <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
-                    <TextBlock Text="Tick" VerticalAlignment="Center" FontSize="12" />
-                    <NumberBox
-                        x:Name="TickValueBox"
-                        Value="0.5" Minimum="0.01" Maximum="60"
-                        SmallChange="0.1" LargeChange="1"
-                        SpinButtonPlacementMode="Inline" Width="115"
-                        ToolTipService.ToolTip="進める時間（秒）" />
-                    <TextBlock Text="s" VerticalAlignment="Center" FontSize="12" />
-                    <Button Content="進める" Click="OnTimerTick" ToolTipService.ToolTip="タイマ経過時間を指定秒進める" />
+                    <TextBlock Text="タイマ実時間計時" VerticalAlignment="Center" FontSize="12" />
+                    <ToggleButton x:Name="TimerPauseBtn" Content="一時停止" Click="OnTimerPauseToggle"
+                                  ToolTipService.ToolTip="タイマの実時間カウントを一時停止/再開" />
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -318,6 +312,18 @@
                                 <TextBlock FontSize="10" HorizontalAlignment="Center" Text="タイマNC" />
                             </StackPanel>
                         </RadioButton>
+                        <RadioButton GroupName="Tools" Style="{StaticResource ToolBtnStyle}" Tag="TimerInstantContactNO" Checked="OnToolSelected">
+                            <StackPanel>
+                                <Image x:Name="IconTimerInstantContactNO" Width="44" Height="32" Stretch="Uniform" />
+                                <TextBlock FontSize="10" HorizontalAlignment="Center" Text="瞬時NO" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton GroupName="Tools" Style="{StaticResource ToolBtnStyle}" Tag="TimerInstantContactNC" Checked="OnToolSelected">
+                            <StackPanel>
+                                <Image x:Name="IconTimerInstantContactNC" Width="44" Height="32" Stretch="Uniform" />
+                                <TextBlock FontSize="10" HorizontalAlignment="Center" Text="瞬時NC" />
+                            </StackPanel>
+                        </RadioButton>
                         <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource AppDividerBrush}" />
                         <!-- 出力系 -->
                         <RadioButton GroupName="Tools" Style="{StaticResource ToolBtnStyle}" Tag="Coil" Checked="OnToolSelected">
@@ -345,6 +351,13 @@
                             <StackPanel>
                                 <TextBlock Width="44" Height="32" FontSize="22" HorizontalAlignment="Center" TextAlignment="Center" Text="&#x2503;" />
                                 <TextBlock FontSize="10" HorizontalAlignment="Center" Text="分岐" />
+                            </StackPanel>
+                        </RadioButton>
+                        <RadioButton GroupName="Tools" Style="{StaticResource ToolBtnStyle}" Tag="wirebreak"
+                                     Checked="OnToolSelected" ToolTipService.ToolTip="配線分断（非接続）：同一行の自動横配線をセル中央で断ち切る。クリックで配置/解除">
+                            <StackPanel>
+                                <TextBlock Width="44" Height="32" FontSize="20" HorizontalAlignment="Center" TextAlignment="Center" Text="&#x2702;" />
+                                <TextBlock FontSize="10" HorizontalAlignment="Center" Text="分断" />
                             </StackPanel>
                         </RadioButton>
                         <RadioButton GroupName="Tools" Style="{StaticResource ToolBtnStyle}" Tag="frame"

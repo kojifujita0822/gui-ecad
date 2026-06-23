@@ -51,3 +51,10 @@ sample/アドマテックス*
 
 # エディタ個人設定
 *.code-workspace
+
+# リリース成果物（ルートに誤 commit しない）
+*.zip
+gui_cad_original/
+
+# 一時スクリプト
+*.csx

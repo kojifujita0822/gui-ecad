@@ -61,6 +61,7 @@ public static class ElementCatalog
         ElementKind.PushButtonNO or ElementKind.PushButtonNC or
         ElementKind.SelectSwitch or
         ElementKind.TimerContactNO or ElementKind.TimerContactNC or
+        ElementKind.TimerInstantContactNO or ElementKind.TimerInstantContactNC or
         ElementKind.EmergencyStop or ElementKind.ThermalOverload;
 
     /// <summary>負荷（コイル・ランプ・タイマコイル・カウンタコイル）か。</summary>

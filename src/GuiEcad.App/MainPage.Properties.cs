@@ -176,23 +176,56 @@ public sealed partial class MainPage : Page
                 Margin = new Thickness(0, 4, 0, 0),
             });
         }
-        else if (_selected.Kind == ElementKind.Timer)
+        else if (_selected.Kind is ElementKind.Timer
+            or ElementKind.TimerContactNO or ElementKind.TimerContactNC
+            or ElementKind.TimerInstantContactNO or ElementKind.TimerInstantContactNC)
         {
-            double setpoint = _selected.Params.TryGetValue(ParamKeys.Setpoint, out var sp) &&
+            // 設定時間はタイマコイル(ElementKind.Timer)が保持するのが基本。接点(限時/瞬時)を選択したときは
+            // 同名のタイマコイルがあればそれを、無ければ選択中の接点自身を対象にする（接点側からも必ず設定可能に）。
+            var target = _selected.Kind == ElementKind.Timer
+                ? _selected
+                : _sheet.Elements.FirstOrDefault(e => e.Kind == ElementKind.Timer
+                    && !string.IsNullOrEmpty(_selected.DeviceName)
+                    && e.DeviceName == _selected.DeviceName) ?? _selected;
+
+            double setpoint = target.Params.TryGetValue(ParamKeys.Setpoint, out var sp) &&
                 double.TryParse(sp, System.Globalization.NumberStyles.Any,
                     System.Globalization.CultureInfo.InvariantCulture, out double d) ? d : 0;
             PropertiesPanel.Children.Add(new TextBlock { Text = "設定時間 (秒)", FontSize = 11, Margin = new Thickness(0, 8, 0, 2) });
             var nb = new NumberBox
             {
-                Value = setpoint,
+                Value = Math.Round(setpoint),
                 Minimum = 0,
                 Maximum = 9999,
-                SmallChange = 0.1,
+                SmallChange = 1,
+                LargeChange = 10,
                 SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
             };
-            nb.ValueChanged += OnSetpointBoxChanged;
+            // 0〜10 秒のスライダー（手早い設定用・1秒刻み）。NumberBox（数値入力）と双方向同期。
+            var slider = new Slider
+            {
+                Minimum = 0,
+                Maximum = 10,
+                StepFrequency = 1,
+                Value = Math.Clamp(Math.Round(setpoint), 0, 10),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 2, 0, 0),
+            };
+            nb.ValueChanged += (_, a) =>               // NumberBox: コマンド実行＋スライダー追従
+            {
+                if (_refreshingProps || double.IsNaN(a.NewValue)) return;
+                _refreshingProps = true; slider.Value = Math.Clamp(a.NewValue, 0, 10); _refreshingProps = false;
+                CommitSetpoint(target, a.NewValue);
+            };
+            slider.ValueChanged += (_, a) =>           // スライダー操作で NumberBox とコマンドを更新
+            {
+                if (_refreshingProps) return;
+                _refreshingProps = true; nb.Value = a.NewValue; _refreshingProps = false;
+                CommitSetpoint(target, a.NewValue);
+            };
             PropertiesPanel.Children.Add(nb);
+            PropertiesPanel.Children.Add(slider);
         }
         else if (_selected.Kind == ElementKind.Lamp)
         {
@@ -258,11 +291,12 @@ public sealed partial class MainPage : Page
         Canvas.Invalidate();
     }
 
-    private void OnSetpointBoxChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    // 設定時間（秒）を Undo/Redo 対応で確定。1秒単位に丸める。NumberBox・スライダー双方から呼ぶ。
+    private void CommitSetpoint(ElementInstance target, double value)
     {
-        if (_refreshingProps || _selected is null || double.IsNaN(args.NewValue)) return;
-        _history.Execute(new SetParamCommand(_sheet, _selected, ParamKeys.Setpoint,
-            args.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        double secs = Math.Round(value);
+        _history.Execute(new SetParamCommand(_sheet, target, ParamKeys.Setpoint,
+            secs.ToString(System.Globalization.CultureInfo.InvariantCulture)));
         Canvas.Invalidate();
     }
 
@@ -392,6 +426,7 @@ public sealed partial class MainPage : Page
         ElementKind.EmergencyStop => "非停",
         ElementKind.ThermalOverload => "OL",
         ElementKind.TimerContactNO or ElementKind.TimerContactNC => "タイマ",
+        ElementKind.TimerInstantContactNO or ElementKind.TimerInstantContactNC => "瞬時",
         ElementKind.SelectSwitch => "SS",
         ElementKind.Lamp => "表示灯",
         ElementKind.Terminal => "端子",

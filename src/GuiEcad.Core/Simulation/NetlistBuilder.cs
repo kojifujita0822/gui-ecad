@@ -38,11 +38,23 @@ public static class NetlistBuilder
         // ---- フェーズ2: 行ごとに要素を集約し横配線 unions を追加 ----
         var byRow = BuildRowIndex(elements, hasPorts);
         foreach (var (row, _) in byRow) byRow[row].Sort((a, b) => elements[a].Pos.Column.CompareTo(elements[b].Pos.Column));
-        AddHorizontalWireUnions(byRow, leftNode, rightNode, leftRail, unions);
-        AddRightRailAutoConnections(byRow, elements, rightBoundary, rightNode, columns, parts, rightRail, unions);
+
+        // 配線分断: 行ごとの分断境界（昇順）。境界 a〜b の間に分断が挟まれば横配線は電気的に切れる。
+        var breaksByRow = BuildBreaksByRow(sheet);
+        bool Severed(int row, double a, double b)
+        {
+            if (!breaksByRow.TryGetValue(row, out var bs)) return false;
+            double lo = Math.Min(a, b), hi = Math.Max(a, b);
+            foreach (var x in bs) if (x > lo && x < hi) return true;
+            return false;
+        }
+
+        AddHorizontalWireUnions(sheet, byRow, leftBoundary, rightBoundary, leftNode, rightNode, leftRail, Severed, unions);
+        AddRightRailAutoConnections(sheet, byRow, elements, rightBoundary, rightNode, columns, parts, rightRail, Severed, unions);
 
         // 指定 (行, 境界) の配線が属するノードを返す（縦コネクタ端点の解決）。
         // ポートが厳密一致すればそれ。なければ母線端、あるいは同一行の横配線が覆う境界へ帰着。
+        // 分断を跨ぐ帰着は行わない（分断の先のセグメントは別ネット）。
         int ResolveNode(int row, double boundary)
         {
             // 整数境界は厳密一致を試す。0.5 位置（セル中央）は横配線セグメントへ帰着させる。
@@ -56,8 +68,10 @@ public static class NetlistBuilder
                 int leftEl = -1, rightEl = -1;
                 foreach (var i in idxs)
                 {
-                    if (rightBoundary[i] <= boundary && (leftEl == -1 || rightBoundary[i] > rightBoundary[leftEl])) leftEl = i;
-                    if (leftBoundary[i] >= boundary && (rightEl == -1 || leftBoundary[i] < leftBoundary[rightEl])) rightEl = i;
+                    if (rightBoundary[i] <= boundary && !Severed(row, rightBoundary[i], boundary)
+                        && (leftEl == -1 || rightBoundary[i] > rightBoundary[leftEl])) leftEl = i;
+                    if (leftBoundary[i] >= boundary && !Severed(row, leftBoundary[i], boundary)
+                        && (rightEl == -1 || leftBoundary[i] < leftBoundary[rightEl])) rightEl = i;
                 }
                 if (leftEl != -1) return rightNode[leftEl];   // 左隣要素の右ポートへ（横配線で連続）
                 if (rightEl != -1) return leftNode[rightEl];  // 右隣要素の左ポートへ
@@ -170,38 +184,77 @@ public static class NetlistBuilder
         return byRow;
     }
 
+    // ---- フェーズ2ヘルパ: 行ごとの分断境界（昇順） ----
+    private static Dictionary<int, List<double>> BuildBreaksByRow(Sheet sheet)
+    {
+        var map = new Dictionary<int, List<double>>();
+        foreach (var b in sheet.WireBreaks)
+        {
+            if (!map.TryGetValue(b.Row, out var list)) { list = new(); map[b.Row] = list; }
+            list.Add(b.Boundary);
+        }
+        foreach (var list in map.Values) list.Sort();
+        return map;
+    }
+
     // ---- フェーズ2ヘルパ: 横配線 unions を追加 ----
     // 同一行・隣接要素間の横配線（空セルを跨いで連続）。
-    // 最左要素の左ポートを左母線へ接続（左母線→最左要素間は常に横配線が繋がる）。
+    // 最左要素の左ポートを左母線へ接続。ただし左延長区間 (0, leftBoundary] に縦コネクタ(分岐源)が
+    // あれば、その行は母線ではなく分岐から給電されるため母線へ繋がない（描画 LeftTerminator と一致）。
+    // 区間に配線分断があれば union をスキップ（同一行内で別ネットになる）。
     private static void AddHorizontalWireUnions(
-        Dictionary<int, List<int>> byRow, int[] leftNode, int[] rightNode,
-        int leftRail, List<(int, int)> unions)
+        Sheet sheet, Dictionary<int, List<int>> byRow, int[] leftBoundary, int[] rightBoundary,
+        int[] leftNode, int[] rightNode, int leftRail,
+        Func<int, double, double, bool> severed, List<(int, int)> unions)
     {
-        foreach (var idxs in byRow.Values)
+        foreach (var (row, idxs) in byRow)
         {
-            unions.Add((leftNode[idxs[0]], leftRail));
+            if (LeftRailReached(sheet, row, leftBoundary[idxs[0]]) && !severed(row, 0, leftBoundary[idxs[0]]))
+                unions.Add((leftNode[idxs[0]], leftRail));
             for (int k = 1; k < idxs.Count; k++)
-                unions.Add((rightNode[idxs[k - 1]], leftNode[idxs[k]]));
+                if (!severed(row, rightBoundary[idxs[k - 1]], leftBoundary[idxs[k]]))
+                    unions.Add((rightNode[idxs[k - 1]], leftNode[idxs[k]]));
         }
     }
 
     // ---- フェーズ2ヘルパ: 末尾負荷・末尾端子台の右母線自動接続 ----
     // 描画上は末尾要素の右から右母線まで横線が延びるため電気的にも繋がるべき。
+    // 末尾要素〜右母線の区間に配線分断 or 縦コネクタ(分岐源)があれば接続しない（描画 RightTerminator と一致）。
     private static void AddRightRailAutoConnections(
-        Dictionary<int, List<int>> byRow, IReadOnlyList<ElementInstance> elements,
+        Sheet sheet, Dictionary<int, List<int>> byRow, IReadOnlyList<ElementInstance> elements,
         int[] rightBoundary, int[] rightNode, int columns, PartLibrary? parts,
-        int rightRail, List<(int, int)> unions)
+        int rightRail, Func<int, double, double, bool> severed, List<(int, int)> unions)
     {
-        foreach (var idxs in byRow.Values)
+        foreach (var (row, idxs) in byRow)
         {
             int last = idxs[^1];
-            if (rightBoundary[last] < columns && PartResolver.CreatesComponent(elements[last], parts))
+            if (rightBoundary[last] < columns && RightRailReached(sheet, row, rightBoundary[last], columns)
+                && !severed(row, rightBoundary[last], columns)
+                && PartResolver.CreatesComponent(elements[last], parts))
             {
                 var kind = PartResolver.ComponentKind(elements[last], parts);
                 if (ElementCatalog.IsLoad(kind) || ElementCatalog.IsPassthrough(kind))
                     unions.Add((rightNode[last], rightRail));
             }
         }
+    }
+
+    // 左母線延長区間 (0, leftBoundary] に縦コネクタ(分岐源)が無ければ母線へ繋がる。
+    private static bool LeftRailReached(Sheet sheet, int row, int leftBoundary)
+    {
+        foreach (var c in sheet.Connectors)
+            if ((c.TopRow == row || c.BottomRow == row) && c.Column > 0 && c.Column <= leftBoundary)
+                return false;
+        return true;
+    }
+
+    // 右母線延長区間 [rightBoundary, columns) に縦コネクタ(分岐源)が無ければ母線へ繋がる。
+    private static bool RightRailReached(Sheet sheet, int row, int rightBoundary, int columns)
+    {
+        foreach (var c in sheet.Connectors)
+            if ((c.TopRow == row || c.BottomRow == row) && c.Column >= rightBoundary && c.Column < columns)
+                return false;
+        return true;
     }
 
     // ---- フェーズ3ヘルパ: 縦コネクタ unions を追加 ----
@@ -261,11 +314,13 @@ public static class NetlistBuilder
             int switchPos = 0;
             if (kind == ElementKind.SelectSwitch &&
                 e.Params.TryGetValue(ParamKeys.Position, out var ps)) int.TryParse(ps, out switchPos);
-            // タイマコイル: 設定時間（秒）を Params["Setpoint"] から読む
-            if (kind == ElementKind.Timer && !string.IsNullOrEmpty(e.DeviceName) &&
+            // タイマ設定時間（秒）を Params["Setpoint"] から読む。コイル/接点どちらに設定されていても拾う。
+            // 同一デバイスで複数あればタイマコイル(ElementKind.Timer)の値を優先する。
+            if (!string.IsNullOrEmpty(e.DeviceName) &&
                 e.Params.TryGetValue(ParamKeys.Setpoint, out var sp) &&
                 double.TryParse(sp, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out double setpoint))
+                    System.Globalization.CultureInfo.InvariantCulture, out double setpoint) &&
+                (kind == ElementKind.Timer || !timerSetpoints.ContainsKey(e.DeviceName)))
             {
                 timerSetpoints[e.DeviceName] = setpoint;
             }
