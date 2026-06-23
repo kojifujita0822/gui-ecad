@@ -256,12 +256,13 @@ public sealed partial class MainPage
                 }
             }
 
-            // クロスリファレンス一覧表を専用ページとして追加する
-            if (xref.CoilEntries.Any())
+            // クロスリファレンス一覧表を専用ページ（A4縦）として追加する。
+            // 表が 1 ページに収まらない場合は複数の A4縦ページへ分割する。
+            int crPages = dr.CrossRefPageCount(xref);
+            for (int cp = 0; cp < crPages; cp++)
             {
-                int lastColumns = _document.Sheets[^1].Grid.Columns;
-                var crRenderer = surface.BeginPage(dr.CrossRefPageSize(xref, lastColumns));
-                dr.RenderCrossRefPage(crRenderer, xref, lastColumns);
+                var crRenderer = surface.BeginPage(dr.CrossRefPageSize());
+                dr.RenderCrossRefPage(crRenderer, xref, cp);
                 surface.EndPage();
             }
 

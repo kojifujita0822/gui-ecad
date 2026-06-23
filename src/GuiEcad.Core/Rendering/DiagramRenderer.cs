@@ -477,17 +477,27 @@ public sealed class DiagramRenderer
         return TableGap + rows * TableRowH + Cell * 0.4;
     }
 
-    private void DrawCrossRefTable(IRenderer r, int columns, double startY, CrossReference xref)
+    // 専用ページの表は A4縦の用紙幅に合わせた固定幅（図面の列数に依存しない）。
+    private double XrefTableRightX => A4W - _opt.MarginMm;   // A4縦 幅(210) - 右余白
+
+    /// <summary>
+    /// クロスリファレンス一覧表を描画する。<paramref name="rowStart"/>/<paramref name="rowCount"/> で
+    /// 描画するデータ行のウィンドウを指定する（専用ページの A4縦 複数ページ分割用）。
+    /// ヘッダ行は各ページに付ける。
+    /// </summary>
+    private void DrawCrossRefTable(IRenderer r, double startY, CrossReference xref, int rowStart, int rowCount)
     {
         var entries = xref.CoilEntries.ToList();
         if (entries.Count == 0) return;
+        int rowEnd = Math.Min(entries.Count, rowStart + rowCount);
+        if (rowStart >= rowEnd) return;
 
         double rh = TableRowH;
         double y0 = startY + TableGap;
         double x0 = X(0);
         double x1 = x0 + DevColW;            // 機器 / コイル 境界
         double x2 = x1 + CoilColW;           // コイル / 接点 境界
-        double x4 = X(columns);              // 表の右端
+        double x4 = XrefTableRightX;         // 表の右端（A4横 用紙幅基準）
         // コメント列を右端に確保。ただし接点列が 20mm 未満にならない範囲で。
         double commentW = Math.Min(XrefCommentColW, Math.Max(0, (x4 - x2) - 20.0));
         double x3 = x4 - commentW;           // 接点 / コメント 境界
@@ -505,10 +515,10 @@ public sealed class DiagramRenderer
         DrawCellText(r, "接点", x2, yh, rh, pad, headerText);
         DrawCellText(r, "コメント", x3, yh, rh, pad, headerText);
 
-        // データ行
-        for (int i = 0; i < entries.Count; i++)
+        // データ行（ウィンドウ内のみ。各ページ先頭に詰めて描画する）
+        for (int i = rowStart; i < rowEnd; i++)
         {
-            double yi = y0 + (i + 1) * rh;
+            double yi = y0 + (i - rowStart + 1) * rh;
             DrawTableRow(r, outline, x0, x4, yi, rh, fill: false, x1, x2, x3);
             var e = entries[i];
             DrawCellText(r, e.DeviceName, x0, yi, rh, pad, cellText);
@@ -542,19 +552,36 @@ public sealed class DiagramRenderer
 
     // ---- クロスリファレンス専用ページ ----
 
-    /// <summary>クロスリファレンス専用ページのサイズ。<paramref name="columns"/> は最終シートの列数。</summary>
-    public Size2D CrossRefPageSize(CrossReference xref, int columns)
+    /// <summary>クロスリファレンス専用ページのサイズ。A4縦固定（行が少なくても縦配置。長ければ複数ページに分割）。</summary>
+    public Size2D CrossRefPageSize() => new(A4W, A4H);   // A4縦: 幅210 × 高さ297
+
+    /// <summary>A4縦 1ページに収まるクロスリファレンス表のデータ行数（ヘッダ行を除く）。</summary>
+    public int CrossRefRowsPerPage()
     {
-        double w = RightBusX(columns) + _opt.MarginMm;
-        double h = _opt.MarginMm + CalcTableHeight(xref) + _opt.MarginMm;
-        return new Size2D(w, h);
+        // 利用可能高さ = A4縦の高さ - 上下余白 - 表の上ギャップ。これを行高で割り、ヘッダ1行を差し引く。
+        double usableH = A4H - 2 * _opt.MarginMm - TableGap;
+        int rowsIncludingHeader = (int)(usableH / TableRowH);
+        return Math.Max(1, rowsIncludingHeader - 1);
     }
 
-    /// <summary>クロスリファレンス一覧表を専用ページの上部に描画する。エントリ0なら何もしない。</summary>
-    public void RenderCrossRefPage(IRenderer r, CrossReference xref, int columns)
+    /// <summary>クロスリファレンス専用ページの総ページ数。エントリ0なら0。</summary>
+    public int CrossRefPageCount(CrossReference xref)
+    {
+        int n = xref.CoilEntries.Count();
+        if (n == 0) return 0;
+        int per = CrossRefRowsPerPage();
+        return (n + per - 1) / per;
+    }
+
+    /// <summary>
+    /// クロスリファレンス専用ページ（A4横）を 1 枚描画する。<paramref name="pageIndex"/> は 0 始まり。
+    /// エントリ0なら何もしない。
+    /// </summary>
+    public void RenderCrossRefPage(IRenderer r, CrossReference xref, int pageIndex)
     {
         if (!xref.CoilEntries.Any()) return;
-        DrawCrossRefTable(r, columns, _opt.MarginMm, xref);
+        int per = CrossRefRowsPerPage();
+        DrawCrossRefTable(r, _opt.MarginMm, xref, pageIndex * per, per);
     }
 
     // ---- BOM（部品表）ページ ----
