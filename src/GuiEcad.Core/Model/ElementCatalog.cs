@@ -39,7 +39,7 @@ public static class ElementCatalog
 
     /// <summary>
     /// 機器名ラベルの既定高さオフセット(mm、正で上)。要素に Params["LabelDy"] が無い場合に使う。
-    /// 密集時の重なり回避の標準位置（sample/kitei.gcad の調整値が由来）。
+    /// 密集時の重なり回避の標準位置（実図面の規定図に基づく調整値が由来）。
     /// </summary>
     public static double DefaultLabelDy(ElementKind k) => k switch
     {

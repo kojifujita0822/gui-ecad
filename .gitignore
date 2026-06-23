@@ -58,3 +58,6 @@ gui_cad_original/
 
 # 一時スクリプト
 *.csx
+
+# リリースビルド出力（成果物・コミットしない）
+publish/
