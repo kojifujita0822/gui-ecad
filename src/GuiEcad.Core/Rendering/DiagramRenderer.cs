@@ -83,12 +83,12 @@ public sealed class DiagramRenderer
         int maxRow = 0;
         foreach (var e in sheet.Elements) maxRow = Math.Max(maxRow, e.Pos.Row);
         // 行コメント（右母線の右側）が長いとページ右にはみ出すため、その分の幅を確保する。
-        // テキスト幅は概算（行コメントのフォント 2.0mm・全角想定で 1 文字 ≒ 2.2mm）。
+        // テキスト幅は概算（行コメントのフォント 3.0mm・全角想定で 1 文字 ≒ 3.3mm）。
         double maxRungLen = sheet.RungComments
             .Where(rc => !string.IsNullOrEmpty(rc.Text))
             .Select(rc => (double)rc.Text.Length)
             .DefaultIfEmpty(0).Max();
-        double rightExtra = maxRungLen > 0 ? 2.0 + maxRungLen * 2.2 + _opt.MarginMm : _opt.MarginMm;
+        double rightExtra = maxRungLen > 0 ? 2.0 + maxRungLen * 3.3 + _opt.MarginMm : _opt.MarginMm;
         double w = RightBusX(sheet.Grid.Columns) + rightExtra;
         double diagramH = _opt.MarginMm + (maxRow + 1) * Cell + _opt.MarginMm;
         double tableH = xref is not null ? CalcTableHeight(xref) : 0.0;
@@ -272,31 +272,44 @@ public sealed class DiagramRenderer
                 int? leftNet = elemNet.TryGetValue(e.Id, out var n1) ? n1.A : null;
                 int? rightNet = elemNet.TryGetValue(e.Id, out var n2) ? n2.B : null;
 
+                // 端子台（passthrough）は左右が同一ネット。隣接配線の線番は抑制して記号真上に1個描く。
+                bool isTerminal = ElementCatalog.IsPassthrough(e.Kind);
+                bool prevIsTerminal = k > 0 && ElementCatalog.IsPassthrough(list[k - 1].Kind);
+
                 // 左側: 先頭要素は左母線へ（パディング分外側）、それ以外は前要素との隙間。
                 // 母線延長区間に縦コネクタ(分岐点)があればそこで終端し、母線へは延ばさない。
                 if (k == 0)
                 {
                     double? lt = LeftTerminator(sheet, row, lb);
                     if (lt is null)
-                        DrawWire(r, LeftBusX, y, X(lb), y, leftNet, netlist, report, powered);
+                        DrawWire(r, LeftBusX, y, X(lb), y, leftNet, netlist, report, powered, isTerminal);
                     else if (lt.Value < lb)
-                        DrawWire(r, X(lt.Value), y, X(lb), y, leftNet, netlist, report, powered);
+                        DrawWire(r, X(lt.Value), y, X(lb), y, leftNet, netlist, report, powered, isTerminal);
                     // lt == lb: 要素端が分岐点 → 母線へ延ばさない
                 }
                 else
                 {
                     int prevRb = RightBoundary(list[k - 1]);
-                    DrawWire(r, X(prevRb), y, X(lb), y, leftNet, netlist, report, powered);
+                    // 前要素が端子台の場合もこのセグメントは端子台の右隣接配線なので線番を抑制する。
+                    DrawWire(r, X(prevRb), y, X(lb), y, leftNet, netlist, report, powered, isTerminal || prevIsTerminal);
                 }
                 // 末尾要素は右母線へ。延長区間に縦コネクタ(分岐点)があればそこで終端する。
                 if (k == list.Count - 1)
                 {
                     double? rt = RightTerminator(sheet, row, rb, columns);
                     if (rt is null)
-                        DrawWire(r, X(rb), y, RightBusX(columns), y, rightNet, netlist, report, powered);
+                        DrawWire(r, X(rb), y, RightBusX(columns), y, rightNet, netlist, report, powered, isTerminal);
                     else if (rt.Value > rb)
-                        DrawWire(r, X(rb), y, X(rt.Value), y, rightNet, netlist, report, powered);
+                        DrawWire(r, X(rb), y, X(rt.Value), y, rightNet, netlist, report, powered, isTerminal);
                     // rt == rb: 要素端が分岐点 → 母線へ延ばさない
+                }
+
+                // 端子台: 記号の水平中心・上辺に線番を1個描く。
+                if (isTerminal && _opt.ShowWireNumbers && leftNet is int tnid && netlist.Nets[tnid].WireNumber > 0)
+                {
+                    double cx = (X(lb) + X(rb)) / 2;
+                    r.DrawText(netlist.Nets[tnid].WireNumber.ToString(),
+                        new(cx, y - Cell * 0.55 + 3.0), _theme.Text(TextRole.LineNumber));
                 }
             }
         }
@@ -426,7 +439,8 @@ public sealed class DiagramRenderer
     }
 
     private void DrawWire(IRenderer r, double x1, double y1, double x2, double y2,
-        int? net, Netlist netlist, ConnectivityReport? report, HashSet<int>? powered)
+        int? net, Netlist netlist, ConnectivityReport? report, HashSet<int>? powered,
+        bool suppressWireNumber = false)
     {
         var stroke = _theme.Get(StrokeRole.Wire);
         if (powered is not null && net is int pid && powered.Contains(pid))
@@ -435,8 +449,8 @@ public sealed class DiagramRenderer
             stroke = stroke with { Color = report.Of(nid) == WireStatus.Connected ? DrawingTheme.Blue : DrawingTheme.Black };
         r.DrawLine(new(x1, y1), new(x2, y2), stroke);
 
-        // 線番（母線ネットは WireNumber=0 で非表示）
-        if (_opt.ShowWireNumbers && net is int id2 && netlist.Nets[id2].WireNumber > 0)
+        // 線番（母線ネットは WireNumber=0 で非表示。端子台隣接配線は呼び出し側で抑制）
+        if (!suppressWireNumber && _opt.ShowWireNumbers && net is int id2 && netlist.Nets[id2].WireNumber > 0)
         {
             double mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
             r.DrawText(netlist.Nets[id2].WireNumber.ToString(), new(mx, my - Cell * 0.12), _theme.Text(TextRole.LineNumber));
@@ -769,7 +783,7 @@ public sealed class DiagramRenderer
     {
         if (sheet.RungComments.Count == 0) return;
         double x = RightBusX(columns) + 2.0;
-        var style = _theme.Text(TextRole.DeviceName) with { HAlign = HAlign.Left, FontSizeMm = 2.0 };
+        var style = _theme.Text(TextRole.DeviceName) with { HAlign = HAlign.Left, FontSizeMm = 3.0 };
         foreach (var rc in sheet.RungComments)
             if (!string.IsNullOrEmpty(rc.Text) && rc.Row >= rowStart && rc.Row < rowEnd)
                 r.DrawText(rc.Text, new(x, YRow(rc.Row)), style);

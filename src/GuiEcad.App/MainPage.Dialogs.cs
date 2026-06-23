@@ -124,6 +124,7 @@ public sealed partial class MainPage
 
     private async void OnSheetSettings(object sender, RoutedEventArgs e)
     {
+        var nameBox  = new TextBox { Text = _sheet.Name, PlaceholderText = "省略時: シート N", Header = "シート名" };
         var leftBox  = new TextBox { Text = _sheet.Bus.LeftName,  PlaceholderText = "左母線名（例: R200）", Header = "左母線名" };
         var rightBox = new TextBox { Text = _sheet.Bus.RightName, PlaceholderText = "右母線名（例: S200）", Header = "右母線名" };
         var voltageBox = new TextBox { Text = _sheet.Bus.PowerLabel ?? "", PlaceholderText = "母線間電圧（例: AC200V）", Header = "電圧（母線間・任意）" };
@@ -150,6 +151,7 @@ public sealed partial class MainPage
         };
 
         var panel = new StackPanel { Spacing = 10 };
+        panel.Children.Add(nameBox);
         panel.Children.Add(leftBox);
         panel.Children.Add(rightBox);
         panel.Children.Add(voltageBox);
@@ -167,10 +169,11 @@ public sealed partial class MainPage
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.XamlRoot,
         };
-        leftBox.Loaded += (_, _) => leftBox.Focus(FocusState.Programmatic);
+        nameBox.Loaded += (_, _) => { nameBox.Focus(FocusState.Programmatic); nameBox.SelectAll(); };
 
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
+        _sheet.Name = nameBox.Text.Trim();
         _sheet.MainCircuit = mainCircuitCheck.IsChecked == true;
         _sheet.Bus = new BusConfig
         {
@@ -202,6 +205,7 @@ public sealed partial class MainPage
             : 1;
         _sheet.Grid.Rows = Math.Max(newRows, minRows);
 
+        RebuildNavTree();  // シート名が変わった場合にツリー表示を更新
         MarkDirty();   // シート設定（母線名・グリッド）は Undo 対象外。変更を保存対象として記録
         Canvas.Invalidate();
     }
@@ -223,7 +227,8 @@ public sealed partial class MainPage
             }
         devices.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
 
-        var grid = new Grid { ColumnSpacing = 8, RowSpacing = 4 };
+        // 縦スクロールバー分（約18px）を右マージンで確保し数量列が隠れないようにする。
+        var grid = new Grid { ColumnSpacing = 8, RowSpacing = 4, Margin = new Thickness(0, 0, 18, 0) };
         foreach (double w in new[] { 110.0, 55.0, 160.0, 120.0, 80.0 })
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w) });
 
@@ -275,8 +280,10 @@ public sealed partial class MainPage
             CloseButtonText = "キャンセル",
             DefaultButton = ContentDialogButton.Primary,
             XamlRoot = this.XamlRoot,
-            MinWidth = 560,
+            MinWidth = 640,
         };
+        // 既定の ContentDialogMaxWidth(約548px) では列がはみ出すため上限を広げる。
+        dialog.Resources["ContentDialogMaxWidth"] = 720.0;
         if (devices.Count == 0) dialog.PrimaryButtonText = "";
 
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;

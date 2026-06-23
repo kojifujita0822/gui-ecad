@@ -134,6 +134,9 @@ public sealed partial class MainPage : Page
         Canvas.Invalidate();
     }
 
+    private void OnNavTreeDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        => OnRenameSheetBtn(sender, e);   // ダブルクリック → 現在選択中シートの名前変更ダイアログ
+
     private async void OnRenameSheetBtn(object sender, RoutedEventArgs e)
     {
         var box = new TextBox { Text = _sheet.Name, PlaceholderText = "シート名" };

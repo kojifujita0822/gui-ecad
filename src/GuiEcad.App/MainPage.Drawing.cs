@@ -74,6 +74,14 @@ public sealed partial class MainPage : Page
         foreach (var fl in _selectedLineSet)
             renderer.DrawLine(new(fl.X1Mm, fl.Y1Mm), new(fl.X2Mm, fl.Y2Mm),
                               new StrokeStyle(DrawingTheme.Blue, 0.5));
+        foreach (var f in _selectedFrameSet)
+        {
+            double fx = f.VisualXMm ?? _geo.X(f.TopLeft.Column);
+            double fy = f.VisualYMm ?? (_geo.YRow(f.TopLeft.Row) - _geo.CellMm * 0.4);
+            double fw = f.VisualWidthMm ?? f.Width * _geo.CellMm;
+            double fh = f.VisualHeightMm ?? f.Height * _geo.CellMm;
+            renderer.DrawRectangle(new(fx, fy, fw, fh), new StrokeStyle(DrawingTheme.Blue, 0.5));
+        }
 
         if (_rangeSelecting)
         {

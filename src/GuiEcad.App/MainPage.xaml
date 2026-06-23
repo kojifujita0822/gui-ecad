@@ -408,7 +408,8 @@
                         x:Name="NavTree"
                         Grid.Row="1"
                         SelectionMode="Single"
-                        SelectionChanged="OnNavTreeSelectionChanged" />
+                        SelectionChanged="OnNavTreeSelectionChanged"
+                        DoubleTapped="OnNavTreeDoubleTapped" />
                     <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="4" Padding="4,3">
                         <Button FontSize="14" Padding="6,2" Click="OnAddSheetBtn" ToolTipService.ToolTip="シートを追加">＋</Button>
                         <Button FontSize="14" Padding="6,2" Click="OnDeleteSheetBtn" ToolTipService.ToolTip="シートを削除">－</Button>

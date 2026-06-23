@@ -288,6 +288,28 @@ internal sealed class DeleteLastRowCommand : IUndoCommand
     }
 }
 
+/// <summary>範囲選択の一括移動で使う。列(double)・TopRow・BottomRow をまとめて変更する。</summary>
+internal sealed class MoveConnectorFullCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly VerticalConnector _connector;
+    private readonly double _fromCol, _toCol;
+    private readonly int _fromTop, _fromBot, _toTop, _toBot;
+
+    public MoveConnectorFullCommand(Sheet sheet, VerticalConnector connector,
+        double fromCol, int fromTop, int fromBot,
+        double toCol,   int toTop,  int toBot)
+    {
+        _sheet = sheet; _connector = connector;
+        _fromCol = fromCol; _fromTop = fromTop; _fromBot = fromBot;
+        _toCol   = toCol;   _toTop   = toTop;   _toBot   = toBot;
+    }
+
+    public Sheet Target => _sheet;
+    public void Execute() { _connector.Column = _toCol;   _connector.TopRow = _toTop;   _connector.BottomRow = _toBot; }
+    public void Undo()    { _connector.Column = _fromCol; _connector.TopRow = _fromTop; _connector.BottomRow = _fromBot; }
+}
+
 internal sealed class MoveConnectorCommand : IUndoCommand
 {
     private readonly Sheet _sheet;
@@ -422,6 +444,28 @@ internal sealed class DeleteRowCommand : IUndoCommand
         _shrunkFrames = new();
         _removedFrames = new();
     }
+}
+
+/// <summary>範囲選択の一括移動で使う。TopLeft(グリッド)と Visual 座標をまとめて変更する。</summary>
+internal sealed class MoveFrameFullCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly GroupFrame _frame;
+    private readonly GridPos _fromTopLeft, _toTopLeft;
+    private readonly double? _fromVisX, _fromVisY, _toVisX, _toVisY;
+
+    public MoveFrameFullCommand(Sheet sheet, GroupFrame frame,
+        GridPos fromTopLeft, double? fromVisX, double? fromVisY,
+        GridPos toTopLeft,   double? toVisX,   double? toVisY)
+    {
+        _sheet = sheet; _frame = frame;
+        _fromTopLeft = fromTopLeft; _fromVisX = fromVisX; _fromVisY = fromVisY;
+        _toTopLeft   = toTopLeft;   _toVisX   = toVisX;   _toVisY   = toVisY;
+    }
+
+    public Sheet Target => _sheet;
+    public void Execute() { _frame.TopLeft = _toTopLeft;   _frame.VisualXMm = _toVisX;   _frame.VisualYMm = _toVisY; }
+    public void Undo()    { _frame.TopLeft = _fromTopLeft; _frame.VisualXMm = _fromVisX; _frame.VisualYMm = _fromVisY; }
 }
 
 internal sealed class MoveFrameCommand : IUndoCommand

@@ -10,6 +10,19 @@
 
 ---
 
+## [1.0.2] - 2026-06-23
+
+### 追加
+- 端子台の線番表示を変更：前後の配線ではなく端子台記号の真上に1個だけ表示するよう変更
+
+### 修正
+- BOM（部品リスト）ダイアログの数量列がスクロールバーに隠れる表示崩れを修正
+- 行コメントの文字サイズを 2.0mm から 3.0mm に拡大
+- シート設定ダイアログにシート名入力欄を追加
+- NavTree のダブルクリックでシート名を変更できるよう追加
+
+---
+
 ## [1.0.1] - 2026-06-23
 
 ### 修正
@@ -40,6 +53,7 @@
 ---
 
 <!-- リンク定義 -->
-[Unreleased]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/kojifujita0822/gui-ecad/releases/tag/v1.0.0

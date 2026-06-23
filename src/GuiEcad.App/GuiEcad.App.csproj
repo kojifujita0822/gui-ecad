@@ -15,7 +15,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <!-- アプリのバージョン（About 画面はここから動的取得する）。 -->
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <!-- exe ファイル自体のアイコン（エクスプローラ/タスクバー表示）。 -->
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <!-- 配布物（exe プロパティ）に出る製品名・発行者・説明。 -->

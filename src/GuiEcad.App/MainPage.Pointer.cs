@@ -216,9 +216,28 @@ public sealed partial class MainPage
         var hitElem = HitTest(row, col);
         if (hitElem is not null)
         {
-            SelectElement(hitElem);
-            _moving = hitElem;
-            _moveStartPos = hitElem.Pos;
+            if (_selectedSet.Count > 1 && _selectedSet.Contains(hitElem))
+            {
+                // 範囲選択中の要素をドラッグ → 全選択要素・分岐線・自由直線を一括移動
+                // SelectElement は呼ばない（多重選択ハイライトを維持する）
+                _moving = hitElem;
+                _moveStartPos = hitElem.Pos;
+                _multiMoveOrigins = _selectedSet.ToDictionary(e => e, e => e.Pos);
+                _multiMoveConnectorOrigins = _selectedConnectorSet.ToDictionary(
+                    c => c, c => (c.Column, c.TopRow, c.BottomRow));
+                _multiMoveLineOrigins = _selectedLineSet.ToDictionary(
+                    l => l, l => (l.X1Mm, l.Y1Mm, l.X2Mm, l.Y2Mm));
+                _multiMoveFrameOrigins = _selectedFrameSet.ToDictionary(
+                    f => f, f => (f.TopLeft, f.VisualXMm, f.VisualYMm));
+            }
+            else
+            {
+                // 範囲選択外の要素をクリック → 多重選択を解除して単体選択
+                ClearMultiSelection();
+                SelectElement(hitElem);
+                _moving = hitElem;
+                _moveStartPos = hitElem.Pos;
+            }
         }
         else if (HitTestConnector(xMm, yMm) is VerticalConnector hitConn)
         {
@@ -250,10 +269,11 @@ public sealed partial class MainPage
         {
             ClearSelection();
             ClearMultiSelection();
-            if (row >= 0 && col >= 0)
+            if (row >= 0)
             {
+                // 左母線より左（col < 0）でも1列目から選択できるよう 0 にクランプする。
                 _rangeSelecting = true;
-                _rangeStart = new GridPos(row, col);
+                _rangeStart = new GridPos(row, Math.Max(0, col));
                 _rangeEnd = _rangeStart;
             }
             else
@@ -345,7 +365,46 @@ public sealed partial class MainPage
         {
             var (xMm, yMm) = ToWorld(pos);
             int row = _geo.RowAt(yMm), col = _geo.ColAt(xMm);
-            if (row >= 0 && col >= 0 && col < _sheet.Grid.Columns
+            if (_multiMoveOrigins.Count > 0)
+            {
+                // 範囲選択の一括移動：アンカー要素の元位置からのデルタを全要素に適用する。
+                int dRow = row - _moveStartPos.Row;
+                int dCol = col - _moveStartPos.Column;
+                if (dRow != _moving.Pos.Row - _moveStartPos.Row || dCol != _moving.Pos.Column - _moveStartPos.Column)
+                {
+                    bool valid = _multiMoveOrigins.Values.All(origin =>
+                    {
+                        int nr = origin.Row + dRow;
+                        int nc = origin.Column + dCol;
+                        return nr >= 0 && nc >= 0 && nc < _sheet.Grid.Columns;
+                    });
+                    if (valid)
+                    {
+                        foreach (var (elem, origin) in _multiMoveOrigins)
+                            elem.Pos = new GridPos(origin.Row + dRow, origin.Column + dCol);
+                        foreach (var (conn, orig) in _multiMoveConnectorOrigins)
+                        {
+                            conn.Column   = orig.Col + dCol;
+                            conn.TopRow   = orig.TopRow + dRow;
+                            conn.BottomRow = orig.BotRow + dRow;
+                        }
+                        double dxMm = dCol * _geo.CellMm, dyMm = dRow * _geo.CellMm;
+                        foreach (var (line, orig) in _multiMoveLineOrigins)
+                        {
+                            line.X1Mm = orig.X1 + dxMm; line.Y1Mm = orig.Y1 + dyMm;
+                            line.X2Mm = orig.X2 + dxMm; line.Y2Mm = orig.Y2 + dyMm;
+                        }
+                        foreach (var (frame, orig) in _multiMoveFrameOrigins)
+                        {
+                            frame.TopLeft = new GridPos(orig.TopLeft.Row + dRow, orig.TopLeft.Column + dCol);
+                            frame.VisualXMm = orig.VisX.HasValue ? orig.VisX.Value + dxMm : (double?)null;
+                            frame.VisualYMm = orig.VisY.HasValue ? orig.VisY.Value + dyMm : (double?)null;
+                        }
+                        Canvas.Invalidate();
+                    }
+                }
+            }
+            else if (row >= 0 && col >= 0 && col < _sheet.Grid.Columns
                 && (row != _moving.Pos.Row || col != _moving.Pos.Column)
                 && CellEmpty(row, col, _moving))
             {
@@ -388,6 +447,11 @@ public sealed partial class MainPage
                 _sheet.FreeLines.Where(fl =>
                     Math.Min(fl.X1Mm, fl.X2Mm) >= rxL - 0.01 && Math.Max(fl.X1Mm, fl.X2Mm) <= rxR + 0.01 &&
                     Math.Min(fl.Y1Mm, fl.Y2Mm) >= ryT - 0.01 && Math.Max(fl.Y1Mm, fl.Y2Mm) <= ryB + 0.01));
+            // 枠線：TopLeft と右下隅が選択範囲内に完全に収まるものを含める。
+            _selectedFrameSet = new HashSet<GroupFrame>(
+                _sheet.Frames.Where(f =>
+                    f.TopLeft.Row >= r1 && f.TopLeft.Row + f.Height - 1 <= r2 &&
+                    f.TopLeft.Column >= c1 && f.TopLeft.Column + f.Width - 1 <= c2));
             Canvas.ReleasePointerCapture(e.Pointer);
             Canvas.Invalidate();
             return;
@@ -484,7 +548,36 @@ public sealed partial class MainPage
         _movingLine = false;
 
         // ドラッグ移動のコマンド登録（位置が変わっていれば）
-        if (_moving is not null && _moving.Pos != _moveStartPos)
+        if (_multiMoveOrigins.Count > 0)
+        {
+            // 範囲選択の一括移動：移動した要素・分岐線・自由直線を BatchCommand で Undo/Redo 可能にする。
+            var cmds = new List<IUndoCommand>();
+            foreach (var (elem, from) in _multiMoveOrigins)
+                if (elem.Pos != from)
+                    cmds.Add(new MoveElementCommand(_sheet, elem, from, elem.Pos));
+            foreach (var (conn, orig) in _multiMoveConnectorOrigins)
+                if (conn.Column != orig.Col || conn.TopRow != orig.TopRow || conn.BottomRow != orig.BotRow)
+                    cmds.Add(new MoveConnectorFullCommand(_sheet, conn,
+                        orig.Col, orig.TopRow, orig.BotRow,
+                        conn.Column, conn.TopRow, conn.BottomRow));
+            foreach (var (line, orig) in _multiMoveLineOrigins)
+                if (line.X1Mm != orig.X1 || line.Y1Mm != orig.Y1)
+                    cmds.Add(new MoveFreeLineCommand(_sheet, line,
+                        orig.X1, orig.Y1, orig.X2, orig.Y2,
+                        line.X1Mm, line.Y1Mm, line.X2Mm, line.Y2Mm));
+            foreach (var (frame, orig) in _multiMoveFrameOrigins)
+                if (frame.TopLeft != orig.TopLeft || frame.VisualXMm != orig.VisX || frame.VisualYMm != orig.VisY)
+                    cmds.Add(new MoveFrameFullCommand(_sheet, frame,
+                        orig.TopLeft, orig.VisX, orig.VisY,
+                        frame.TopLeft, frame.VisualXMm, frame.VisualYMm));
+            if (cmds.Count > 0)
+                _history.Execute(new BatchCommand(_sheet, cmds));
+            _multiMoveOrigins.Clear();
+            _multiMoveConnectorOrigins.Clear();
+            _multiMoveLineOrigins.Clear();
+            _multiMoveFrameOrigins.Clear();
+        }
+        else if (_moving is not null && _moving.Pos != _moveStartPos)
             _history.Execute(new MoveElementCommand(_sheet, _moving, _moveStartPos, _moving.Pos));
 
         _moving = null;
@@ -497,6 +590,10 @@ public sealed partial class MainPage
     {
         _panning = false;
         _moving = null;
+        _multiMoveOrigins.Clear();
+        _multiMoveConnectorOrigins.Clear();
+        _multiMoveLineOrigins.Clear();
+        _multiMoveFrameOrigins.Clear();
         _movingFrame = false;
         _movingConnector = null;
         _rangeSelecting = false;

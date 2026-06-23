@@ -141,8 +141,20 @@ public sealed partial class MainPage : Page
     private HashSet<VerticalConnector> _selectedConnectorSet = new();   // 範囲選択に含まれる分岐線（縦コネクタ）
     private HashSet<FreeLine> _selectedLineSet = new();                 // 範囲選択に含まれる自由直線
 
-    // 複数選択（要素＋分岐線＋自由直線）をまとめて解除する。
-    private void ClearMultiSelection() { _selectedSet.Clear(); _selectedConnectorSet.Clear(); _selectedLineSet.Clear(); }
+    private HashSet<GroupFrame> _selectedFrameSet = new();                    // 範囲選択に含まれる枠線
+
+    // 範囲選択の一括移動：ドラッグ開始時の元位置を記録（空なら単体移動）。
+    private Dictionary<ElementInstance, GridPos> _multiMoveOrigins = new();
+    private Dictionary<VerticalConnector, (double Col, int TopRow, int BotRow)> _multiMoveConnectorOrigins = new();
+    private Dictionary<FreeLine, (double X1, double Y1, double X2, double Y2)> _multiMoveLineOrigins = new();
+    private Dictionary<GroupFrame, (GridPos TopLeft, double? VisX, double? VisY)> _multiMoveFrameOrigins = new();
+
+    // 複数選択（要素＋分岐線＋自由直線＋枠線）をまとめて解除する。
+    private void ClearMultiSelection()
+    {
+        _selectedSet.Clear(); _selectedConnectorSet.Clear();
+        _selectedLineSet.Clear(); _selectedFrameSet.Clear();
+    }
 
     // コピー・ペースト
     private sealed record ClipboardData(
@@ -609,8 +621,17 @@ public sealed partial class MainPage : Page
     private void OnPointerWheel(object sender, PointerRoutedEventArgs e)
     {
         var p = e.GetCurrentPoint(Canvas);
-        double factor = Math.Pow(1.1, p.Properties.MouseWheelDelta / 120.0);
-        ZoomBy(factor, p.Position);
+        int delta = p.Properties.MouseWheelDelta;
+        bool ctrlDown = (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control) & CoreVirtualKeyStates.Down) != 0;
+        if (ctrlDown)
+        {
+            ZoomBy(Math.Pow(1.1, delta / 120.0), p.Position);
+        }
+        else
+        {
+            _viewport.PanY += delta / 3.0;   // 1ノッチ=120→約40dip スクロール
+            Canvas.Invalidate();
+        }
     }
 
     private Point ViewCenter() => new(Canvas.ActualWidth / 2, Canvas.ActualHeight / 2);
