@@ -36,13 +36,27 @@ public sealed partial class MainPage : Page
         Canvas.Invalidate();
     }
 
-    /// <summary>現在の検索インデックスの一致要素へジャンプ（別シートなら切替）。</summary>
+    /// <summary>現在の検索インデックスの一致要素へジャンプ（別シートなら切替＋ビューを中央へパン）。</summary>
     private void JumpToFindResult()
     {
         if (_find.Current is not { } hit) return;
         // シート切替は SwitchToSheet 一本化（編集中コミット・選択/テストセッション整合を担保）。
         if (hit.Sheet != _sheet) SwitchToSheet(hit.Sheet);
+        CenterViewOnElement(hit.El);   // 一致要素が画面中央に来るようパン（「移動しない」対策）
         Canvas.Invalidate();
+    }
+
+    /// <summary>指定要素が作図エリアの中央に来るようビューをパンする（ズーム倍率は変えない）。</summary>
+    private void CenterViewOnElement(ElementInstance el)
+    {
+        double cw = Canvas.ActualWidth, ch = Canvas.ActualHeight;
+        if (cw <= 0 || ch <= 0) return;
+        var (l, right) = PartResolver.BoundarySpan(el, _document.Library);
+        double exMm = (_geo.X(l) + _geo.X(right)) / 2;   // 要素中心の mm 座標
+        double eyMm = _geo.YRow(el.Pos.Row);
+        double scale = _viewport.Scale;                  // mm → DIP
+        _viewport.PanX = cw / 2 - exMm * scale;
+        _viewport.PanY = ch / 2 - eyMm * scale;
     }
 
     private void UpdateFindStatus()

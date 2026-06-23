@@ -179,13 +179,14 @@ public sealed partial class MainPage : Page
 
     // 下部出力パネル (P3)
     private List<Diagnostic> _lastDrcResults = new();
-    private bool _outputPanelCollapsed;
+    private bool _outputPanelCollapsed = true;   // 既定は折りたたみ（DRC/検索/接続検査の実行時に自動展開）
     private const double OutputPanelDefaultHeight = 130;
 
     public MainPage()
     {
         InitializeComponent();
         LoadTheme();
+        LoadCanvasTheme();   // ダークモード(作図色)の復元＋キャンバス背景反映
         LoadPaletteState();   // ツールパレットのドック/フロート状態・位置を復元
 #if !DEBUG
         RestartMenuItem.Visibility = Visibility.Collapsed;   // 開発用「再ビルドして再起動」は配布版で隠す
@@ -240,6 +241,47 @@ public sealed partial class MainPage : Page
     {
         _showGrid = GridMenuItem.IsChecked;
         Canvas.Invalidate();
+    }
+
+    // ===== ダークモード(作図色)（キャンバス色のみ。UIクロムのダークモードとは独立に切替） =====
+    // 画面描画に使う作図テーマ。Default=白地黒線 / Dark=暗地明線。PDFは常に DrawingTheme.Default。
+    private DrawingTheme _drawingTheme = DrawingTheme.Default;
+
+    private static string DrawingThemeSettingPath =>
+        System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "GuiEcad", "drawing-theme.txt");
+
+    // 起動時: 保存済みの作図ダークモードを復元（キャンバス背景・メニュー チェックに反映）。
+    private void LoadCanvasTheme()
+    {
+        bool dark = false;
+        try { dark = System.IO.File.Exists(DrawingThemeSettingPath) &&
+                     System.IO.File.ReadAllText(DrawingThemeSettingPath).Trim() == "Dark"; }
+        catch { /* 読込失敗はライトで続行 */ }
+        _drawingTheme = dark ? DrawingTheme.Dark : DrawingTheme.Default;
+        CanvasDarkModeItem.IsChecked = dark;
+        ApplyCanvasBackground();
+    }
+
+    private void OnCanvasDarkToggle(object sender, RoutedEventArgs e)
+    {
+        bool dark = CanvasDarkModeItem.IsChecked;
+        _drawingTheme = dark ? DrawingTheme.Dark : DrawingTheme.Default;
+        ApplyCanvasBackground();
+        try
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(DrawingThemeSettingPath)!);
+            System.IO.File.WriteAllText(DrawingThemeSettingPath, dark ? "Dark" : "Light");
+        }
+        catch { /* 設定保存失敗は致命的でない */ }
+        Canvas.Invalidate();
+    }
+
+    // キャンバス背景を作図テーマの背景色に合わせる（Win2D CanvasControl.ClearColor）。
+    private void ApplyCanvasBackground()
+    {
+        var bg = _drawingTheme.Background;
+        Canvas.ClearColor = Windows.UI.Color.FromArgb(bg.A, bg.R, bg.G, bg.B);
     }
 
 

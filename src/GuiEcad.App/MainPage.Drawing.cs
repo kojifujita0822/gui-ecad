@@ -48,7 +48,7 @@ public sealed partial class MainPage : Page
         var transform = Matrix3x2.CreateScale((float)scale) * Matrix3x2.CreateTranslation((float)_viewport.PanX, (float)_viewport.PanY);
 
         var renderer = new Win2DRenderer(args.DrawingSession, transform);
-        var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions { ConnectivityCheck = _connectivityCheck, ShowGrid = _showGrid });
+        var dr = new DiagramRenderer(_drawingTheme, new RenderOptions { ConnectivityCheck = _connectivityCheck, ShowGrid = _showGrid });
         dr.Render(renderer, _sheet, _document.Library, _testSession?.State);
 
         // 図面枠ON時は、PDF出力1ページ分（A4縦）の範囲を仮枠ガイドで表示する。

@@ -353,7 +353,7 @@ public sealed class DiagramRenderer
             r.DrawLine(new(x, YRow(top)), new(x, YRow(bot)), wire);
             // 接合点ドットは合流点（上端）のみ。元の上端がこのページ内にある場合だけ描く。
             if (c.TopRow >= rowStart && c.TopRow < rowEnd)
-                r.FillCircle(new(x, YRow(c.TopRow)), Cell * 0.07, DrawingTheme.Black);
+                r.FillCircle(new(x, YRow(c.TopRow)), Cell * 0.07, _theme.Foreground);
         }
     }
 
@@ -508,7 +508,7 @@ public sealed class DiagramRenderer
         if (powered is not null && net is int pid && powered.Contains(pid))
             stroke = stroke with { Color = DrawingTheme.Powered, Width = DrawingTheme.PoweredWireWidth };   // テスト: 通電
         else if (report is not null && net is int nid)
-            stroke = stroke with { Color = report.Of(nid) == WireStatus.Connected ? DrawingTheme.Blue : DrawingTheme.Black };
+            stroke = stroke with { Color = report.Of(nid) == WireStatus.Connected ? DrawingTheme.Blue : _theme.Foreground };
         r.DrawLine(new(x1, y1), new(x2, y2), stroke);
 
         // 線番（母線ネットは WireNumber=0 で非表示。端子台隣接配線は呼び出し側で抑制）
@@ -605,10 +605,10 @@ public sealed class DiagramRenderer
     }
 
     // 外枠（x0..x4）＋任意の縦区切り線を描く。
-    private static void DrawTableRow(IRenderer r, StrokeStyle s,
+    private void DrawTableRow(IRenderer r, StrokeStyle s,
         double x0, double x4, double y, double rh, bool fill, params double[] dividers)
     {
-        if (fill) r.FillRectangle(new(x0, y, x4 - x0, rh), DrawingTheme.TableHeaderFill);
+        if (fill) r.FillRectangle(new(x0, y, x4 - x0, rh), _theme.TableHeaderFill);
         r.DrawRectangle(new(x0, y, x4 - x0, rh), s);
         foreach (var xd in dividers)
             r.DrawLine(new(xd, y), new(xd, y + rh), s);
@@ -725,10 +725,10 @@ public sealed class DiagramRenderer
         }
     }
 
-    private static void DrawBomRow(IRenderer r, StrokeStyle s,
+    private void DrawBomRow(IRenderer r, StrokeStyle s,
         double x0, double y, double x1, double x2, double x3, double x4, double x5, double rh, bool fill)
     {
-        if (fill) r.FillRectangle(new(x0, y, x5 - x0, rh), DrawingTheme.TableHeaderFill);
+        if (fill) r.FillRectangle(new(x0, y, x5 - x0, rh), _theme.TableHeaderFill);
         r.DrawRectangle(new(x0, y, x5 - x0, rh), s);
         r.DrawLine(new(x1, y), new(x1, y + rh), s);
         r.DrawLine(new(x2, y), new(x2, y + rh), s);

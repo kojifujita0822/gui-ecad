@@ -145,6 +145,7 @@
                 <ToggleMenuFlyoutItem x:Name="GridMenuItem" Text="グリッド表示" Click="OnGridToggle" />
                 <MenuFlyoutSeparator />
                 <ToggleMenuFlyoutItem x:Name="DarkModeMenuItem" Text="ダークモード" Click="OnDarkModeToggle" />
+                <ToggleMenuFlyoutItem x:Name="CanvasDarkModeItem" Text="ダークモード(作図色)" Click="OnCanvasDarkToggle" />
             </MenuBarItem>
             <MenuBarItem x:Name="ShapeMenuBarItem" Title="図形(G)" />
             <MenuBarItem Title="ヘルプ(H)">
@@ -431,7 +432,7 @@
                 </Grid>
             </Border>
 
-            <!-- 検索・置換バー（Ctrl+F で表示） -->
+            <!-- 検索・置換バー（Ctrl+F で表示・作図エリア上部に表示） -->
             <Border
                 x:Name="FindBar"
                 Grid.Row="0"
@@ -449,12 +450,13 @@
                         PlaceholderText="機器名を検索"
                         KeyDown="OnFindBoxKeyDown"
                         TextChanged="OnFindBoxTextChanged" />
-                    <Button Width="30" Content="＜" Click="OnFindPrev" ToolTipService.ToolTip="前の一致" />
-                    <Button Width="30" Content="＞" Click="OnFindNext" ToolTipService.ToolTip="次の一致" />
+                    <Button Click="OnFindPrev" ToolTipService.ToolTip="前の一致"><FontIcon Glyph="&#xE76B;" FontSize="12" /></Button>
+                    <Button Click="OnFindNext" ToolTipService.ToolTip="次の一致"><FontIcon Glyph="&#xE76C;" FontSize="12" /></Button>
                     <TextBlock
                         x:Name="FindStatus"
                         VerticalAlignment="Center"
                         FontSize="11"
+                        MinWidth="40"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <Rectangle
                         Width="1"
@@ -464,7 +466,7 @@
                     <TextBox x:Name="ReplaceBox" Width="130" PlaceholderText="置換後の機器名" />
                     <Button Content="置換" Click="OnReplaceOne" />
                     <Button Content="全置換" Click="OnReplaceAll" />
-                    <Button Width="28" Click="OnFindClose" ToolTipService.ToolTip="閉じる"><FontIcon Glyph="&#xE8BB;" FontSize="12" /></Button>
+                    <Button Click="OnFindClose" ToolTipService.ToolTip="閉じる"><FontIcon Glyph="&#xE8BB;" FontSize="12" /></Button>
                 </StackPanel>
             </Border>
 
@@ -628,7 +630,7 @@
                 Grid.Row="2"
                 Grid.Column="1"
                 Grid.ColumnSpan="3"
-                Height="130"
+                Height="40"
                 BorderBrush="{ThemeResource AppDividerBrush}"
                 BorderThickness="0,1,0,0"
                 Background="{ThemeResource AppPanelBackgroundBrush}">
@@ -639,7 +641,7 @@
                     <TabView.TabStripFooter>
                         <Button
                             x:Name="OutputCollapseBtn"
-                            Content="▼"
+                            Content="▲"
                             Padding="6,2"
                             FontSize="11"
                             Click="OnOutputPanelToggle"
