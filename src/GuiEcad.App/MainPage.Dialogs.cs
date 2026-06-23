@@ -222,6 +222,11 @@ public sealed partial class MainPage
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
                 if (!seen.Add(elem.DeviceName)) continue;
+                if (!PartResolver.CreatesComponent(elem, _document.Library))
+                {
+                    devices.Add((elem.DeviceName, "記号", ElementKind.ContactNO));
+                    continue;
+                }
                 var kind = PartResolver.ComponentKind(elem, _document.Library);
                 devices.Add((elem.DeviceName, DeviceKindLabel(kind), kind));
             }

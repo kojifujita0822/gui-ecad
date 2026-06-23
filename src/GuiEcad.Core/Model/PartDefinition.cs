@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace GuiEcad.Model;
 
 /// <summary>自作パーツの電気的役割（テストモード挙動）。NetlistBuilder で既定種別へ写像する。</summary>
-public enum PartRole { ContactNO, ContactNC, Coil, Lamp, Terminal, NonSimulated }
+public enum PartRole { ContactNO, ContactNC, Coil, Lamp, Terminal, NonSimulated, InputNO, InputNC }
 
 /// <summary>
 /// パーツ図形プリミティブ（パーツローカル座標＝セル単位。原点=最左ポート点・行中心線=y0、+x右/+y下）。

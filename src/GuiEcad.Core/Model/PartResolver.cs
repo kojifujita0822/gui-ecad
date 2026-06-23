@@ -45,6 +45,8 @@ public static class PartResolver
             PartRole.Coil => ElementKind.Coil,
             PartRole.Lamp => ElementKind.Lamp,
             PartRole.Terminal => ElementKind.Terminal,
+            PartRole.InputNO => ElementKind.PushButtonNO,
+            PartRole.InputNC => ElementKind.PushButtonNC,
             _ => throw new InvalidOperationException(
                 $"ComponentKind called for role '{part.Role}'. Check CreatesComponent before calling ComponentKind."),
         };

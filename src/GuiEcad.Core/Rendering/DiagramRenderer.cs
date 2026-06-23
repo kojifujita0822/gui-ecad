@@ -693,22 +693,35 @@ public sealed class DiagramRenderer
     {
         int lb = LeftBoundary(e), rb = RightBoundary(e);
         double width = e.CellWidth * Cell;
+        var part = _lib?.Get(e.PartId);
+
         bool on = energized is not null && e.DeviceName is not null
                   && energized.TryGetValue(e.DeviceName, out var v) && v;
         var stroke = on ? _theme.Get(StrokeRole.SymbolOutline) with { Color = DrawingTheme.Powered }
                         : _theme.Get(StrokeRole.SymbolOutline);
 
-        // ContactNO/NC の縦棒間を半透明青で塗る（ユーザーが手動強制した接点の明示）
+        // 組込み ContactNO/NC: 縦棒間を半透明青で塗る（手動強制の明示）
         bool isContact = e.Kind is ElementKind.ContactNO or ElementKind.ContactNC;
         bool manuallyForced = isContact && e.DeviceName is not null && inputs is not null
                               && inputs.TryGetValue(e.DeviceName, out var mv) && mv;
-        Color? fill = manuallyForced ? DrawingTheme.ManualForced : null;
+        Color? contactFill = manuallyForced ? DrawingTheme.ManualForced : null;
 
-        var part = _lib?.Get(e.PartId);
+        // 負荷（コイル・ランプ等）か判定。自作パーツはライブラリ経由で解決。
+        bool isLoad = part is not null
+            ? PartResolver.CreatesComponent(e, _lib) && ElementCatalog.IsLoad(PartResolver.ComponentKind(e, _lib))
+            : ElementCatalog.IsLoad(e.Kind);
+
+        // 1×1 セル背景塗り: 負荷が通電中、またはカスタムパーツが手動強制中
+        Color? bgFill = (on && isLoad) ? DrawingTheme.ManualForced
+                      : (part is not null && manuallyForced) ? DrawingTheme.ManualForced
+                      : null;
+
         r.PushTransform(X(lb), YRow(e.Pos.Row));
         string? orient = e.Params.GetValueOrDefault(ParamKeys.Orient);
+        if (bgFill is Color bg)
+            r.FillRectangle(new(0, -Cell / 2, Cell, Cell), bg);
         if (part is not null) PartDrawing.Draw(r, _theme, part, Cell, stroke);
-        else SymbolGlyphs.Draw(r, stroke, e.Kind, width, Cell, fill,
+        else SymbolGlyphs.Draw(r, stroke, e.Kind, width, Cell, contactFill,
                                e.Params.GetValueOrDefault(ParamKeys.Type), orient);
         r.PopTransform();
 

@@ -91,8 +91,10 @@ public sealed partial class MainPage : Page
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
                 if (!seen.Add(elem.DeviceName)) continue;
-                var kind = PartResolver.ComponentKind(elem, _document.Library);
-                items.Add((elem.DeviceName, DeviceKindLabel(kind), sheet, elem));
+                string kindLabel = PartResolver.CreatesComponent(elem, _document.Library)
+                    ? DeviceKindLabel(PartResolver.ComponentKind(elem, _document.Library))
+                    : "記号";
+                items.Add((elem.DeviceName, kindLabel, sheet, elem));
             }
         }
         items.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));

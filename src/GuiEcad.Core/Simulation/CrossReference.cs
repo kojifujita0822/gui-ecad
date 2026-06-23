@@ -64,6 +64,7 @@ public static class CrossReferenceBuilder
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
 
+                if (!PartResolver.CreatesComponent(elem, lib)) continue;
                 var effectiveKind = PartResolver.ComponentKind(elem, lib);
                 bool isLoad = ElementCatalog.IsLoad(effectiveKind);
                 bool isContact = ElementCatalog.IsContact(effectiveKind);

@@ -61,7 +61,7 @@ public static class DesignRuleCheck
             foreach (var elem in sheet.Elements)
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
-
+                if (!PartResolver.CreatesComponent(elem, lib)) continue;
                 var kind = PartResolver.ComponentKind(elem, lib);
                 // リレー接点＝接点のうち外部入力駆動でないもの（ContactNO/NC・TimerContactNO/NC）
                 bool isRelayContact = ElementCatalog.IsContact(kind) && !ElementCatalog.IsInputControlled(kind);
@@ -125,6 +125,7 @@ public static class DesignRuleCheck
             foreach (var elem in sheet.Elements)
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
+                if (!PartResolver.CreatesComponent(elem, lib)) continue;
                 var kind = PartResolver.ComponentKind(elem, lib);
                 int circuitNo = circuitByRow.GetValueOrDefault(elem.Pos.Row, 0);
                 var cref = new CircuitRef(sheet.PageNumber, circuitNo);

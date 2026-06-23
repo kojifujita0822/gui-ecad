@@ -44,6 +44,8 @@
                     <ComboBoxItem Content="表示灯" Tag="Lamp" />
                     <ComboBoxItem Content="端子台" Tag="Terminal" />
                     <ComboBoxItem Content="非シミュレート" Tag="NonSimulated" />
+                    <ComboBoxItem Content="外部入力 a接点 (NO)" Tag="InputNO" />
+                    <ComboBoxItem Content="外部入力 b接点 (NC)" Tag="InputNC" />
                 </ComboBox>
 
                 <Rectangle Margin="6,2" Width="1" VerticalAlignment="Stretch"
