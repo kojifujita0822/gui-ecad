@@ -8,6 +8,10 @@
 
 ## [Unreleased]
 
+---
+
+## [1.0.4] - 2026-06-23
+
 ### 追加
 - ダークモード(作図色): 作図エリア（線・文字・背景）を暗色に切替（UIクロムのダークモードとは独立）。PDF出力は常に白地・黒線。
 - 出力パネルを起動時は折りたたみ表示に（接続検査・DRC・検索の実行時に自動展開）
@@ -82,7 +86,8 @@
 ---
 
 <!-- リンク定義 -->
-[Unreleased]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/kojifujita0822/gui-ecad/compare/v1.0.0...v1.0.1
