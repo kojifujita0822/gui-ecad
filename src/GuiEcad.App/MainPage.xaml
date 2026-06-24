@@ -165,7 +165,7 @@
             BorderThickness="0,0,0,1">
             <StackPanel Orientation="Horizontal" Padding="4,2" Spacing="2" VerticalAlignment="Center">
                 <!-- モード切替 -->
-                <ToggleButton x:Name="TestModeBtn" VerticalAlignment="Center" Click="OnTestModeToggle" Content="テスト" />
+                <ToggleButton x:Name="TestModeBtn" AutomationProperties.AutomationId="TestModeBtn" VerticalAlignment="Center" Click="OnTestModeToggle" Content="テスト" />
                 <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- Undo / Redo -->
                 <Button VerticalAlignment="Center" Click="OnMenuUndo" ToolTipService.ToolTip="元に戻す (Ctrl+Z)">
@@ -181,7 +181,7 @@
                 </Button>
                 <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- 接続検査 -->
-                <ToggleButton x:Name="ConnectivityToggle" VerticalAlignment="Center" Click="OnConnectivityToggle" Content="接続検査" />
+                <ToggleButton x:Name="ConnectivityToggle" AutomationProperties.AutomationId="ConnectivityToggle" VerticalAlignment="Center" Click="OnConnectivityToggle" Content="接続検査" />
                 <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- ズーム -->
                 <Button VerticalAlignment="Center" Click="OnZoomIn" ToolTipService.ToolTip="拡大 (Ctrl++)">
@@ -265,6 +265,7 @@
                         <!-- 選択ツール -->
                         <RadioButton
                             x:Name="BtnSelect"
+                            AutomationProperties.AutomationId="BtnSelect"
                             GroupName="Tools"
                             IsChecked="True"
                             Style="{StaticResource ToolBtnStyle}"
@@ -782,6 +783,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Left">
                     <TextBlock
                         x:Name="StatusMode"
+                        AutomationProperties.AutomationId="StatusMode"
                         FontSize="11"
                         FontWeight="SemiBold"
                         Text="作画モード"
@@ -797,6 +799,7 @@
                     <Rectangle Width="1" Margin="0,2" Fill="{ThemeResource AppStatusBarDividerBrush}" VerticalAlignment="Stretch" />
                     <TextBlock
                         x:Name="StatusSheet"
+                        AutomationProperties.AutomationId="StatusSheet"
                         FontSize="11"
                         Text="シート 1 / 1"
                         Foreground="{ThemeResource AppStatusBarForegroundBrush}"

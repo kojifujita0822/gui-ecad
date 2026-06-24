@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WinUI3 アプリ（GuiEcad.App）の E2E スモークテスト。
+    Windows UI Automation (UIA) を FlaUI 経由で叩く。実デスクトップセッションが必要なため、
+    GuiEcad.sln には含めず（CI のヘッドレス実行で落とさない）、手元で明示実行する。
+      1) アプリを先にビルド: dotnet build src/GuiEcad.App/GuiEcad.App.csproj -r win-x64
+      2) UI テスト実行:      dotnet test tests/GuiEcad.UiTests/GuiEcad.UiTests.csproj
+    ※ Win2D の CanvasControl（作画エリア）内の記号は UIA から見えない。
+       本テストがカバーするのはメニュー/ツールバー/ダイアログ等の XAML UI まで。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlaUI.UIA3" Version="4.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageReference Include="xunit" Version="2.5.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
