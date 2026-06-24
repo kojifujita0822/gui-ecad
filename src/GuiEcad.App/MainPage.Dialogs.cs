@@ -25,6 +25,29 @@ namespace GuiEcad_App;
 
 public sealed partial class MainPage
 {
+    // ContentDialog の多重表示を防ぐゲート。WinUI3 は同時に複数の ContentDialog を
+    // 開けず "Only a single ContentDialog can be open at any time" 例外になるため、
+    // SemaphoreSlim で 1 つずつ直列に表示する。
+    private readonly SemaphoreSlim _dialogGate = new(1, 1);
+
+    /// <summary>
+    /// ContentDialog を直列表示するラッパー。先行ダイアログが開いている間は
+    /// その表示が閉じるまで待ってから本ダイアログを開く（多重表示による例外を回避）。
+    /// XamlRoot は呼び出し側で設定済みであること。
+    /// </summary>
+    private async Task<ContentDialogResult> ShowDialogAsync(ContentDialog dialog)
+    {
+        await _dialogGate.WaitAsync();
+        try
+        {
+            return await dialog.ShowAsync();
+        }
+        finally
+        {
+            _dialogGate.Release();
+        }
+    }
+
     // ===== ドキュメント情報（表題欄） =====
 
     private async void OnDocumentInfo(object sender, RoutedEventArgs e)
@@ -101,7 +124,7 @@ public sealed partial class MainPage
         };
         boxes[0].Loaded += (_, _) => boxes[0].Focus(FocusState.Programmatic);
 
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogAsync(dialog) != ContentDialogResult.Primary) return;
         for (int i = 0; i < fields.Length; i++)
             fields[i].Set(boxes[i].Text.Trim());
 
@@ -171,7 +194,7 @@ public sealed partial class MainPage
         };
         nameBox.Loaded += (_, _) => { nameBox.Focus(FocusState.Programmatic); nameBox.SelectAll(); };
 
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogAsync(dialog) != ContentDialogResult.Primary) return;
 
         _sheet.Name = nameBox.Text.Trim();
         _sheet.MainCircuit = mainCircuitCheck.IsChecked == true;
@@ -291,7 +314,7 @@ public sealed partial class MainPage
         dialog.Resources["ContentDialogMaxWidth"] = 720.0;
         if (devices.Count == 0) dialog.PrimaryButtonText = "";
 
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogAsync(dialog) != ContentDialogResult.Primary) return;
 
         // 入力を DeviceTable へ書き戻す（変更があればダーティ化）
         bool changed = false;

@@ -152,7 +152,7 @@ public sealed partial class MainPage : Page
             DefaultButton = ContentDialogButton.Close,
             XamlRoot = Content.XamlRoot,
         };
-        if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+        if (await ShowDialogAsync(dlg) != ContentDialogResult.Primary) return;
 
         _document.Library!.ById.Remove(id);
         if (_tool.PartId == id)
