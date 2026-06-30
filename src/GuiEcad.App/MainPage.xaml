@@ -170,12 +170,8 @@
                 <!-- モード切替 -->
                 <ToggleButton x:Name="TestModeBtn" AutomationProperties.AutomationId="TestModeBtn"
                               VerticalAlignment="Center" Click="OnTestModeToggle"
-                              Padding="10,5" MinWidth="80">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <FontIcon Glyph="&#xE768;" FontSize="13" />
-                        <TextBlock Text="テスト" VerticalAlignment="Center" FontWeight="SemiBold" />
-                    </StackPanel>
-                </ToggleButton>
+                              Content="&#x25B6; テスト" FontWeight="SemiBold"
+                              Padding="10,5" MinWidth="80" />
                 <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- Undo / Redo -->
                 <Button VerticalAlignment="Center" Click="OnMenuUndo" ToolTipService.ToolTip="元に戻す (Ctrl+Z)">
