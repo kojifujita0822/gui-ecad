@@ -26,6 +26,7 @@
                             <SolidColorBrush x:Key="AppStatusBarDividerBrush" Color="#33FFFFFF" />
                             <SolidColorBrush x:Key="AppStatusDirtyBrush" Color="#FFFFC857" />
                             <SolidColorBrush x:Key="AppStatusWarnBrush" Color="#FFFF8A80" />
+                            <SolidColorBrush x:Key="AppTestModeBrush" Color="#FFFFEBC8" />
                         </ResourceDictionary>
                         <!-- ===== ダーク ===== -->
                         <ResourceDictionary x:Key="Dark">
@@ -40,6 +41,7 @@
                             <SolidColorBrush x:Key="AppStatusBarDividerBrush" Color="#33FFFFFF" />
                             <SolidColorBrush x:Key="AppStatusDirtyBrush" Color="#FFFFD166" />
                             <SolidColorBrush x:Key="AppStatusWarnBrush" Color="#FFFF8A80" />
+                            <SolidColorBrush x:Key="AppTestModeBrush" Color="#FF2D1A00" />
                         </ResourceDictionary>
                     </ResourceDictionary.ThemeDictionaries>
                 </ResourceDictionary>

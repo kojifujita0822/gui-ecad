@@ -85,6 +85,8 @@ public sealed partial class MainPage : Page
         _lineStartMm = null;
         _connStartRow = null;
         if (OtherPartButton is not null) OtherPartButton.Content = "その他部品";
+        UpdateHintText();
+        Canvas.Invalidate();
     }
 
     // 「その他部品」メニューから記号を選択（ツールバーに常設しない記号の配置）
@@ -164,46 +166,6 @@ public sealed partial class MainPage : Page
         Canvas.Invalidate();
     }
 
-    // パーツライブラリを外部ファイル（.gcadparts）へ書き出す。
-    private async void OnExportParts(object sender, RoutedEventArgs e)
-    {
-        if (_document.Library is null || _document.Library.ById.Count == 0) return;
-
-        var picker = new FileSavePicker(GetPickerWindowId());
-        picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-        picker.SuggestedFileName = "parts";
-        picker.FileTypeChoices.Add("パーツライブラリ", new List<string> { ".gcadparts" });
-
-        var file = await picker.PickSaveFileAsync();
-        if (file is null) return;
-
-        try { PartLibrarySerializer.Save(_document.Library, file.Path); }
-        catch (Exception ex) { await ShowErrorAsync(ex.Message); }
-    }
-
-    // 外部ファイルからパーツを読み込み、現ドキュメントのライブラリへ統合（同 Id は上書き）。
-    private async void OnImportParts(object sender, RoutedEventArgs e)
-    {
-        var picker = new FileOpenPicker(GetPickerWindowId());
-        picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-        picker.FileTypeFilter.Add(".gcadparts");
-
-        var file = await picker.PickSingleFileAsync();
-        if (file is null) return;
-
-        try
-        {
-            var parts = PartLibrarySerializer.Load(file.Path);
-            if (parts.Count == 0) { await ShowErrorAsync("読み込むパーツがありません。"); return; }
-
-            _document.Library ??= new PartLibrary();
-            foreach (var p in parts) _document.Library.ById[p.Id] = p;
-            RebuildOtherPartMenu();
-            Canvas.Invalidate();
-        }
-        catch (Exception ex) { await ShowErrorAsync(ex.Message); }
-    }
-
     // 「その他部品」メニューを再生成（組込みの常設記号＋ドキュメントの自作パーツ）。
     private void RebuildOtherPartMenu()
     {
@@ -243,12 +205,12 @@ public sealed partial class MainPage : Page
         create.Click += OnCreateFolderPart;
         flyout.Items.Add(create);
 
-        var import = new MenuFlyoutItem { Text = "パーツをインポート..." };
-        import.Click += OnImportParts;
+        var import = new MenuFlyoutItem { Text = "自作パーツをインポート..." };
+        import.Click += OnImportLibrary;
         flyout.Items.Add(import);
 
-        var export = new MenuFlyoutItem { Text = "パーツをエクスポート..." };
-        export.Click += OnExportParts;
+        var export = new MenuFlyoutItem { Text = "自作パーツをエクスポート..." };
+        export.Click += OnExportLibrary;
         flyout.Items.Add(export);
     }
 

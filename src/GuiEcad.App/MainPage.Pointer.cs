@@ -42,6 +42,13 @@ public sealed partial class MainPage
         // e.Handled も立てない（立てると同様に RightTapped が発火しなくなる）。
         if (e.GetCurrentPoint(Canvas).Properties.IsRightButtonPressed) return;
 
+        // 描画エリアクリックで DRC ハイライトを消す
+        if (_drcHighlightRow >= 0)
+        {
+            _drcHighlightRow = -1;
+            Canvas.Invalidate();
+        }
+
         // 前操作のドラッグ残骸を破棄（キャプチャ喪失等で固まるのを防ぐ）＋キーボード操作のためフォーカス確保
         _connStartRow = null;
         _frameStartMm = null;
@@ -300,6 +307,7 @@ public sealed partial class MainPage
             }
         }
         Canvas.CapturePointer(e.Pointer);
+        UpdateHintText();
         RefreshPropertiesPanel();
         Canvas.Invalidate();
     }
@@ -470,6 +478,7 @@ public sealed partial class MainPage
                     f.TopLeft.Row >= r1 && f.TopLeft.Row + f.Height - 1 <= r2 &&
                     f.TopLeft.Column >= c1 && f.TopLeft.Column + f.Width - 1 <= c2));
             Canvas.ReleasePointerCapture(e.Pointer);
+            UpdateHintText();
             Canvas.Invalidate();
             return;
         }
@@ -514,6 +523,7 @@ public sealed partial class MainPage
                 SelectFrame(frame);
             }
             Canvas.ReleasePointerCapture(e.Pointer);
+            UpdateHintText();
             Canvas.Invalidate();
             return;
         }

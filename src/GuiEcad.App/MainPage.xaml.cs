@@ -11,6 +11,7 @@ using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Foundation;
@@ -225,6 +226,7 @@ public sealed partial class MainPage : Page
             RebuildNavTree();
             InitShapeFolder();        // _folderEntries を先に用意（その他▼の自作図形に必要）
             RebuildOtherPartMenu();
+            UpdateHintText();
         };
     }
 
@@ -322,6 +324,10 @@ public sealed partial class MainPage : Page
         TimerTickPanel.Visibility = _testMode ? Visibility.Visible : Visibility.Collapsed;
         if (_testMode) StartRealtimeTimer(); else StopRealtimeTimer();
         UpdateTestStatus();
+        UpdateHintText();
+        ToolbarBorder.Background = _testMode
+            ? (Brush)Application.Current.Resources["AppTestModeBrush"]
+            : (Brush)Application.Current.Resources["AppToolbarBackgroundBrush"];
         Canvas.Invalidate();
     }
 

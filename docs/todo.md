@@ -49,6 +49,18 @@
 - [x] **ツールパレットのフロート化（Jw_cad 風）** — ドック⇄フロート切替・タイトルバードラッグ移動・位置永続化（`MyDocuments\GuiEcad\palette-pos.txt`）を実装。オーバーレイ `ToolOverlay`（Background=`{x:Null}`）上の `ToolPaletteFloat` に中身（`ToolScroll`）を付け替え。既定はフロート（作図エリア左上 Left=4,Top=4）。**上下端へドラッグ吸着で横並び化**（`ToolTopDock`/`ToolBottomDock` がキャンバスを押し下げ・`SetPaletteOrientation` で縦横変換、enum `PaletteDock` で4状態管理）。完了 2026-06-22。→ [docs/float-palette-plan.md](float-palette-plan.md)。
 - [x] **主回路用記号** — ブレーカ(NFB/MCCB/ELB は `Breaker3P`＋`Params["Type"]` でラベル切替)・電磁接触器主接点(`ContactorMain3P`)・サーマル(`ThermalOverload3P` 3極)を `ElementKind` 追加（非シミュレート）。縦/横専用の別記号・接続点「点(●)」ツール・配置プレビュー・PDF整合まで実装。三相モータは既存 Motor、母線R/S/Tは自由直線。完了 2026-06-22（commit cee3a41）。残は記号意匠の微調整等（任意）。→ [docs/three-phase-plan.md](three-phase-plan.md)。
 
+## 次回実装計画（2026-06-30 積み上げ）
+
+### UI / UX
+- [x] **下部ヒント #1: パーツ選択中に「Enter: 機器名入力」を追加表示** — `UpdateHintText` でパーツ選択状態を検出して追記。完了 2026-06-30。
+- [x] **下部ヒント #2: 選択対象ごとのヒント切り替え** — 要素・分岐・枠・フリーラインなど、選択物の種類に応じてヒントテキストを変える。完了 2026-06-30。
+- [x] **ヘルプ画面の改善** — 箇条書き+ショートカット2列 Grid 化。`ShowDialogAsync` 統一・MaxHeight 600・MinWidth 460。完了 2026-06-30。
+- [x] **ゴーストプレビューの消去** — `OnToolSelected` に `Canvas.Invalidate()` を追加。パレットクリック時に即消去。完了 2026-06-30。
+- [x] **テストモードボタンの視認性改善** — 再生アイコン(▶)+SemiBold テキスト・ツールバー背景アンバー切替（`AppTestModeBrush`）。完了 2026-06-30。
+
+### 機能
+- [x] **ライブラリのインポート・エクスポート機能の現状確認と改善** — メニューテキスト明確化・成功件数ダイアログ追加・「その他▼」重複ハンドラを図形(G)側に統一。完了 2026-06-30。
+
 ## アプリ全般
 - [ ] **パッケージング・配布** — MSIX 等。開発完成後に検討。
 

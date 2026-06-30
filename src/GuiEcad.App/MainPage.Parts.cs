@@ -105,13 +105,13 @@ public sealed partial class MainPage
 
         var export = new MenuFlyoutItem
         {
-            Text = "ライブラリのエクスポート...",
+            Text = "自作パーツをエクスポート (.gcadparts)...",
             IsEnabled = _document.Library?.ById.Count > 0,
         };
         export.Click += OnExportLibrary;
         menu.Items.Add(export);
 
-        var import = new MenuFlyoutItem { Text = "ライブラリのインポート..." };
+        var import = new MenuFlyoutItem { Text = "自作パーツをインポート (.gcadparts / .gcadpart)..." };
         import.Click += OnImportLibrary;
         menu.Items.Add(import);
 
@@ -334,7 +334,19 @@ public sealed partial class MainPage
         var file = await picker.PickSaveFileAsync();
         if (file is null) return;
 
-        try { PartLibrarySerializer.Save(lib, file.Path); }
+        int count = lib.ById.Count;
+        try
+        {
+            PartLibrarySerializer.Save(lib, file.Path);
+            var dlg = new ContentDialog
+            {
+                Title = "エクスポート完了",
+                Content = $"{count} 件の自作パーツをエクスポートしました。",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot,
+            };
+            await ShowDialogAsync(dlg);
+        }
         catch (Exception ex) { await ShowErrorAsync(ex.Message); }
     }
 
@@ -364,6 +376,14 @@ public sealed partial class MainPage
             RebuildOtherPartMenu();
             RebuildShapeMenu();
             Canvas.Invalidate();
+            var dlg = new ContentDialog
+            {
+                Title = "インポート完了",
+                Content = $"{parts.Count} 件の自作パーツをインポートしました（同名パーツは上書き）。",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot,
+            };
+            await ShowDialogAsync(dlg);
         }
         catch (Exception ex) { await ShowErrorAsync(ex.Message); }
     }
@@ -383,7 +403,38 @@ public sealed partial class MainPage
             foreach (UIElement child in ToolStackPanel.Children)
                 if (child is RadioButton rb && rb.Tag?.ToString() == tag)
                 { rb.IsChecked = true; break; }
+        UpdateHintText();
         Canvas.Invalidate();
+    }
+
+    private void UpdateHintText()
+    {
+        if (HintText is null) return;
+        HintText.Text = (_testMode, _tool.Mode) switch
+        {
+            (true,  _)                       => "クリック: 接点 ON/OFF | ホイール: ズーム",
+            (false, ToolMode.Select) when _selected is not null
+                => "ドラッグ: 移動 | DEL: 削除 | Enter: 機器名入力 | F2: コメント",
+            (false, ToolMode.Select) when _selectedConnector is not null
+                => "ドラッグ: 列移動 | DEL: 削除",
+            (false, ToolMode.Select) when _selectedFrame is not null
+                => "ドラッグ: 移動 | DEL: 削除 | ダブルクリック: ラベル編集",
+            (false, ToolMode.Select) when _selectedLine is not null
+                => "ドラッグ: 移動 | DEL: 削除",
+            (false, ToolMode.Select) when _selectedDot is not null
+                => "DEL: 削除",
+            (false, ToolMode.Select) when _selectedSet.Count > 0
+                => "ドラッグ: 一括移動 | DEL: 一括削除 | Ctrl+C: コピー",
+            (false, ToolMode.Select)
+                => "クリック: 選択 | ドラッグ: 範囲選択",
+            (false, ToolMode.PlaceElement)   => "クリック: 配置 | 右クリック: メニュー | Esc: 選択に戻る",
+            (false, ToolMode.PlaceConnector) => "クリック: 分岐配置 | Esc: 選択に戻る",
+            (false, ToolMode.PlaceFrame)     => "ドラッグ: 枠描画 | Esc: 選択に戻る",
+            (false, ToolMode.PlaceLine)      => "クリック: 始点/終点 | Esc: キャンセル",
+            (false, ToolMode.PlaceDot)       => "クリック: 接続点配置 | Esc: 選択に戻る",
+            (false, ToolMode.PlaceWireBreak) => "クリック: 断線配置 | Esc: 選択に戻る",
+            _                                => "",
+        };
     }
 
 }

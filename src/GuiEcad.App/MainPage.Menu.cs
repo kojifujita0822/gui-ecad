@@ -461,49 +461,105 @@ if ($LASTEXITCODE -eq 0) {
 
     private async void OnMenuHowTo(object sender, RoutedEventArgs e)
     {
-        var panel = new StackPanel { Spacing = 8 };
-        void Section(string head, string body)
+        var panel = new StackPanel { Spacing = 4 };
+
+        void Header(string text)
         {
             panel.Children.Add(new TextBlock
             {
-                Text = head,
+                Text = text,
                 FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                 FontSize = 14,
-                Margin = new Thickness(0, 4, 0, 0),
+                Margin = new Thickness(0, 10, 0, 2),
             });
-            panel.Children.Add(new TextBlock { Text = body, TextWrapping = TextWrapping.Wrap, FontSize = 12 });
         }
 
-        Section("モード切替",
-            "ツールバーの「テスト」ボタンで作画モードとテストモードを切り替えます。作画モードで図を描き、テストモードでは接点をクリックして動作（通電・励磁）を確認します。");
-        Section("作図",
-            "左の縦パレットでツール（接点・コイル・端子台など）を選び、作図エリアのセルをクリックして配置します。同じ行で隣り合う要素は自動で横配線され、縦の分岐は「分岐」ツールで列の交点を上から下へドラッグします。");
-        Section("機器名・コメント",
-            "要素をダブルクリック（または Enter）で機器名を編集、F2 でコメントを編集します。右母線の右側をダブルクリックすると行コメントを入力できます。");
-        Section("選択・移動・削除",
-            "「選択」ツールで要素・分岐・枠をクリックして選択し、ドラッグで移動、Del キーで削除します。");
-        Section("範囲選択・コピー＆貼り付け",
-            "「選択」ツールで何もないセルからドラッグすると青い破線の枠で範囲選択でき、枠内の要素がまとめて選択されます。Ctrl+C でコピーし、貼り付けたい位置にマウスを置いて Ctrl+V を押すと、その位置を左上として貼り付きます（機器名はコピー元と同じまま）。貼り付け直後は新しい要素が選択された状態になります。右クリックメニューの「コピー」「貼り付け」からも同じ操作ができ、貼り付けは右クリックした位置に貼り付きます。");
-        Section("シート・表示",
-            "左のツリーでシートを切り替え、＋／－でシートを追加・削除します。Ctrl + ＋／－ で拡大・縮小、Ctrl+0 で全体表示、スペースキーを押しながらドラッグで画面を移動できます。");
-        Section("ファイル・出力",
-            "Ctrl+S で保存（.GCAD 形式）、Ctrl+O で開きます。メニューの「PDF出力」で全シートをベクター PDF として出力します。");
-        Section("主なショートカット",
-            "新規 Ctrl+N ／ 開く Ctrl+O ／ 保存 Ctrl+S\n" +
-            "元に戻す Ctrl+Z ／ やり直し Ctrl+Y\n" +
-            "検索・置換 Ctrl+F ／ 削除 Del\n" +
-            "コピー Ctrl+C ／ 貼り付け Ctrl+V（マウス位置へ）\n" +
-            "行追加 Ctrl+Shift+↑ ／ 行削除 Ctrl+Shift+↓\n" +
-            "コメント編集 F2 ／ 機器名編集 Enter");
+        void Body(string text)
+        {
+            panel.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 12 });
+        }
+
+        void BulletList(string[] items)
+        {
+            var bp = new StackPanel { Spacing = 2, Margin = new Thickness(4, 0, 0, 0) };
+            foreach (var item in items)
+                bp.Children.Add(new TextBlock { Text = "・" + item, TextWrapping = TextWrapping.Wrap, FontSize = 12 });
+            panel.Children.Add(bp);
+        }
+
+        void ShortcutTable((string key, string desc)[] rows)
+        {
+            var grid = new Grid { Margin = new Thickness(4, 2, 0, 0) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            for (int i = 0; i < rows.Length; i++)
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var keyTb  = new TextBlock { Text = rows[i].key,  FontSize = 12, Margin = new Thickness(0, 1, 0, 1) };
+                var descTb = new TextBlock { Text = rows[i].desc, FontSize = 12, Margin = new Thickness(0, 1, 0, 1) };
+                Grid.SetRow(keyTb,  i); Grid.SetColumn(keyTb,  0);
+                Grid.SetRow(descTb, i); Grid.SetColumn(descTb, 1);
+                grid.Children.Add(keyTb);
+                grid.Children.Add(descTb);
+            }
+            panel.Children.Add(grid);
+        }
+
+        Header("モード切替");
+        Body("ツールバーの「テスト」ボタンで作画モードとテストモードを切り替えます。作画モードで図を描き、テストモードでは接点をクリックして動作（通電・励磁）を確認します。");
+
+        Header("作図");
+        Body("左の縦パレットでツール（接点・コイル・端子台など）を選び、作図エリアのセルをクリックして配置します。同じ行で隣り合う要素は自動で横配線され、縦の分岐は「分岐」ツールで列の交点を上から下へドラッグします。");
+
+        Header("機器名・コメント");
+        BulletList([
+            "要素をダブルクリックまたは Enter → 機器名を編集",
+            "F2 → コメントを編集",
+            "右母線の右側をダブルクリック → 行コメントを入力",
+        ]);
+
+        Header("選択・移動・削除");
+        BulletList([
+            "「選択」ツールで要素・分岐・枠をクリック → 選択",
+            "選択後ドラッグ → 移動、Del → 削除",
+            "何もない場所からドラッグ → 青い破線の範囲選択",
+            "範囲選択後 Ctrl+C でコピー、Ctrl+V でマウス位置へ貼り付け",
+            "右クリックメニューからもコピー・貼り付け・行追加・削除が可能",
+        ]);
+
+        Header("シート・表示");
+        BulletList([
+            "左のツリーでシートを切り替え、＋／－でシートを追加・削除",
+            "Ctrl+＋／－ で拡大・縮小、Ctrl+0 で全体表示",
+            "スペースキーを押しながらドラッグで画面を移動",
+        ]);
+
+        Header("ファイル・出力");
+        Body("Ctrl+S で保存（.GCAD 形式）、Ctrl+O で開きます。メニューの「PDF出力」で全シートをベクター PDF として出力します。");
+
+        Header("主なショートカット");
+        ShortcutTable([
+            ("Ctrl+N / O / S", "新規 / 開く / 保存"),
+            ("Ctrl+Z / Y", "元に戻す / やり直し"),
+            ("Ctrl+C / V", "コピー / 貼り付け（マウス位置へ）"),
+            ("Ctrl+F", "検索・置換"),
+            ("Ctrl+Shift+↑ / ↓", "行追加 / 行削除"),
+            ("Ctrl++ / - / 0", "拡大 / 縮小 / 全体表示"),
+            ("Del", "選択要素の削除"),
+            ("Enter", "選択要素の機器名編集"),
+            ("F2", "選択要素のコメント編集"),
+            ("Space+ドラッグ", "画面パン"),
+            ("Esc", "選択ツールへ戻る"),
+        ]);
 
         var dialog = new ContentDialog
         {
             Title = "使い方",
-            Content = new ScrollViewer { Content = panel, MaxHeight = 480 },
+            Content = new ScrollViewer { Content = panel, MaxHeight = 600, MinWidth = 460 },
             CloseButtonText = "OK",
             XamlRoot = this.XamlRoot,
         };
-        await dialog.ShowAsync();
+        await ShowDialogAsync(dialog);
     }
 
     // Microsoft.Windows.Storage.Pickers は WindowId をコンストラクタで受け取る（InitializeWithWindow 不要）。
