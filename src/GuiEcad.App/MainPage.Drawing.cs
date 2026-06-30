@@ -82,6 +82,9 @@ public sealed partial class MainPage : Page
             double fh = f.VisualHeightMm ?? f.Height * _geo.CellMm;
             renderer.DrawRectangle(new(fx, fy, fw, fh), new StrokeStyle(DrawingTheme.Blue, 0.5));
         }
+        foreach (var d in _selectedDotSet)
+            renderer.DrawCircle(new(d.XMm, d.YMm), _geo.CellMm * 0.22,
+                                new StrokeStyle(DrawingTheme.Blue, 0.3));
 
         if (_rangeSelecting)
         {

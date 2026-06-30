@@ -172,24 +172,26 @@ public sealed partial class MainPage : Page
     private HashSet<FreeLine> _selectedLineSet = new();                 // 範囲選択に含まれる自由直線
 
     private HashSet<GroupFrame> _selectedFrameSet = new();                    // 範囲選択に含まれる枠線
+    private HashSet<ConnectionDot> _selectedDotSet = new();                   // 範囲選択に含まれる接続点
 
     // 範囲選択の一括移動：ドラッグ開始時の元位置を記録（空なら単体移動）。
     private Dictionary<ElementInstance, GridPos> _multiMoveOrigins = new();
     private Dictionary<VerticalConnector, (double Col, int TopRow, int BotRow)> _multiMoveConnectorOrigins = new();
     private Dictionary<FreeLine, (double X1, double Y1, double X2, double Y2)> _multiMoveLineOrigins = new();
     private Dictionary<GroupFrame, (GridPos TopLeft, double? VisX, double? VisY)> _multiMoveFrameOrigins = new();
+    private Dictionary<ConnectionDot, (double X, double Y)> _multiMoveDotOrigins = new();
 
-    // 複数選択（要素＋分岐線＋自由直線＋枠線）をまとめて解除する。
+    // 複数選択（要素＋分岐線＋自由直線＋枠線＋接続点）をまとめて解除する。
     private void ClearMultiSelection()
     {
         _selectedSet.Clear(); _selectedConnectorSet.Clear();
-        _selectedLineSet.Clear(); _selectedFrameSet.Clear();
+        _selectedLineSet.Clear(); _selectedFrameSet.Clear(); _selectedDotSet.Clear();
     }
 
     // コピー・ペースト
     private sealed record ClipboardData(
         List<ElementInstance> Elements, List<VerticalConnector> Connectors,
-        List<FreeLine> FreeLines, int OriginRow, int OriginCol);
+        List<FreeLine> FreeLines, List<ConnectionDot> Dots, int OriginRow, int OriginCol);
     private ClipboardData? _clipboard;
     private GridPos _hoverCell;   // 直近のマウス位置セル（ペースト基準・OnPointerMoved で更新）
 
@@ -480,12 +482,15 @@ public sealed partial class MainPage : Page
 
     private void DeleteSelected()
     {
-        if (_selectedSet.Count > 0 || _selectedConnectorSet.Count > 0 || _selectedLineSet.Count > 0)
+        if (_selectedSet.Count > 0 || _selectedConnectorSet.Count > 0 || _selectedLineSet.Count > 0
+            || _selectedFrameSet.Count > 0 || _selectedDotSet.Count > 0)
         {
             var cmds = _selectedSet
                 .Select(e => (IUndoCommand)new DeleteElementCommand(_sheet, e))
                 .Concat(_selectedConnectorSet.Select(c => (IUndoCommand)new DeleteConnectorCommand(_sheet, c)))
                 .Concat(_selectedLineSet.Select(l => (IUndoCommand)new DeleteFreeLineCommand(_sheet, l)))
+                .Concat(_selectedFrameSet.Select(f => (IUndoCommand)new DeleteFrameCommand(_sheet, f)))
+                .Concat(_selectedDotSet.Select(d => (IUndoCommand)new DeleteDotCommand(_sheet, d)))
                 .ToList();
             _history.Execute(new BatchCommand(_sheet, cmds));
             ClearMultiSelection();

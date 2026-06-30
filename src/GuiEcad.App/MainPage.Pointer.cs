@@ -253,6 +253,8 @@ public sealed partial class MainPage
                     l => l, l => (l.X1Mm, l.Y1Mm, l.X2Mm, l.Y2Mm));
                 _multiMoveFrameOrigins = _selectedFrameSet.ToDictionary(
                     f => f, f => (f.TopLeft, f.VisualXMm, f.VisualYMm));
+                _multiMoveDotOrigins = _selectedDotSet.ToDictionary(
+                    d => d, d => (d.XMm, d.YMm));
             }
             else
             {
@@ -425,6 +427,10 @@ public sealed partial class MainPage
                             frame.VisualXMm = orig.VisX.HasValue ? orig.VisX.Value + dxMm : (double?)null;
                             frame.VisualYMm = orig.VisY.HasValue ? orig.VisY.Value + dyMm : (double?)null;
                         }
+                        foreach (var (dot, orig) in _multiMoveDotOrigins)
+                        {
+                            dot.XMm = orig.X + dxMm; dot.YMm = orig.Y + dyMm;
+                        }
                         Canvas.Invalidate();
                     }
                 }
@@ -477,6 +483,11 @@ public sealed partial class MainPage
                 _sheet.Frames.Where(f =>
                     f.TopLeft.Row >= r1 && f.TopLeft.Row + f.Height - 1 <= r2 &&
                     f.TopLeft.Column >= c1 && f.TopLeft.Column + f.Width - 1 <= c2));
+            // 接続点：座標（mm 換算）が選択範囲に完全に収まるものを含める。
+            _selectedDotSet = new HashSet<ConnectionDot>(
+                _sheet.ConnectionDots.Where(d =>
+                    d.XMm >= rxL - 0.01 && d.XMm <= rxR + 0.01 &&
+                    d.YMm >= ryT - 0.01 && d.YMm <= ryB + 0.01));
             Canvas.ReleasePointerCapture(e.Pointer);
             UpdateHintText();
             Canvas.Invalidate();

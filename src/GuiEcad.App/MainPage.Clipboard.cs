@@ -41,9 +41,13 @@ public sealed partial class MainPage : Page
         var lines = _selectedLineSet.Count > 0
             ? _selectedLineSet.ToList()
             : _selectedLine is not null ? new List<FreeLine> { _selectedLine } : new();
-        if (elems.Count == 0 && conns.Count == 0 && lines.Count == 0) return;
+        // 接続点：範囲選択 → 単一選択の順。
+        var dots = _selectedDotSet.Count > 0
+            ? _selectedDotSet.ToList()
+            : _selectedDot is not null ? new List<ConnectionDot> { _selectedDot } : new();
+        if (elems.Count == 0 && conns.Count == 0 && lines.Count == 0 && dots.Count == 0) return;
 
-        // 選択全体の左上を原点として相対座標に変換する（要素・分岐線・自由直線を含めて最小を取る）。
+        // 選択全体の左上を原点として相対座標に変換する（要素・分岐線・自由直線・接続点を含めて最小を取る）。
         int minRow = int.MaxValue, minCol = int.MaxValue;
         foreach (var e in elems) { minRow = Math.Min(minRow, e.Pos.Row); minCol = Math.Min(minCol, e.Pos.Column); }
         foreach (var c in conns) { minRow = Math.Min(minRow, c.TopRow); minCol = Math.Min(minCol, (int)Math.Floor(c.Column)); }
@@ -52,7 +56,12 @@ public sealed partial class MainPage : Page
             minRow = Math.Min(minRow, _geo.RowAt(Math.Min(l.Y1Mm, l.Y2Mm)));
             minCol = Math.Min(minCol, _geo.ColAt(Math.Min(l.X1Mm, l.X2Mm)));
         }
-        // 自由直線は mm 座標なので、原点セルの mm 位置を引いて相対化する。
+        foreach (var d in dots)
+        {
+            minRow = Math.Min(minRow, _geo.RowAt(d.YMm));
+            minCol = Math.Min(minCol, _geo.ColAt(d.XMm));
+        }
+        // 自由直線・接続点は mm 座標なので、原点セルの mm 位置を引いて相対化する。
         double oxMm = _geo.X(minCol), oyMm = _geo.YRow(minRow) - _geo.CellMm * 0.5;
 
         _clipboard = new ClipboardData(
@@ -73,6 +82,10 @@ public sealed partial class MainPage : Page
                 X1Mm = l.X1Mm - oxMm, Y1Mm = l.Y1Mm - oyMm,
                 X2Mm = l.X2Mm - oxMm, Y2Mm = l.Y2Mm - oyMm,
                 Style = l.Style,
+            }).ToList(),
+            Dots: dots.Select(d => new ConnectionDot
+            {
+                XMm = d.XMm - oxMm, YMm = d.YMm - oyMm,
             }).ToList(),
             OriginRow: minRow,
             OriginCol: minCol);
@@ -103,7 +116,7 @@ public sealed partial class MainPage : Page
                 BottomRow = baseRow + c.BottomRow,
             })
             .ToList();
-        // 自由直線：原点セルの mm 位置を足して貼り付け位置へ平行移動。
+        // 自由直線・接続点：原点セルの mm 位置を足して貼り付け位置へ平行移動。
         double bxMm = _geo.X(baseCol), byMm = _geo.YRow(baseRow) - _geo.CellMm * 0.5;
         var placedLines = _clipboard.FreeLines
             .Select(l => new FreeLine
@@ -113,18 +126,23 @@ public sealed partial class MainPage : Page
                 Style = l.Style,
             })
             .ToList();
+        var placedDots = _clipboard.Dots
+            .Select(d => new ConnectionDot { XMm = bxMm + d.XMm, YMm = byMm + d.YMm })
+            .ToList();
 
         var cmds = placedElems.Select(p => (IUndoCommand)new PlaceElementCommand(_sheet, p))
             .Concat(placedConns.Select(c => (IUndoCommand)new AddConnectorCommand(_sheet, c)))
             .Concat(placedLines.Select(l => (IUndoCommand)new PlaceFreeLineCommand(_sheet, l)))
+            .Concat(placedDots.Select(d => (IUndoCommand)new PlaceDotCommand(_sheet, d)))
             .ToList();
         if (cmds.Count == 0) return;
         _history.Execute(new BatchCommand(_sheet, cmds));
 
-        // 貼り付け直後は新要素・分岐線・自由直線を選択状態にして、続けて移動・削除できるようにする。
+        // 貼り付け直後は新要素・分岐線・自由直線・接続点を選択状態にして、続けて移動・削除できるようにする。
         _selectedSet = new HashSet<ElementInstance>(placedElems);
         _selectedConnectorSet = new HashSet<VerticalConnector>(placedConns);
         _selectedLineSet = new HashSet<FreeLine>(placedLines);
+        _selectedDotSet = new HashSet<ConnectionDot>(placedDots);
         ClearSelection();
         RefreshDevicePanel();
         Canvas.Invalidate();
