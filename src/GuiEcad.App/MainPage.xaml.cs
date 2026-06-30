@@ -325,9 +325,10 @@ public sealed partial class MainPage : Page
         if (_testMode) StartRealtimeTimer(); else StopRealtimeTimer();
         UpdateTestStatus();
         UpdateHintText();
-        ToolbarBorder.Background = _testMode
-            ? (Brush)Application.Current.Resources["AppTestModeBrush"]
-            : (Brush)Application.Current.Resources["AppToolbarBackgroundBrush"];
+        if (_testMode)
+            ToolbarBorder.Background = (Brush)Application.Current.Resources["AppTestModeBrush"];
+        else
+            ToolbarBorder.ClearValue(Border.BackgroundProperty);
         Canvas.Invalidate();
     }
 
