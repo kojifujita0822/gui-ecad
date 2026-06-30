@@ -29,7 +29,6 @@ public sealed partial class MainPage : Page
 {
     private void OnRunDrc(object sender, RoutedEventArgs e)
     {
-        _drcHighlightRow = -1;
         CircuitNumberer.Number(_document);
         _lastDrcResults = DesignRuleCheck.CheckCrossReference(_document, _document.Library)
             .Concat(DesignRuleCheck.CheckDeviceTypeConsistency(_document, _document.Library))
@@ -43,6 +42,17 @@ public sealed partial class MainPage : Page
 
         int errCnt = _lastDrcResults.Count(d => d.Severity == DiagnosticSeverity.Error);
         int warnCnt = _lastDrcResults.Count(d => d.Severity == DiagnosticSeverity.Warning);
+
+        // ハイライト中の行の問題が解消されたら消す（まだエラーがあれば維持）
+        if (_drcHighlightRow >= 0)
+        {
+            int targetCircuit = _drcHighlightRow + 1;
+            bool stillHasError = _lastDrcResults.Any(d =>
+                d.Locations.Any(loc => loc.PageNumber == _sheet.PageNumber
+                                       && loc.CircuitNumber == targetCircuit));
+            if (!stillHasError) _drcHighlightRow = -1;
+        }
+        Canvas.Invalidate();
 
         if (_lastDrcResults.Count == 0)
         {
