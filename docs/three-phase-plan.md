@@ -104,3 +104,88 @@
 - 主回路モードのシートで、母線R/S/T（自由直線）＋ブレーカ＋接触器主接点＋サーマル＋モータを配置して三相動力回路が作図できる。
 - 新記号がネットリスト/DRC/シミュレーションに影響しない（既存154テストが緑のまま、新テスト追加）。
 - PDF出力で主回路シートが破綻なく出る。
+
+## 8. 次期実装プラン（2026-07-01 起案・侍／隠密調査を踏まえる・未着手）
+
+> 家老の指示により本セクションのみ起案。実装はまだ着手しない。
+
+### 8-1. ConnectionDot の範囲選択対応
+
+**現状の欠落箇所**（隠密調査）:
+| 箇所 | ファイル:行 | 内容 |
+|---|---|---|
+| 範囲選択確定 | `MainPage.Pointer.cs:460-479` | `_selectedSet`/`_selectedConnectorSet`/`_selectedLineSet`/`_selectedFrameSet` は構築するが Dot 用が無い |
+| 一括移動起点記録 | `MainPage.Pointer.cs:245-256` | `_multiMoveOrigins` 系に Dot 用が無い |
+| クリップボード | `MainPage.Clipboard.cs` | `ConnectionDot` のコピペ未対応（`ClipboardData` に Dots フィールドが無い） |
+| 一括削除 | `MainPage.xaml.cs:481-496` | バッチ削除の条件・cmds に Dot が無い |
+
+**追加で確認できた関連事実**: 同じ一括削除ブロック（`MainPage.xaml.cs:483` の条件、`485-489` の `cmds`）は **`_selectedFrameSet`（枠の範囲選択削除）も対象外**になっている。Dot と同じ場所を触るため、ついでに直すか家老の判断を仰ぐ（最小実行の原則に従い、本プランでは「要判断事項」として明示するに留め、自動では含めない）。
+
+**方針**: 既存の `FreeLine` 対応パターンをそのまま踏襲する（`ConnectionDot` も mm 実座標を持つ点で `FreeLine` と同型）。
+- 新規フィールド（`MainPage.xaml.cs` 142-180 付近の選択状態フィールド群に追加）:
+  - `private HashSet<ConnectionDot> _selectedDotSet = new();`
+  - `private Dictionary<ConnectionDot, (double X, double Y)> _multiMoveDotOrigins = new();`
+- `ClearMultiSelection()`: `_selectedDotSet.Clear();` を追加。
+- `MainPage.Pointer.cs` 範囲選択確定（`OnPointerReleased` 内）: `FreeLine` と同じ `rxL/rxR/ryT/ryB`（mm 範囲）を使い、点が範囲内に収まるものを `_selectedDotSet` に集める。
+- `MainPage.Pointer.cs` 一括移動起点記録（`OnPointerPressed` のグループドラッグ分岐）: `_multiMoveDotOrigins = _selectedDotSet.ToDictionary(d => d, d => (d.XMm, d.YMm));`
+- `MainPage.Pointer.cs` 一括移動デルタ適用（`OnPointerMoved` の `_multiMoveOrigins.Count > 0` ブロック）: `FreeLine` と同じ `dxMm`/`dyMm` を使い `dot.XMm = orig.X + dxMm; dot.YMm = orig.Y + dyMm;`
+- `MainPage.Clipboard.cs`:
+  - `ClipboardData` レコードに `List<ConnectionDot> Dots` を追加。
+  - `CopySelection()`: `_selectedDotSet`→単一 `_selectedDot` の順で対象決定（既存パターン踏襲）、`oxMm/oyMm` で相対化して `Dots` に格納。
+  - `PasteSelection()`: `bxMm/byMm` で平行移動して `PlaceDotCommand` を `cmds` に追加。貼り付け後は `_selectedDotSet` に設定（既存の `_selectedSet`/`_selectedLineSet` 同様）。
+- `MainPage.xaml.cs` `DeleteSelected()`: バッチ削除の条件に `|| _selectedDotSet.Count > 0` を追加し、`cmds` に `_selectedDotSet.Select(d => (IUndoCommand)new DeleteDotCommand(_sheet, d))` を `Concat`。
+- `MainPage.Drawing.cs`（任意・UI仕上げ）: 67-84 行付近の選択ハイライトループに `_selectedDotSet` 用の輪描画を追加（`_selectedDot` 単体ハイライトと同じ描き方、132-134 行参照）。
+
+**影響範囲・変更ファイル一覧**:
+- `src/GuiEcad.App/MainPage.xaml.cs`（フィールド宣言・`ClearMultiSelection`・`DeleteSelected`）
+- `src/GuiEcad.App/MainPage.Pointer.cs`（範囲選択確定・一括移動起点記録・一括移動デルタ適用）
+- `src/GuiEcad.App/MainPage.Clipboard.cs`（`ClipboardData`・`CopySelection`・`PasteSelection`）
+- `src/GuiEcad.App/MainPage.Drawing.cs`（選択ハイライト・任意）
+
+**テスト方針**: `MainPage` はポインタ操作・WinUI 依存のため既存テストに UI 自動テストの前例が無い（`tests/` は `GuiEcad.Core`/`GuiEcad.Pdf` のみ対象）。本件も同様に**自動テスト対象外**とし、`dotnet build`/`dotnet test`（既存154件が緑のまま）で回帰が無いことを確認した上で、**実機確認**（忍者）で「Dot を含む範囲選択 → 一括移動 → コピペ → 一括削除 → Undo/Redo」の一連動作を確認する。
+
+**概算工数**: 0.5〜1人日（既存 `FreeLine` パターンの横展開が中心。実機確認込み）。
+
+**要判断事項**: `_selectedFrameSet` の一括削除対象外バグを本件と同時に修正するか（同一コード行を触るため低コストだが、家老の指示は Dot 対応のみのため別途確認）。
+
+### 8-2. 主回路シートPDFのmmベース分割
+
+**現状**（隠密調査）: `Sheet.MainCircuit = true` でも `DiagramRenderer.cs:53,64-65` の行ベース分割（`RowsPerPage = 28` 固定・`PageCount` も行数ベース）がそのまま使われる。`GuiEcad.Pdf` 配下に mm ベース分割の実装は無い。主回路は自由直線（`FreeLine`／`ConnectionDot`）が mm 座標で自由に配置されるため、要素のグリッド行（`Pos.Row`）だけを基準にした行分割では実際の図面の縦方向の広がりを正しく捉えられない（母線や結線が要素の行範囲を超えて伸びるケースを想定）。
+
+**方針（要判断・2案）**:
+- **方針B（推奨・最小変更）**: 主回路シート専用の新規 API を追加し、`Render()` に mm ベースのページウィンドウ（`pageYStartMm`/`pageYEndMm` 等）を渡せる分岐を増やす。既存の行ベース経路（制御回路シート）は無修正・無リスク。実装コストが低くプロジェクト方針（シンプルさ優先）に合う。
+- **方針A（将来案）**: `Render()` 内部を「行ウィンドウ→mm バンド」に統一するリファクタを行い、行ベース・mm ベースの両方を同じ mm バンドから導出する。重複ロジックを減らせるが、本件の範囲を超える既存コードの書き換えを伴うためリスクが上がる。今回は見送り、方針Bで様子を見て将来必要なら検討。
+
+**方針B の実装イメージ**:
+1. `DiagramRenderer` に主回路の内容高さ算出を追加:
+   ```csharp
+   // _rowBase=0 前提（Render 呼び出し前 or 専用インスタンスで呼ぶ）
+   public double MainCircuitContentHeightMm(Sheet sheet)
+   ```
+   要素（グリッド行由来）・`FreeLines`（Y1/Y2Mm）・`ConnectionDots`（YMm）・`Frames`（`VisualYMm ?? グリッド由来` + 高さ）の最大 Y を取る。
+2. ページ高さ基準値とページ数:
+   ```csharp
+   public int MainCircuitPageCount(Sheet sheet)
+   ```
+   基準値候補: `A4H - 2*MarginMm - TitleBlockH`（≒243mm、表題欄を毎ページ保守的に避ける）、または既存の行ベースと統一感を出すため `RowsPerPage * CellMm`（=252mm）を流用。**実機確認で微調整**が必要（要判断）。
+3. `Render()` に主回路用の mm ウィンドウ引数を追加し、`sheet.MainCircuit` のときはこちらを使う。`DrawFreeLines`/`DrawDots` は既に mm バンドでクリップしているため流用しやすい。`DrawConnectors`・要素ループ（`InWindow`）・`DrawRowNumbers` は mm バンドを行範囲に変換（`_geo.RowAt`）して適用する分岐を追加。
+
+**影響範囲・変更ファイル一覧**:
+- `src/GuiEcad.Core/Rendering/DiagramRenderer.cs`（`MainCircuitContentHeightMm`/`MainCircuitPageCount` 新設、`Render()` の主回路分岐、`DrawConnectors`/要素ループ/`DrawRowNumbers` の mm ウィンドウ対応）
+- `src/GuiEcad.App/MainPage.Menu.cs`（PDF出力: `sheet.MainCircuit` のとき新 API へ分岐）
+- `src/GuiEcad.App/PdfPreviewDialog.xaml.cs`（プレビューも同じ分岐が必要。`PreviewPage` レコードに mm ウィンドウ用フィールド追加）
+- `src/GuiEcad.App/MainPage.Drawing.cs`（`DrawPageGuides` の画面上ページ境界ガイドも主回路時は mm 境界に合わせる・任意だが整合性のため推奨）
+
+**テスト方針**: `GuiEcad.Core` 側の論理は xUnit でテスト可能（既存 `tests/GuiEcad.Tests/PageSplitTests.cs` と同じ形）。
+- `MainCircuitContentHeightMm` が要素・自由直線・接続点・枠の最大値を正しく拾うことを検証する単体テスト。
+- `MainCircuitPageCount` の境界値テスト（`PageCount_SplitsByRowsPerPage` と同型の `[Theory]`）。
+- 複数ページにまたがる主回路シート（自由直線・接続点を意図的にページ境界をまたぐ位置に配置）を `Render()` してテスト用 `IRenderer`（または既存のテスト方式）で例外が出ないことを確認するスモークテスト（`NewPartsTests.cs` 等のパターン踏襲）。
+- 既存154テストの回帰確認（`dotnet test GuiEcad.sln`）。
+- 実機確認（忍者）: 長い主回路図面（母線が28行相当を超えるもの）を PDF 出力し、ページ境界での自由直線の途切れ・表題欄との重なりが無いことを目視確認。
+
+**概算工数**: 1.5〜2人日（`Render()` 内部分岐の実装・テスト追加・ページ高さ基準値の実機チューニングを含む）。
+
+**要判断事項**:
+- ページ高さ基準値（`A4H - 2*MarginMm - TitleBlockH` か `RowsPerPage * CellMm` か）
+- 主回路シートでの `ShowRowNumbers`／`DrawPageGuides` の扱い（mm 分割後も継続表示するか）
+- 方針A（統一リファクタ）を将来やるかどうか
