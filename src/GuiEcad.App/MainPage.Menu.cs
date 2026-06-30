@@ -127,21 +127,27 @@ public sealed partial class MainPage
     private async void OnMenuOpen(object sender, RoutedEventArgs e)
     {
         if (!await ConfirmDiscardIfDirtyAsync()) return;
+        // FileTypeFilter は大文字小文字を区別しない。.gcad のみ登録すれば .GCAD も照合される。
+        var picker = new FileOpenPicker(GetPickerWindowId());
+        picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+        picker.FileTypeFilter.Add(".gcad");
+
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+
+        await LoadFileAsync(file.Path);
+    }
+
+    /// <summary>パスを指定してファイルを読み込む。D&amp;D・起動引数からも呼ばれる。未保存確認は呼び出し元で行うこと。</summary>
+    internal async Task LoadFileAsync(string path)
+    {
         try
         {
-            // FileTypeFilter は大文字小文字を区別しない。.gcad のみ登録すれば .GCAD も照合される。
-            var picker = new FileOpenPicker(GetPickerWindowId());
-            picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
-            picker.FileTypeFilter.Add(".gcad");
-
-            var file = await picker.PickSingleFileAsync();
-            if (file is null) return;
-
-            var doc = GcadSerializer.Load(file.Path);
+            var doc = GcadSerializer.Load(path);
             _document = doc;
             if (doc.Sheets.Count == 0) doc.Sheets.Add(new Sheet());
             _sheet = doc.Sheets[0];
-            _currentPath = file.Path;
+            _currentPath = path;
             _selected = null;
             _history.Clear();
             _savedUndoDepth = 0;
@@ -156,7 +162,7 @@ public sealed partial class MainPage
         catch (Exception ex)
         {
             AppLog.Debug($"[OPEN-ERROR] {ex}");
-            await ShowErrorAsync(ex.Message);   // ユーザー表示はメッセージのみ。全文は AppLog.Debug に記録。
+            await ShowErrorAsync(ex.Message);
         }
     }
 
@@ -212,6 +218,20 @@ public sealed partial class MainPage
             ContentDialogResult.Secondary => true,                     // 破棄して続行
             _ => false,                                                // キャンセル＝中止
         };
+    }
+
+    private async void OnMenuPreviewPdf(object sender, RoutedEventArgs e)
+    {
+        CircuitNumberer.Number(_document);
+        var xref = CrossReferenceBuilder.Build(_document, _document.Library);
+
+        var dialog = new PdfPreviewDialog(_document, xref, _document.Settings.EnableBorder)
+        {
+            XamlRoot = this.XamlRoot,
+        };
+        var result = await ShowDialogAsync(dialog);
+        if (result == ContentDialogResult.Primary)
+            OnMenuExportPdf(sender, e);
     }
 
     private async void OnMenuExportPdf(object sender, RoutedEventArgs e)

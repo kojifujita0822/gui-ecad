@@ -1,6 +1,9 @@
 using System.IO;
+using System.Linq;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -44,6 +47,51 @@ public sealed partial class MainWindow : Window
             _allowClose = true;
             Close();
         }
+    }
+
+    private async void OnDragOver(object sender, DragEventArgs e)
+    {
+        var deferral = e.GetDeferral();
+        try
+        {
+            if (e.DataView.Contains(StandardDataFormats.StorageItems))
+            {
+                var items = await e.DataView.GetStorageItemsAsync();
+                if (items.OfType<StorageFile>().Any(f =>
+                    f.Name.EndsWith(".gcad", StringComparison.OrdinalIgnoreCase)))
+                {
+                    e.AcceptedOperation = DataPackageOperation.Copy;
+                    return;
+                }
+            }
+            e.AcceptedOperation = DataPackageOperation.None;
+        }
+        finally
+        {
+            deferral.Complete();
+        }
+    }
+
+    private async void OnDrop(object sender, DragEventArgs e)
+    {
+        if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
+        var items = await e.DataView.GetStorageItemsAsync();
+        var file = items.OfType<StorageFile>()
+            .FirstOrDefault(f => f.Name.EndsWith(".gcad", StringComparison.OrdinalIgnoreCase));
+        if (file is null) return;
+
+        if (RootFrame.Content is not MainPage page) return;
+        if (!await page.ConfirmDiscardIfDirtyAsync()) return;
+        await page.LoadFileAsync(file.Path);
+    }
+
+    /// <summary>起動引数・ファイル関連付けによる初回ファイルオープン。未保存確認は不要（起動直後のため）。</summary>
+    public async Task OpenFileOnStartupAsync(string path)
+    {
+        // Yield してウィンドウ・ページの初期化完了を待つ。
+        await Task.Yield();
+        if (RootFrame.Content is not MainPage page) return;
+        await page.LoadFileAsync(path);
     }
 
     /// <summary>

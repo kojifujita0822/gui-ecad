@@ -40,6 +40,30 @@ public sealed partial class MainPage : Page
     private MenuBarItem _shapeMenuItem = null!;   // 「図形(G)」。再構築時に丸ごと差し替える
     private IReadOnlyList<PartFolderEntry> _folderEntries = Array.Empty<PartFolderEntry>();
     private readonly Dictionary<string, PartFolderEntry> _folderPartMap = new();
+    private PinnedPartStore _pinnedStore = null!;
+    private HashSet<string> _pinnedIds = new();
+
+    // アセンブリ埋め込みの組み込みパーツ（その他図形メニューに常設）
+    private static readonly IReadOnlyList<PartDefinition> _builtinParts = LoadBuiltinParts();
+
+    private static IReadOnlyList<PartDefinition> LoadBuiltinParts()
+    {
+        var asm = typeof(MainPage).Assembly;
+        var names = new[]
+        {
+            "GuiEcad.App.thermal-relay-a.gcadpart",
+            "GuiEcad.App.thermal-relay-b.gcadpart",
+        };
+        var result = new List<PartDefinition>();
+        foreach (var n in names)
+        {
+            using var stream = asm.GetManifestResourceStream(n);
+            if (stream is null) continue;
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            result.Add(PartLibrarySerializer.DeserializeOne(reader.ReadToEnd()));
+        }
+        return result;
+    }
 
     // 表示状態
     private bool _connectivityCheck;

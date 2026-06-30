@@ -212,6 +212,29 @@ public sealed partial class MainPage : Page
 
         AddOtherBuiltins(flyout.Items);
 
+        // 組み込みパーツ（EmbeddedResource: thermal-relay 等）
+        foreach (var part in _builtinParts)
+        {
+            var item = new MenuFlyoutItem { Text = part.Name, Tag = $"builtin-part:{part.Id}" };
+            item.Click += OnPlaceBuiltinPart;
+            flyout.Items.Add(item);
+        }
+
+        // ピン留め済み自作図形（直接配置・サブメニューなし）
+        var pinnedEntries = _folderEntries
+            .Where(e => _pinnedIds.Contains(e.Definition.Id))
+            .ToList();
+        if (pinnedEntries.Count > 0)
+        {
+            flyout.Items.Add(new MenuFlyoutSeparator());
+            foreach (var e in pinnedEntries)
+            {
+                var item = new MenuFlyoutItem { Text = e.Definition.Name, Tag = e.Definition.Id };
+                item.Click += OnPlacePinnedPart;
+                flyout.Items.Add(item);
+            }
+        }
+
         flyout.Items.Add(new MenuFlyoutSeparator());
         flyout.Items.Add(BuildCustomShapesSubItem());   // 図形/自作/ の自作図形（上メニューと共有）
 

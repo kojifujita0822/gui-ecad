@@ -86,8 +86,56 @@ src/GuiEcad.App/bin/Release/net8.0-windows10.0.26100.0/win-x64/publish/
 
 ---
 
-## 5. 将来検討（保留）
+## 5. Inno Setup インストーラー
+
+スクリプト: `installer/GuiEcad_Setup.iss`
+
+### 5.1 前提
+- [Inno Setup 6.x](https://jrsoftware.org/isinfo.php) をインストール済みであること（`iscc.exe` にパスが通っていること）。
+- 事前に publish ビルド（2.2 節）を完了していること。
+
+### 5.2 ビルド手順
+
+```pwsh
+# ワンコマンドでビルド（Inno Setup 未インストールでも自動対応）
+.\installer\build-installer.ps1
+```
+
+手動で行う場合:
+
+```pwsh
+# 1. publish を生成する（まだなければ）
+dotnet publish src/GuiEcad.App/GuiEcad.App.csproj `
+  -c Release -r win-x64 --self-contained true `
+  -p:WindowsPackageType=None
+
+# 2. インストーラーをビルドする
+iscc installer\GuiEcad_Setup.iss
+```
+
+成功すると `installer\GuiEcad_Setup_1.0.4.exe` が生成される。
+
+### 5.3 インストーラーの内容
+
+| 項目 | 内容 |
+|---|---|
+| インストール先 | `%ProgramFiles%\GuiEcad\` |
+| ファイル関連付け | `.gcad` → `GuiEcad.Document`（開くコマンド: `GuiEcad.App.exe "%1"`） |
+| DefaultIcon | `GuiEcad.App.exe,0` |
+| スタートメニュー | `GuiEcad` グループ（起動 + アンインストール） |
+| デスクトップ | オプション（インストール時に選択） |
+| 対象アーキテクチャ | x64 のみ |
+| 権限 | 管理者（ProgramFiles への書き込みに必要） |
+
+### 5.4 バージョン更新時の手順
+
+1. `GuiEcad.App.csproj` の `<Version>` を更新する。
+2. `installer/GuiEcad_Setup.iss` の `#define AppVersion` を同じ値に更新する。
+3. publish → `iscc` の順で再ビルドする。
+
+---
+
+## 6. 将来検討（保留）
 
 - MSIX パッケージ化（ストア/署名配布が必要になった場合）。`EnableMsixTooling=true` は既に有効で土台はある。
 - 自動更新の仕組み（現状は手動でフォルダ差し替え）。
-- インストーラ（MSI/Inno Setup 等）でのスタートメニュー登録（現状はフォルダ起動）。

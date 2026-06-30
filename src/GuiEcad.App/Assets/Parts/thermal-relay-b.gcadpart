@@ -1,0 +1,54 @@
+﻿{
+  "id": "c387e205bf3248cc8e931d3e563966f4",
+  "name": "サーマルリレーｂ",
+  "widthCells": 1,
+  "heightCells": 1,
+  "role": "contactNC",
+  "ports": [
+    {
+      "name": "L",
+      "rowOffset": 0,
+      "boundaryOffset": 0
+    },
+    {
+      "name": "R",
+      "rowOffset": 0,
+      "boundaryOffset": 1
+    }
+  ],
+  "primitives": [
+    {
+      "type": "circle",
+      "cx": 0.875,
+      "cy": 0,
+      "r": 0.125
+    },
+    {
+      "type": "circle",
+      "cx": 0.125,
+      "cy": 0,
+      "r": 0.125
+    },
+    {
+      "type": "line",
+      "x1": 0.625,
+      "y1": 0.0625,
+      "x2": 0.375,
+      "y2": 0.3125
+    },
+    {
+      "type": "line",
+      "x1": 0.375,
+      "y1": 0.0625,
+      "x2": 0.625,
+      "y2": 0.3125
+    },
+    {
+      "type": "line",
+      "x1": 0.125,
+      "y1": 0.1875,
+      "x2": 0.875,
+      "y2": 0.1875
+    }
+  ]
+}

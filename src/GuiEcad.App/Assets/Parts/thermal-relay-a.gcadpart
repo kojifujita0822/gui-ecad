@@ -1,0 +1,54 @@
+﻿{
+  "id": "fade680f05b74c0098051fa3558e690b",
+  "name": "サーマルリレ-a",
+  "widthCells": 1,
+  "heightCells": 1,
+  "role": "contactNO",
+  "ports": [
+    {
+      "name": "L",
+      "rowOffset": 0,
+      "boundaryOffset": 0
+    },
+    {
+      "name": "R",
+      "rowOffset": 0,
+      "boundaryOffset": 1
+    }
+  ],
+  "primitives": [
+    {
+      "type": "circle",
+      "cx": 0.875,
+      "cy": 0,
+      "r": 0.125
+    },
+    {
+      "type": "circle",
+      "cx": 0.125,
+      "cy": 0,
+      "r": 0.125
+    },
+    {
+      "type": "line",
+      "x1": 0.125,
+      "y1": -0.1875,
+      "x2": 0.875,
+      "y2": -0.1875
+    },
+    {
+      "type": "line",
+      "x1": 0.625,
+      "y1": -0.3125,
+      "x2": 0.375,
+      "y2": -0.0625
+    },
+    {
+      "type": "line",
+      "x1": 0.375,
+      "y1": -0.3125,
+      "x2": 0.625,
+      "y2": -0.0625
+    }
+  ]
+}

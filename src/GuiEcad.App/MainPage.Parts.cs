@@ -31,6 +31,8 @@ public sealed partial class MainPage
     private void InitShapeFolder()
     {
         _folderStore = PartFolderStore.CreateDefault();
+        _pinnedStore = PinnedPartStore.CreateDefault();
+        _pinnedIds = _pinnedStore.Load();
         try
         {
             _folderStore.EnsureFolders();
@@ -61,6 +63,30 @@ public sealed partial class MainPage
         // その他図形 = 組込みのその他記号 ＋ 自作図形（左パネル「その他▼」と同じ並び）
         var other = new MenuFlyoutSubItem { Text = "その他図形" };
         AddOtherBuiltins(other.Items);
+
+        // 組み込みパーツ（EmbeddedResource: thermal-relay 等）
+        foreach (var part in _builtinParts)
+        {
+            var item = new MenuFlyoutItem { Text = part.Name, Tag = $"builtin-part:{part.Id}" };
+            item.Click += OnPlaceBuiltinPart;
+            other.Items.Add(item);
+        }
+
+        // ピン留め済み自作図形（直接配置・サブメニューなし）
+        var pinnedEntries = _folderEntries
+            .Where(e => _pinnedIds.Contains(e.Definition.Id))
+            .ToList();
+        if (pinnedEntries.Count > 0)
+        {
+            other.Items.Add(new MenuFlyoutSeparator());
+            foreach (var e in pinnedEntries)
+            {
+                var item = new MenuFlyoutItem { Text = e.Definition.Name, Tag = e.Definition.Id };
+                item.Click += OnPlacePinnedPart;
+                other.Items.Add(item);
+            }
+        }
+
         other.Items.Add(new MenuFlyoutSeparator());
         other.Items.Add(BuildCustomShapesSubItem());
         menu.Items.Add(other);
@@ -139,7 +165,68 @@ public sealed partial class MainPage
         del.Click += OnDeleteFolderPart;
         sub.Items.Add(del);
 
+        var pinLabel = _pinnedIds.Contains(def.Id) ? "その他図形のピン留めを解除" : "その他図形にピン留め";
+        var pin = new MenuFlyoutItem { Text = pinLabel, Tag = def.Id };
+        pin.Click += OnTogglePinPart;
+        sub.Items.Add(pin);
+
         return sub;
+    }
+
+    // ピン留め済み自作図形を配置対象にする（その他図形メニューからの直接配置）。
+    private void OnPlacePinnedPart(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuFlyoutItem)?.Tag is not string id
+            || !_folderPartMap.TryGetValue(id, out var entry)) return;
+
+        _document.Library ??= new PartLibrary();
+        _document.Library.ById[entry.Definition.Id] = entry.Definition;
+
+        _frameStartMm = null;
+        _lineStartMm = null;
+        _connStartRow = null;
+        ClearToolRadios();
+
+        _tool = new ToolState(ToolMode.PlaceElement, ElementKind.ContactNO, PartId: entry.Definition.Id);
+        OtherPartButton.Content = entry.Definition.Name;
+        Canvas.Invalidate();
+    }
+
+    // 自作図形のピン留めをトグル（自作図形サブメニューから）。
+    private void OnTogglePinPart(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuFlyoutItem)?.Tag is not string id) return;
+
+        if (_pinnedIds.Contains(id))
+            _pinnedIds.Remove(id);
+        else
+            _pinnedIds.Add(id);
+
+        _pinnedStore.Save(_pinnedIds);
+        RebuildShapeMenu();
+        RebuildOtherPartMenu();
+    }
+
+    // 組み込みパーツ（EmbeddedResource）を配置対象にする。ドキュメント Library へ埋め込み維持。
+    private void OnPlaceBuiltinPart(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuFlyoutItem)?.Tag is not string tag) return;
+        var id = tag["builtin-part:".Length..];
+        var part = _builtinParts.FirstOrDefault(p => p.Id == id);
+        if (part is null) return;
+
+        _document.Library ??= new PartLibrary();
+        _document.Library.ById[part.Id] = part;
+
+        ClearToolRadios();
+        _frameStartMm = null;
+        _lineStartMm = null;
+        _connStartRow = null;
+
+        // PartId 指定時は Kind が無視されるが既定値を置く（OnPlaceFolderPart と同様）。
+        _tool = new ToolState(ToolMode.PlaceElement, ElementKind.ContactNO, PartId: part.Id);
+        OtherPartButton.Content = part.Name;
+        Canvas.Invalidate();
     }
 
     // フォルダの図形を配置対象にする。ドキュメント Library へ埋め込み（.GCAD 自己完結）を維持する。

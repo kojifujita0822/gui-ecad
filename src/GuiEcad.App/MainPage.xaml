@@ -120,6 +120,7 @@
                 <MenuFlyoutItem Text="上書き保存(S)" KeyboardAcceleratorTextOverride="Ctrl+S" Click="OnMenuSave" />
                 <MenuFlyoutItem Text="名前を付けて保存(A)..." Click="OnMenuSaveAs" />
                 <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="PDF プレビュー..." Click="OnMenuPreviewPdf" />
                 <MenuFlyoutItem Text="PDF出力..." Click="OnMenuExportPdf" />
             </MenuBarItem>
             <MenuBarItem Title="編集(E)">
@@ -202,6 +203,13 @@
                 <Button VerticalAlignment="Center" Click="OnInsertRowBtn" Content="行＋" ToolTipService.ToolTip="末尾に行追加 (Ctrl+Shift+↑)" />
                 <Button VerticalAlignment="Center" Click="OnDeleteRowBtn" Content="行－" ToolTipService.ToolTip="末尾の行削除 (Ctrl+Shift+↓)" />
                 <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
+                <!-- PDF プレビュー -->
+                <Button VerticalAlignment="Center" Click="OnMenuPreviewPdf" ToolTipService.ToolTip="PDF プレビュー">
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <FontIcon Glyph="&#xE8A4;" FontSize="14" />
+                        <TextBlock Text="プレビュー" VerticalAlignment="Center" FontSize="11" />
+                    </StackPanel>
+                </Button>
                 <!-- PDF -->
                 <Button VerticalAlignment="Center" Click="OnMenuExportPdf" ToolTipService.ToolTip="PDF出力">
                     <StackPanel Orientation="Horizontal" Spacing="3">

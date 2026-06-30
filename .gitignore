@@ -61,3 +61,6 @@ gui_cad_original/
 
 # リリースビルド出力（成果物・コミットしない）
 publish/
+
+# インストーラー生成物（GitHub Releases で配布・git には含めない）
+installer/*.exe
