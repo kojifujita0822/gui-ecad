@@ -86,7 +86,7 @@ public sealed partial class MainPage : Page
         _connStartRow = null;
         if (OtherPartButton is not null) OtherPartButton.Content = "その他部品";
         UpdateHintText();
-        Canvas.Invalidate();
+        DispatcherQueue.TryEnqueue(() => Canvas.Invalidate());
     }
 
     // 「その他部品」メニューから記号を選択（ツールバーに常設しない記号の配置）
