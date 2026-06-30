@@ -39,6 +39,8 @@ public sealed partial class MainPage
     { DoUndo(); args.Handled = true; }
     private void OnRedoAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     { DoRedo(); args.Handled = true; }
+    private async void OnSaveAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    { await SaveCurrentAsync(); args.Handled = true; }
 
     // Delete もフォーカス非依存に（ツール選択中・要素/縦コネクタ選択後でも効く）。
     // ただしインライン編集中・検索バー入力中はテキスト編集に委ね、要素を消さない

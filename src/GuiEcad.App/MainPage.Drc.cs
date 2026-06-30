@@ -29,6 +29,7 @@ public sealed partial class MainPage : Page
 {
     private void OnRunDrc(object sender, RoutedEventArgs e)
     {
+        _drcHighlightRow = -1;
         CircuitNumberer.Number(_document);
         _lastDrcResults = DesignRuleCheck.CheckCrossReference(_document, _document.Library)
             .Concat(DesignRuleCheck.CheckDeviceTypeConsistency(_document, _document.Library))
@@ -69,6 +70,18 @@ public sealed partial class MainPage : Page
         var target = _document.Sheets.FirstOrDefault(s => s.PageNumber == loc.PageNumber);
         // シート切替は SwitchToSheet 一本化（編集中コミット・選択/テストセッション整合を担保）。
         if (target != null && target != _sheet) SwitchToSheet(target);
+        _drcHighlightRow = loc.CircuitNumber > 0 ? loc.CircuitNumber - 1 : -1;
+        if (_drcHighlightRow >= 0) CenterViewOnRow(_drcHighlightRow);
+        Canvas.Invalidate();
+    }
+
+    private void CenterViewOnRow(int row)
+    {
+        double cw = Canvas.ActualWidth, ch = Canvas.ActualHeight;
+        if (cw <= 0 || ch <= 0) return;
+        double eyMm = _geo.YRow(row);
+        double scale = _viewport.Scale;
+        _viewport.PanY = ch / 2 - eyMm * scale;
     }
 
     private void RefreshSearchResultPanel()
@@ -147,7 +160,7 @@ public sealed partial class MainPage : Page
             _ => "I"
         };
         string loc = d.Locations.Count > 0
-            ? $" [P{d.Locations[0].PageNumber} 回路{d.Locations[0].CircuitNumber}]"
+            ? $" [P{d.Locations[0].PageNumber} 行{d.Locations[0].CircuitNumber}]"
             : "";
         return $"[{sev}] {d.Code}{loc}  {d.Message}";
     }

@@ -88,9 +88,14 @@ public sealed partial class MainWindow : Window
     /// <summary>起動引数・ファイル関連付けによる初回ファイルオープン。未保存確認は不要（起動直後のため）。</summary>
     public async Task OpenFileOnStartupAsync(string path)
     {
-        // Yield してウィンドウ・ページの初期化完了を待つ。
-        await Task.Yield();
-        if (RootFrame.Content is not MainPage page) return;
+        // MainPage が Content にセットされるまで最大 30 tick 待つ
+        MainPage? page = null;
+        for (int i = 0; i < 30 && page is null; i++)
+        {
+            await Task.Yield();
+            page = RootFrame.Content as MainPage;
+        }
+        if (page is null) return;
         await page.LoadFileAsync(path);
     }
 

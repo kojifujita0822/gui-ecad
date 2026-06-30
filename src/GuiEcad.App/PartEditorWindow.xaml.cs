@@ -9,8 +9,10 @@ using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.Windows.Storage.Pickers;
 using Windows.Foundation;
 using Windows.UI;
+using WinRT.Interop;
 
 namespace GuiEcad_App;
 
@@ -74,25 +76,38 @@ public sealed partial class PartEditorWindow : Window
     {
         InitializeComponent();
 
+        _id = edit?.Id ?? Guid.NewGuid().ToString("N");
+
         if (edit is not null)
-        {
-            _id = edit.Id;
-            _w = Math.Max(1, edit.WidthCells);
-            _h = Math.Max(1, edit.HeightCells);
-            _prims.AddRange(edit.Primitives);
-            _ports.AddRange(edit.Ports);
-        }
+            ApplyDefinition(edit);
         else
         {
-            _id = Guid.NewGuid().ToString("N");
+            NameBox.Text = "";
+            WidthBox.Value = _w;
+            HeightBox.Value = _h;
+            SelectRole(PartRole.ContactNO);
         }
 
-        NameBox.Text = edit?.Name ?? "";
-        WidthBox.Value = _w;
-        HeightBox.Value = _h;
-        SelectRole(edit?.Role ?? PartRole.ContactNO);
         BuildTemplateMenu();
         UpdateStatus();
+    }
+
+    // コンストラクタと OnOpenPart から共用する定義復元処理。_id は変更しない。
+    private void ApplyDefinition(PartDefinition def)
+    {
+        _w = Math.Max(1, def.WidthCells);
+        _h = Math.Max(1, def.HeightCells);
+        _prims.Clear();
+        _prims.AddRange(def.Primitives);
+        _ports.Clear();
+        _ports.AddRange(def.Ports);
+        _selPrim = -1;
+        _selPort = -1;
+
+        NameBox.Text = def.Name ?? "";
+        WidthBox.Value = _w;
+        HeightBox.Value = _h;
+        SelectRole(def.Role);
     }
 
     // ===== 組込み図形（たたき台）読み込み =====
@@ -557,6 +572,11 @@ public sealed partial class PartEditorWindow : Window
     private void OnCanvasKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == Windows.System.VirtualKey.Space) { _spaceDown = true; e.Handled = true; }
+        else if (e.Key == Windows.System.VirtualKey.Delete || e.Key == Windows.System.VirtualKey.Back)
+        {
+            OnDeleteSelected(null!, null!);
+            e.Handled = true;
+        }
     }
 
     private void OnCanvasKeyUp(object sender, KeyRoutedEventArgs e)
@@ -878,6 +898,24 @@ public sealed partial class PartEditorWindow : Window
 
     // ===== 保存・閉じる =====
 
+    private async void OnOpenPart(object sender, RoutedEventArgs e)
+    {
+        var hwnd = WindowNative.GetWindowHandle(this);
+        var picker = new FileOpenPicker(Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd));
+        picker.FileTypeFilter.Add(".gcadpart");
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+
+        PartDefinition loaded;
+        try { loaded = PartLibrarySerializer.LoadOne(file.Path); }
+        catch { return; }
+
+        PushUndo();
+        ApplyDefinition(loaded);
+        UpdateStatus();
+        EditCanvas.Invalidate();
+    }
+
     private async void OnSave(object sender, RoutedEventArgs e)
     {
         CommitPolyline();
@@ -889,6 +927,8 @@ public sealed partial class PartEditorWindow : Window
             await Warn("接続点（ポート）を2つ以上配置してください。"); return;
         }
 
+        // 保存前に同一直線上の線を1本にマージ（_prims は編集セッション中は変更しない）
+        var optimized = PartOptimizer.MergeCollinearLines(_prims);
         var def = new PartDefinition
         {
             Id = _id,
@@ -897,11 +937,12 @@ public sealed partial class PartEditorWindow : Window
             HeightCells = _h,
             Role = CurrentRole(),
             Ports = _ports.OrderBy(p => p.BoundaryOffset).ToList(),   // 先頭=NetA・末尾=NetB
-            Primitives = new(_prims),
+            Primitives = optimized,
         };
         Saved?.Invoke(def);
         Close();
     }
+
 
     private async Task Warn(string msg)
     {

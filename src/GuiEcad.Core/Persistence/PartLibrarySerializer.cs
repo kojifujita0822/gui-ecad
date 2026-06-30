@@ -64,6 +64,11 @@ public static class PartLibrarySerializer
     // 単体パーツ(.gcadpart)は PartDefinition を素のままシリアライズするためバージョンフィールドを持たない。
     // よってライブラリ/ドキュメントのような SchemaVersion 検査は行わない（非対称は意図的）。
     public static PartDefinition DeserializeOne(string json)
-        => JsonSerializer.Deserialize<PartDefinition>(json, JsonOptions.Default)
+    {
+        var part = JsonSerializer.Deserialize<PartDefinition>(json, JsonOptions.Default)
             ?? throw new InvalidDataException("Failed to deserialize part definition.");
+        // 断片化した線を読み込み時に自動マージ（エディタ・組み込みパーツ共通）
+        part.Primitives = PartOptimizer.MergeCollinearLines(part.Primitives);
+        return part;
+    }
 }

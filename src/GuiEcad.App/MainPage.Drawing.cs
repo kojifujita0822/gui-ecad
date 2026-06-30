@@ -160,6 +160,10 @@ public sealed partial class MainPage : Page
             renderer.DrawRectangle(new(fx, fy, fw, fh), new StrokeStyle(DrawingTheme.Blue, 0.4));
         }
 
+        // DRC ジャンプ先ハイライト（選択した診断の行を半透明オレンジで強調）
+        if (_drcHighlightRow >= 0)
+            DrawDrcRowHighlight(renderer, _drcHighlightRow);
+
         // テストモード: 作動中（計時中）の限時タイマ接点の上に残り時間を小窓表示。
         DrawTimerCountdowns(renderer);
     }
@@ -220,6 +224,18 @@ public sealed partial class MainPage : Page
         double x = _geo.X(l) - pad, y = _geo.YRow(e.Pos.Row) - _geo.CellMm * 0.5 - pad;
         double w = (right - l) * _geo.CellMm + 2 * pad, h = _geo.CellMm + 2 * pad;
         r.DrawRectangle(new(x, y, w, h), new StrokeStyle(DrawingTheme.Blue, 0.3));
+    }
+
+    // DRC ジャンプ先の行を半透明オレンジで強調表示する。
+    private void DrawDrcRowHighlight(Win2DRenderer r, int row)
+    {
+        double xMm = 0;
+        double yMm = _geo.YRow(row) - _geo.CellMm * 0.5;
+        double wMm = _geo.X(_sheet.Grid.Columns);
+        double hMm = _geo.CellMm;
+
+        r.FillRectangle(new(xMm, yMm, wMm, hMm), new Color(55, 255, 140, 0));
+        r.DrawRectangle(new(xMm, yMm, wMm, hMm), new StrokeStyle(new Color(200, 230, 80, 0), 1.5));
     }
 
     private void DrawElementHighlight(Win2DRenderer r, ElementInstance e, Color color)

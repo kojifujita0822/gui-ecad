@@ -55,9 +55,6 @@ public static class DesignRuleCheck
 
         foreach (var sheet in doc.Sheets.OrderBy(s => s.PageNumber))
         {
-            // Row → CircuitNumber のルックアップ（CrossReferenceBuilder と同一規則）
-            var circuitByRow = sheet.CircuitByRow();
-
             foreach (var elem in sheet.Elements)
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
@@ -69,8 +66,7 @@ public static class DesignRuleCheck
                 bool isRelayCoil = kind is ElementKind.Coil or ElementKind.Timer;
                 if (!isRelayContact && !isRelayCoil) continue;
 
-                int circuitNo = circuitByRow.GetValueOrDefault(elem.Pos.Row, 0);
-                var cref = new CircuitRef(sheet.PageNumber, circuitNo);
+                var cref = new CircuitRef(sheet.PageNumber, elem.Pos.Row + 1);
 
                 if (!usage.TryGetValue(elem.DeviceName, out var u))
                     usage[elem.DeviceName] = u = new DeviceUsage();
@@ -120,15 +116,12 @@ public static class DesignRuleCheck
 
         foreach (var sheet in doc.Sheets.OrderBy(s => s.PageNumber))
         {
-            var circuitByRow = sheet.CircuitByRow();
-
             foreach (var elem in sheet.Elements)
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
                 if (!PartResolver.CreatesComponent(elem, lib)) continue;
                 var kind = PartResolver.ComponentKind(elem, lib);
-                int circuitNo = circuitByRow.GetValueOrDefault(elem.Pos.Row, 0);
-                var cref = new CircuitRef(sheet.PageNumber, circuitNo);
+                var cref = new CircuitRef(sheet.PageNumber, elem.Pos.Row + 1);
 
                 if (!info.TryGetValue(elem.DeviceName, out var di))
                     info[elem.DeviceName] = di = new DeviceTypeInfo();
@@ -180,14 +173,12 @@ public static class DesignRuleCheck
     public static IReadOnlyList<Diagnostic> CheckVerticalCrossings(Sheet sheet, Netlist net)
     {
         if (net.VerticalCrossings.Count == 0) return Array.Empty<Diagnostic>();
-        var circuitByRow = sheet.CircuitByRow();
         var diags = new List<Diagnostic>();
         foreach (var (row, col) in net.VerticalCrossings)
         {
-            int circuitNo = circuitByRow.GetValueOrDefault(row, 0);
             diags.Add(new Diagnostic(DiagnosticSeverity.Warning, VerticalCrossing, "",
                 $"縦コネクタ（列{col}）が {row + 1} 行目の横配線と非接続で交差しています（ドット無し交差）。",
-                [new CircuitRef(sheet.PageNumber, circuitNo)]));
+                [new CircuitRef(sheet.PageNumber, row + 1)]));
         }
         return diags;
     }
@@ -200,18 +191,16 @@ public static class DesignRuleCheck
     {
         var fromLeft  = FloodContacts(net, net.LeftRailNet);
         var fromRight = FloodContacts(net, net.RightRailNet);
-        var circuitByRow = sheet.CircuitByRow();
 
-        // SourceElementId → 回路番号 のルックアップ
-        var elemCircuit = sheet.Elements.ToDictionary(e => e.Id,
-            e => circuitByRow.GetValueOrDefault(e.Pos.Row, 0));
+        // SourceElementId → 行番号（1始まり）のルックアップ
+        var elemRow = sheet.Elements.ToDictionary(e => e.Id, e => e.Pos.Row + 1);
 
         var diags = new List<Diagnostic>();
         foreach (var c in net.Components)
         {
             if (c.Role != ComponentRole.Load) continue;
-            int circuitNo = elemCircuit.TryGetValue(c.SourceElementId, out var cn) ? cn : 0;
-            var loc = new CircuitRef(sheet.PageNumber, circuitNo);
+            int rowNo = elemRow.TryGetValue(c.SourceElementId, out var rn) ? rn : 0;
+            var loc = new CircuitRef(sheet.PageNumber, rowNo);
             string name = c.DeviceName ?? "";
 
             if (!fromLeft.Contains(c.NetA))
@@ -236,9 +225,7 @@ public static class DesignRuleCheck
     {
         var fromLeft = FloodContacts(net, net.LeftRailNet);
         var fromRight = FloodContacts(net, net.RightRailNet);
-        var circuitByRow = sheet.CircuitByRow();
-        var elemCircuit = sheet.Elements.ToDictionary(e => e.Id,
-            e => circuitByRow.GetValueOrDefault(e.Pos.Row, 0));
+        var elemRow = sheet.Elements.ToDictionary(e => e.Id, e => e.Pos.Row + 1);
 
         // 節点 → その節点に端子を持つ負荷の一覧
         var loadsByNet = new Dictionary<int, List<Component>>();
@@ -259,7 +246,7 @@ public static class DesignRuleCheck
 
             var names = string.Join(", ", distinct.Select(c => string.IsNullOrEmpty(c.DeviceName) ? "(無名)" : c.DeviceName));
             var locs = distinct
-                .Select(c => new CircuitRef(sheet.PageNumber, elemCircuit.GetValueOrDefault(c.SourceElementId, 0)))
+                .Select(c => new CircuitRef(sheet.PageNumber, elemRow.GetValueOrDefault(c.SourceElementId, 0)))
                 .Distinct().ToList();
             diags.Add(new Diagnostic(DiagnosticSeverity.Warning, SeriesCoils, distinct[0].DeviceName ?? "",
                 $"コイル {names} が直列に接続されています（二重コイル）。各コイルは単独で母線間に接続してください。",

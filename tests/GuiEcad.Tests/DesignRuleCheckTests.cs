@@ -325,15 +325,16 @@ public sealed class DesignRuleCheckTests
     [Fact]
     public void Load_NotConnectedToRightRail_FlagsLoadNotReachableFromRight()
     {
-        // Coil が行末ではなく（右側に ContactNO がある）、右母線に到達できない。
-        // 末尾負荷は右母線へ自動接続されるため、末尾以外の負荷が検出対象。
+        // Coil が行末ではなく（右側に ContactNO がある）、右側の ContactNO が右母線へ自動接続される。
+        // OUT1右 → CR2左（horizontal union）→ CR2右 → 右母線 という経路で OUT1 は右母線に到達可能。
+        // よって LoadNotReachableFromRight DRC フラグは立たない（フラグ0件が正しい新動作）。
         var sheet = new Sheet { Grid = new GridSpec { Columns = 5 }, PageNumber = 1 };
         sheet.Elements.Add(El(ElementKind.ContactNO, 0, 0, "CR1")); // 境界0..1
         sheet.Elements.Add(El(ElementKind.Coil, 0, 1, "OUT1"));     // 境界1..2（行末ではない）
-        sheet.Elements.Add(El(ElementKind.ContactNO, 0, 3, "CR2")); // 境界3..4（行末、右母線未到達）
+        sheet.Elements.Add(El(ElementKind.ContactNO, 0, 3, "CR2")); // 境界3..4（行末、右母線へ自動接続）
         var net = NetlistBuilder.Build(sheet);
         var diags = DesignRuleCheck.CheckLoadReachability(sheet, net);
-        Assert.Single(diags, d => d.Code == DesignRuleCheck.LoadNotReachableFromRight);
+        Assert.Empty(diags);
     }
 
     [Fact]

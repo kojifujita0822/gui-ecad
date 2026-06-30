@@ -232,9 +232,7 @@ public static class NetlistBuilder
                 && !severed(row, rightBoundary[last], columns)
                 && PartResolver.CreatesComponent(elements[last], parts))
             {
-                var kind = PartResolver.ComponentKind(elements[last], parts);
-                if (ElementCatalog.IsLoad(kind) || ElementCatalog.IsPassthrough(kind))
-                    unions.Add((rightNode[last], rightRail));
+                unions.Add((rightNode[last], rightRail));
             }
         }
     }

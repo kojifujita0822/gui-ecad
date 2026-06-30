@@ -67,15 +67,16 @@ public class ConnectivityTests
     [Fact]
     public void DanglingStub_IsFlaggedBlack()
     {
-        // L —[NO A]—(net1: 行き止まり)   …  別に L … (Coil C)—R（左側は未結線）
+        // L —[NO A]— R（行末接点は右母線へ自動接続 = 左右母線直結のバイパス回路として有効）
+        // 別行: L … (Coil C)—R（C左は左母線直結）
         var sheet = new Sheet { Grid = new GridSpec { Columns = 6 } };
-        sheet.Elements.Add(El(ElementKind.ContactNO, 0, 0, "A"));   // A.R = どこにもつながらない
+        sheet.Elements.Add(El(ElementKind.ContactNO, 0, 0, "A"));   // A.R = 右母線へ自動接続
         sheet.Elements.Add(El(ElementKind.Coil, 2, 5, "C"));        // C.L = どこにもつながらない
 
         var nl = NetlistBuilder.Build(sheet);
         var report = ConnectivityChecker.Check(nl);
 
-        Assert.Equal(WireStatus.Dangling, report.Of(NetsOf(nl, "A").B.Id)); // A 右の宙ぶらり = 黒（行内に右隣要素なし）
+        Assert.Equal(WireStatus.Connected, report.Of(NetsOf(nl, "A").B.Id)); // A 右は右母線に自動接続 = Connected
         Assert.Equal(WireStatus.Connected, report.Of(NetsOf(nl, "C").A.Id)); // C 左は左母線直結（行内最左要素は常に左母線に接続）
     }
 

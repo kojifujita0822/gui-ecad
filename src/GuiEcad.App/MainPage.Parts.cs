@@ -97,8 +97,8 @@ public sealed partial class MainPage
         create.Click += OnCreateFolderPart;
         menu.Items.Add(create);
 
-        var open = new MenuFlyoutItem { Text = "図形フォルダを開く" };
-        open.Click += OnOpenShapeFolder;
+        var open = new MenuFlyoutItem { Text = "自作図形を読み込んで編集..." };
+        open.Click += OnLoadAndEditPart;
         menu.Items.Add(open);
 
         menu.Items.Add(new MenuFlyoutSeparator());
@@ -302,19 +302,20 @@ public sealed partial class MainPage
         RebuildOtherPartMenu();
     }
 
-    // 図形フォルダ（図形/）をエクスプローラーで開く。
-    private async void OnOpenShapeFolder(object sender, RoutedEventArgs e)
+    // .gcadpart ファイルを開き、同じパスへ上書き保存できる状態でエディタを起動する。
+    private async void OnLoadAndEditPart(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            _folderStore.EnsureFolders();
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = _folderStore.RootDir,
-                UseShellExecute = true,
-            });
-        }
-        catch (Exception ex) { await ShowErrorAsync(ex.Message); }
+        var picker = new FileOpenPicker(GetPickerWindowId());
+        picker.SuggestedStartLocation = PickerLocationId.DocumentsLibrary;
+        picker.FileTypeFilter.Add(".gcadpart");
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+
+        PartDefinition loaded;
+        try { loaded = PartLibrarySerializer.LoadOne(file.Path); }
+        catch (Exception ex) { await ShowErrorAsync(ex.Message); return; }
+
+        OpenFolderPartEditor(loaded, oldPath: file.Path);
     }
 
     private async void OnExportLibrary(object sender, RoutedEventArgs e)

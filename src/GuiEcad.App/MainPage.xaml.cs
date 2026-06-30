@@ -42,6 +42,7 @@ public sealed partial class MainPage : Page
     private readonly Dictionary<string, PartFolderEntry> _folderPartMap = new();
     private PinnedPartStore _pinnedStore = null!;
     private HashSet<string> _pinnedIds = new();
+    private int _drcHighlightRow = -1;   // DRC ジャンプ先ハイライト行（0始まり、-1=なし）
 
     // アセンブリ埋め込みの組み込みパーツ（その他図形メニューに常設）
     private static readonly IReadOnlyList<PartDefinition> _builtinParts = LoadBuiltinParts();

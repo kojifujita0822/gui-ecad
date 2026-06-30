@@ -103,6 +103,7 @@
             <KeyboardAccelerator Modifiers="Control" Key="C" Invoked="OnCopyAccelerator" />
             <KeyboardAccelerator Modifiers="Control" Key="V" Invoked="OnPasteAccelerator" />
             <KeyboardAccelerator Modifiers="Control" Key="F" Invoked="OnFindAccelerator" />
+            <KeyboardAccelerator Modifiers="Control" Key="S" Invoked="OnSaveAccelerator" />
         </Grid.KeyboardAccelerators>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -659,8 +660,8 @@
                             Margin="0,0,4,0" />
                     </TabView.TabStripFooter>
 
-                    <!-- DRCエラータブ -->
-                    <TabViewItem Header="DRCエラー" IsClosable="False">
+                    <!-- 回路エラータブ -->
+                    <TabViewItem Header="回路エラー" IsClosable="False">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -672,7 +673,7 @@
                                 BorderThickness="0,0,0,1"
                                 Padding="4,2">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <Button Content="DRC実行" Click="OnRunDrc" />
+                                    <Button Content="回路チェック" Click="OnRunDrc" />
                                     <TextBlock
                                         x:Name="DrcStatusText"
                                         VerticalAlignment="Center"

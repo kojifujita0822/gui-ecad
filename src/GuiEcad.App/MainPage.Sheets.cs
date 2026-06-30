@@ -75,6 +75,7 @@ public sealed partial class MainPage : Page
         if (_editingComment != null) CommitComment(accept: true);
         if (_editingRungComment != null) CommitRungComment(accept: true);
         _sheet = sheet;
+        _drcHighlightRow = -1;
         _selected = null;
         _selectedConnector = null;
         _moving = null;
