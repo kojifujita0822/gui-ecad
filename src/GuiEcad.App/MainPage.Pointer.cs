@@ -746,7 +746,8 @@ public sealed partial class MainPage
         _moving = null;
         _groupMoveDotAnchor = null;
         _panning = false;
-        Canvas.ReleasePointerCapture(e.Pointer);
+        if (_editingElement is null && _editingComment is null && _editingRungComment is null && _editingFrame is null)
+            Canvas.ReleasePointerCapture(e.Pointer);
     }
 
     /// <summary>ドラッグ/パン等の進行中ポインタ状態を破棄する（ツール切替・モード切替・キャプチャ喪失時の保険）。</summary>
@@ -826,6 +827,12 @@ public sealed partial class MainPage
 
     private void OnFrameLabelBoxLostFocus(object sender, RoutedEventArgs e)
     {
+        var newFocus = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(this.XamlRoot) as FrameworkElement;
+        System.Diagnostics.Debug.WriteLine(
+            $"[KeyboardFocusFix] OnFrameLabelBoxLostFocus: _editingFrame={_editingFrame is not null}, " +
+            $"OriginalSource={(e.OriginalSource as FrameworkElement)?.Name ?? e.OriginalSource?.GetType().Name ?? "null"}, " +
+            $"newFocus={newFocus?.Name ?? newFocus?.GetType().Name ?? "null"}");
+        System.Diagnostics.Debug.WriteLine(new System.Diagnostics.StackTrace().ToString());
         if (_editingFrame is not null) CommitFrameLabel(accept: true);
     }
 
