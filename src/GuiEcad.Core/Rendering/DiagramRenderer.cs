@@ -16,6 +16,8 @@ public sealed class RenderOptions
     public bool ShowGrid { get; init; }
     /// <summary>接続検査モード: 接続済み配線を青、未結線を黒で表示（docs/rendering.md）。</summary>
     public bool ConnectivityCheck { get; init; }
+    /// <summary>枠あり出力（PDF/画面ガイド）の用紙サイズ。既定 A4縦。</summary>
+    public PaperSize PaperSize { get; init; } = PaperSize.A4;
 }
 
 /// <summary>
@@ -48,9 +50,10 @@ public sealed class DiagramRenderer
     private int _rowBase;
     private double YRow(int row) => _geo.YRow(row - _rowBase);
 
-    /// <summary>枠（A4縦）出力時の1ページあたり行数。これを超える図面は複数ページへ分割する。
-    /// 28行で右下の表題欄と重ならない範囲に収まる。</summary>
-    public const int RowsPerPage = 28;
+    /// <summary>枠出力時の1ページあたり行数。これを超える図面は複数ページへ分割する。
+    /// 用紙の余白を除いた高さに収まる行数（表題欄は右下固定配置のため全幅では重ならない）。
+    /// A4縦では 28（=(297-2*20)/9 の切り捨て）。用紙サイズ（<see cref="RenderOptions.PaperSize"/>）に応じて変わる。</summary>
+    public int RowsPerPage => (int)((PageH - 2 * _opt.MarginMm) / Cell);
 
     /// <summary>シートが描画する総行数（グリッド行数と要素最大行+1 の大きい方）。</summary>
     public static int TotalRows(Sheet sheet)
@@ -61,7 +64,7 @@ public sealed class DiagramRenderer
     }
 
     /// <summary>枠出力時にこのシートが必要とする物理ページ数（行分割）。</summary>
-    public static int PageCount(Sheet sheet) =>
+    public int PageCount(Sheet sheet) =>
         Math.Max(1, (TotalRows(sheet) + RowsPerPage - 1) / RowsPerPage);
 
     /// <summary>主回路（Sheet.MainCircuit）シートの仮想行数。自由直線・接続点・枠は mm 実座標で
@@ -88,7 +91,7 @@ public sealed class DiagramRenderer
         return sheet.MainCircuit ? Math.Max(rows, MainCircuitVirtualRows(sheet)) : rows;
     }
 
-    /// <summary>枠出力時の物理ページ数。制御回路シートは静的 <see cref="PageCount"/> と同じ結果を返し、
+    /// <summary>枠出力時の物理ページ数。制御回路シートは <see cref="PageCount"/> と同じ結果を返し、
     /// 主回路シートは自由直線・接続点・枠の mm 座標による内容の広がりも考慮する。</summary>
     public int RenderPageCount(Sheet sheet)
     {
@@ -98,22 +101,24 @@ public sealed class DiagramRenderer
     private double LeftBusX => X(0) - BusPad;
     private double RightBusX(int columns) => X(columns) + BusPad;
 
+    // 用紙サイズ（縦固定）。A3 は A4 の長辺・短辺を単純に拡大した 297×420mm。
+    private double PageW => _opt.PaperSize == PaperSize.A3 ? 297.0 : 210.0;
+    private double PageH => _opt.PaperSize == PaperSize.A3 ? 420.0 : 297.0;
+
     private const double TitleCompanyRowH = 6.0;                              // 社名欄の高さ (mm)
     private const double TitleDetailRowsH = 14.0;                             // 図面名称/図番/ページ行＋顧客等行の高さ (mm)
     private const double TitleBlockH = TitleCompanyRowH + TitleDetailRowsH;   // 表題欄全体の高さ (mm)
     private const double RevRowH     = 7.0;    // 改定欄 データ行の高さ (mm)
     private const double RevHdrH     = 5.0;    // 改定欄 ヘッダ行の高さ (mm)
-    private const double A4W         = 210.0;  // A4縦 幅 (mm)
-    private const double A4H         = 297.0;  // A4縦 高さ (mm)
 
     private double RevisionBlockH(DocumentInfo info)
         => info.Revisions.Count == 0 ? 0 : RevHdrH + info.Revisions.Count * RevRowH;
 
-    /// <summary>描画に必要なページサイズ(mm)。enableBorder=true のとき A4縦固定。</summary>
+    /// <summary>描画に必要なページサイズ(mm)。enableBorder=true のとき用紙サイズ（RenderOptions.PaperSize）固定。</summary>
     public Size2D PageSize(Sheet sheet, CrossReference? xref = null, DocumentInfo? info = null,
                            bool enableBorder = false)
     {
-        if (enableBorder) return new Size2D(A4W, A4H);
+        if (enableBorder) return new Size2D(PageW, PageH);
         int maxRow = 0;
         foreach (var e in sheet.Elements) maxRow = Math.Max(maxRow, e.Pos.Row);
         // 行コメント（右母線の右側）が長いとページ右にはみ出すため、その分の幅を確保する。
@@ -600,8 +605,8 @@ public sealed class DiagramRenderer
         return TableGap + rows * TableRowH + Cell * 0.4;
     }
 
-    // 専用ページの表は A4縦の用紙幅に合わせた固定幅（図面の列数に依存しない）。
-    private double XrefTableRightX => A4W - _opt.MarginMm;   // A4縦 幅(210) - 右余白
+    // 専用ページの表は用紙幅に合わせた固定幅（図面の列数に依存しない）。
+    private double XrefTableRightX => PageW - _opt.MarginMm;
 
     /// <summary>
     /// クロスリファレンス一覧表を描画する。<paramref name="rowStart"/>/<paramref name="rowCount"/> で
@@ -675,14 +680,14 @@ public sealed class DiagramRenderer
 
     // ---- クロスリファレンス専用ページ ----
 
-    /// <summary>クロスリファレンス専用ページのサイズ。A4縦固定（行が少なくても縦配置。長ければ複数ページに分割）。</summary>
-    public Size2D CrossRefPageSize() => new(A4W, A4H);   // A4縦: 幅210 × 高さ297
+    /// <summary>クロスリファレンス専用ページのサイズ。用紙サイズ縦固定（行が少なくても縦配置。長ければ複数ページに分割）。</summary>
+    public Size2D CrossRefPageSize() => new(PageW, PageH);
 
-    /// <summary>A4縦 1ページに収まるクロスリファレンス表のデータ行数（ヘッダ行を除く）。</summary>
+    /// <summary>1ページに収まるクロスリファレンス表のデータ行数（ヘッダ行を除く）。</summary>
     public int CrossRefRowsPerPage()
     {
-        // 利用可能高さ = A4縦の高さ - 上下余白 - 表の上ギャップ。これを行高で割り、ヘッダ1行を差し引く。
-        double usableH = A4H - 2 * _opt.MarginMm - TableGap;
+        // 利用可能高さ = 用紙の高さ - 上下余白 - 表の上ギャップ。これを行高で割り、ヘッダ1行を差し引く。
+        double usableH = PageH - 2 * _opt.MarginMm - TableGap;
         int rowsIncludingHeader = (int)(usableH / TableRowH);
         return Math.Max(1, rowsIncludingHeader - 1);
     }
@@ -927,14 +932,14 @@ public sealed class DiagramRenderer
 
     private const double TitleBlockW = 95.0;   // 右下表題欄の幅 (mm)
 
-    // 表題欄（＋その上に改定欄）を A4 縦ページの右下に固定配置する（枠あり出力時）。
+    // 表題欄（＋その上に改定欄）を用紙縦ページの右下に固定配置する（枠あり出力時）。
     // 絶対座標で描くため _rowBase（ページ行オフセット）の影響は受けない。
     private void DrawTitleAndRevisionBottomRight(IRenderer r, DocumentInfo info, int pageNumber, int totalPages)
     {
         const double pageMargin = 5.0;   // 外枠線と同じ用紙端余白
-        double x0 = A4W - pageMargin - TitleBlockW;
-        double x1 = A4W - pageMargin;
-        double titleStartY = A4H - pageMargin - TitleBlockH;
+        double x0 = PageW - pageMargin - TitleBlockW;
+        double x1 = PageW - pageMargin;
+        double titleStartY = PageH - pageMargin - TitleBlockH;
         DrawTitleBlock(r, info, x0, x1, titleStartY, pageNumber, totalPages);
         double revH = RevisionBlockH(info);
         if (revH > 0)
@@ -998,12 +1003,12 @@ public sealed class DiagramRenderer
         r.DrawText(value, new(x + pad, y + h * 0.65), dataStyle);
     }
 
-    // A4縦用紙の図面枠（外枠線）を描画する。
+    // 用紙縦の図面枠（外枠線）を描画する。
     private void DrawBorder(IRenderer r)
     {
         const double margin = 5.0;   // 用紙端からの余白
         var thick = _theme.Get(StrokeRole.BusRail) with { Width = 0.5 };
-        r.DrawRectangle(new(margin, margin, A4W - margin * 2, A4H - margin * 2), thick);
+        r.DrawRectangle(new(margin, margin, PageW - margin * 2, PageH - margin * 2), thick);
     }
 
     // 改定欄（表題欄の上）を描画する。最新エントリが上に来るよう逆順表示。

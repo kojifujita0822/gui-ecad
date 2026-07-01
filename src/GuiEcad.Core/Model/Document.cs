@@ -38,9 +38,14 @@ public sealed class RevisionEntry
     public string By { get; set; } = "";
 }
 
+/// <summary>PDF/枠出力の用紙サイズ（縦固定）。</summary>
+public enum PaperSize { A4, A3 }
+
 public sealed class DocumentSettings
 {
     public BusConfig DefaultBus { get; set; } = new();
-    /// <summary>true のとき PDF 出力に A4 縦の図面枠（外枠・改定欄・表題欄）を描画する。既定で有効。</summary>
+    /// <summary>true のとき PDF 出力に図面枠（外枠・改定欄・表題欄）を描画する。既定で有効。</summary>
     public bool EnableBorder { get; set; } = true;
+    /// <summary>枠あり出力（PDF/画面ガイド）の用紙サイズ。既定 A4縦。</summary>
+    public PaperSize PaperSize { get; set; } = PaperSize.A4;
 }

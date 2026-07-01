@@ -36,27 +36,42 @@ public class PageSplitTests
     [InlineData(57, 3)]   // 57 行 → 3ページ
     public void PageCount_SplitsByRowsPerPage(int contentRows, int expectedPages)
     {
-        // RowsPerPage は 28 を前提（定数が変わってもロジックを検証）。
-        Assert.Equal(28, DiagramRenderer.RowsPerPage);
+        var dr = new DiagramRenderer();
+        // RowsPerPage は既定(A4)で 28 を前提（定数が変わってもロジックを検証）。
+        Assert.Equal(28, dr.RowsPerPage);
 
         // contentRows 行ぶんを占有する要素を 1 行目と最終行に置く（Grid.Rows は小さく）。
         var sheet = new Sheet { Grid = new GridSpec { Columns = 4, Rows = 1 } };
         sheet.Elements.Add(El(ElementKind.Coil, contentRows - 1, 3, "OUT"));
 
         Assert.Equal(contentRows, DiagramRenderer.TotalRows(sheet));
-        Assert.Equal(expectedPages, DiagramRenderer.PageCount(sheet));
+        Assert.Equal(expectedPages, dr.PageCount(sheet));
+    }
+
+    [Theory]
+    [InlineData(42, 1)]   // A3: (420-2*20)/9=42 が1ページの行数 → ちょうど収まる
+    [InlineData(43, 2)]   // 43 行 → 2ページ
+    public void PageCount_A3_UsesTallerRowsPerPage(int contentRows, int expectedPages)
+    {
+        var dr = new DiagramRenderer(options: new RenderOptions { PaperSize = PaperSize.A3 });
+        Assert.Equal(42, dr.RowsPerPage);
+
+        var sheet = new Sheet { Grid = new GridSpec { Columns = 4, Rows = 1 } };
+        sheet.Elements.Add(El(ElementKind.Coil, contentRows - 1, 3, "OUT"));
+
+        Assert.Equal(expectedPages, dr.PageCount(sheet));
     }
 
     // ---- 主回路（MainCircuit）シートの mm ベース分割（RenderPageCount） ----
 
     [Fact]
-    public void RenderPageCount_NonMainCircuit_MatchesStaticPageCount()
+    public void RenderPageCount_NonMainCircuit_MatchesPageCount()
     {
-        // 制御回路シートは従来どおり静的 PageCount と同じ結果を返す（互換性の確認）。
+        // 制御回路シートは従来どおり PageCount と同じ結果を返す（互換性の確認）。
         var sheet = new Sheet { Grid = new GridSpec { Columns = 4, Rows = 40 } };
         var dr = new DiagramRenderer();
 
-        Assert.Equal(DiagramRenderer.PageCount(sheet), dr.RenderPageCount(sheet));
+        Assert.Equal(dr.PageCount(sheet), dr.RenderPageCount(sheet));
     }
 
     [Fact]
@@ -68,8 +83,8 @@ public class PageSplitTests
         sheet.FreeLines.Add(new FreeLine { X1Mm = 30, Y1Mm = 20, X2Mm = 30, Y2Mm = 20 + 40 * 9 });
         var dr = new DiagramRenderer();
 
-        // 要素グリッド行だけを見る静的 PageCount では1ページ扱いになってしまう（旧挙動）。
-        Assert.Equal(1, DiagramRenderer.PageCount(sheet));
+        // 要素グリッド行だけを見る PageCount では1ページ扱いになってしまう（旧挙動）。
+        Assert.Equal(1, dr.PageCount(sheet));
         // mm 座標の内容を加味した RenderPageCount は 2ページと判定する。
         Assert.Equal(2, dr.RenderPageCount(sheet));
     }
@@ -118,8 +133,8 @@ public class PageSplitTests
         {
             for (int page = 0; page < pages; page++)
                 dr.Render(rec, sheet, enableBorder: true,
-                          pageRowStart: page * DiagramRenderer.RowsPerPage,
-                          pageRowCount: DiagramRenderer.RowsPerPage);
+                          pageRowStart: page * dr.RowsPerPage,
+                          pageRowCount: dr.RowsPerPage);
         });
         Assert.Null(ex);
         Assert.Equal(0, rec.ClipDepth);
@@ -147,8 +162,8 @@ public class PageSplitTests
         {
             for (int page = 0; page < pages; page++)
                 dr.Render(rec, sheet, enableBorder: true,
-                          pageRowStart: page * DiagramRenderer.RowsPerPage,
-                          pageRowCount: DiagramRenderer.RowsPerPage);
+                          pageRowStart: page * dr.RowsPerPage,
+                          pageRowCount: dr.RowsPerPage);
         });
         Assert.Null(ex);
         Assert.Equal(0, rec.ClipDepth);          // Push/Pop が全ページで釣り合う

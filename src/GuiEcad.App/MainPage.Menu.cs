@@ -285,7 +285,8 @@ public sealed partial class MainPage
 
             var info = _document.Info;
             bool enableBorder = _document.Settings.EnableBorder;
-            var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions());
+            var dr = new DiagramRenderer(DrawingTheme.Default,
+                new RenderOptions { PaperSize = _document.Settings.PaperSize });
             using var surface = new PdfRenderSurface(file.Path);
 
             // 物理ページ総数（枠あり時は長い図面を RowsPerPage 行ごとに複数ページへ分割する。
@@ -305,8 +306,8 @@ public sealed partial class MainPage
                     var renderer = surface.BeginPage(dr.PageSize(sheet, null, info, enableBorder));
                     dr.Render(renderer, sheet, _document.Library, xref: null, info: info,
                               pageNumber: physical, totalPages: totalPages, enableBorder: enableBorder,
-                              pageRowStart: p * DiagramRenderer.RowsPerPage,
-                              pageRowCount: enableBorder ? DiagramRenderer.RowsPerPage : int.MaxValue);
+                              pageRowStart: p * dr.RowsPerPage,
+                              pageRowCount: enableBorder ? dr.RowsPerPage : int.MaxValue);
                     surface.EndPage();
                 }
             }

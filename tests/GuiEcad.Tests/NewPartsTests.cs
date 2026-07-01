@@ -242,7 +242,8 @@ public class NewPartsTests
     public void MainCircuit_MultiPage_FreeLinesRender_ClipBalanced()
     {
         // 主回路シートを2ページに跨らせ、自由直線（母線）描画でクリップが釣り合うこと（はみ出し対策）。
-        int rows = DiagramRenderer.RowsPerPage + 5;   // 2ページ分
+        var dr = new DiagramRenderer();
+        int rows = dr.RowsPerPage + 5;   // 2ページ分
         var sheet = new Sheet { MainCircuit = true, Grid = new GridSpec { Columns = 6, Rows = rows } };
         // 全行に跨る縦母線R/S/Tを自由直線で引く。
         for (int i = 0; i < 3; i++)
@@ -250,14 +251,13 @@ public class NewPartsTests
         sheet.Elements.Add(new ElementInstance
         { Kind = ElementKind.Breaker3P, Pos = new GridPos(2, 1), CellWidth = 3 });
 
-        var dr = new DiagramRenderer();
         var rec = new NullRenderer();
         var ex = Record.Exception(() =>
         {
-            for (int page = 0; page < DiagramRenderer.PageCount(sheet); page++)
+            for (int page = 0; page < dr.PageCount(sheet); page++)
                 dr.Render(rec, sheet, enableBorder: true,
-                          pageRowStart: page * DiagramRenderer.RowsPerPage,
-                          pageRowCount: DiagramRenderer.RowsPerPage);
+                          pageRowStart: page * dr.RowsPerPage,
+                          pageRowCount: dr.RowsPerPage);
         });
         Assert.Null(ex);
         Assert.Equal(0, rec.ClipDepth);   // PushClip/PopClip が全ページで釣り合う

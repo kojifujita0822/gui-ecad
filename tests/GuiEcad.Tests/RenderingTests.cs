@@ -269,6 +269,42 @@ public class RenderingTests
         Assert.True(File.Exists(path));
     }
 
+    [Fact]
+    public void PaperSize_A3_RendersAtA3DimensionsWithoutException()
+    {
+        // 用紙サイズ A3 でも例外なく描画でき、PageSize が A3 縦(297×420mm)を返すこと。
+        var sheet = SampleSheet();
+        sheet.PageNumber = 1;
+        var doc = new LadderDocument
+        {
+            Info = new DocumentInfo { CompanyName = "テスト電機株式会社", Title = "制御盤" },
+            Settings = new DocumentSettings { PaperSize = PaperSize.A3 },
+        };
+        doc.Sheets.Add(sheet);
+
+        var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "temp"));
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "a3_test.pdf");
+        File.Delete(path);
+        var dr = new DiagramRenderer(options: new RenderOptions { PaperSize = doc.Settings.PaperSize });
+
+        var pageSize = dr.PageSize(sheet, null, doc.Info, enableBorder: true);
+        Assert.Equal(297.0, pageSize.Width);
+        Assert.Equal(420.0, pageSize.Height);
+
+        Exception? ex;
+        using (var surface = new PdfRenderSurface(path))
+        {
+            var r = surface.BeginPage(pageSize);
+            ex = Record.Exception(() =>
+                dr.Render(r, sheet, null, null, xref: null, info: doc.Info, enableBorder: true));
+            surface.EndPage();
+        }
+
+        Assert.Null(ex);
+        Assert.True(File.Exists(path));
+    }
+
     private static void Render(Sheet sheet, string path, bool connectivity)
     {
         var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions { ConnectivityCheck = connectivity });

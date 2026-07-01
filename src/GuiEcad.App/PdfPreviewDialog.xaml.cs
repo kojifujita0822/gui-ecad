@@ -40,7 +40,8 @@ internal sealed partial class PdfPreviewDialog : ContentDialog
         _document = document;
         _xref = xref;
         _enableBorder = enableBorder;
-        _dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions());
+        _dr = new DiagramRenderer(DrawingTheme.Default,
+            new RenderOptions { PaperSize = document.Settings.PaperSize });
 
         InitializeComponent();
 
@@ -69,7 +70,7 @@ internal sealed partial class PdfPreviewDialog : ContentDialog
                 physical++;
                 _pages.Add(new PreviewPage(
                     PageKind.Sheet, sheet,
-                    PageRowStart: p * DiagramRenderer.RowsPerPage,
+                    PageRowStart: p * _dr.RowsPerPage,
                     PageNumber: physical,
                     TotalPages: totalPages,
                     CrPageIndex: 0
@@ -213,7 +214,7 @@ internal sealed partial class PdfPreviewDialog : ContentDialog
                            pageNumber: page.PageNumber, totalPages: page.TotalPages,
                            enableBorder: _enableBorder,
                            pageRowStart: page.PageRowStart,
-                           pageRowCount: DiagramRenderer.RowsPerPage);
+                           pageRowCount: _dr.RowsPerPage);
                 break;
             case PageKind.CrossRef:
                 _dr.RenderCrossRefPage(renderer, _xref, page.CrPageIndex);

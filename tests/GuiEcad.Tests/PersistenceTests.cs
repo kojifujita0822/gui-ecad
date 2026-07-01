@@ -21,6 +21,7 @@ public class PersistenceTests
             Settings = new DocumentSettings
             {
                 DefaultBus = new BusConfig { LeftName = "N24", RightName = "P24" },
+                PaperSize = PaperSize.A3,
             },
         };
 
@@ -73,6 +74,7 @@ public class PersistenceTests
         Assert.Equal("コンプレッサー遠方運転盤", back.Info.Title);
         Assert.Equal("赤松", back.Info.Designer);
         Assert.Equal("N24", back.Settings.DefaultBus.LeftName);
+        Assert.Equal(PaperSize.A3, back.Settings.PaperSize);
         Assert.True(back.Devices.ByName.ContainsKey("CR11"));
         Assert.Equal(DeviceClass.Relay, back.Devices.ByName["CR11"].Class);
         Assert.Equal("MY2N", back.Devices.ByName["CR11"].Model);

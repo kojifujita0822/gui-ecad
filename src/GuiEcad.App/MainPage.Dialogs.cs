@@ -72,11 +72,21 @@ public sealed partial class MainPage
         // 図面枠 ON/OFF トグル
         var borderToggle = new ToggleSwitch
         {
-            Header = "図面枠を描画（A4横・PDF出力時）",
+            Header = "図面枠を描画（PDF出力時）",
             IsOn = _document.Settings.EnableBorder,
             Margin = new Thickness(0, 8, 0, 0),
         };
         panel.Children.Add(borderToggle);
+
+        // 用紙サイズ（A4/A3・縦固定）
+        var paperSizeBox = new ComboBox
+        {
+            Header = "用紙サイズ（PDF出力・図面枠）",
+            Margin = new Thickness(0, 8, 0, 0),
+            ItemsSource = new[] { "A4", "A3" },
+            SelectedIndex = _document.Settings.PaperSize == PaperSize.A3 ? 1 : 0,
+        };
+        panel.Children.Add(paperSizeBox);
 
         // 改定欄セクション
         panel.Children.Add(new TextBlock
@@ -131,6 +141,7 @@ public sealed partial class MainPage
 
         // 図面枠設定を保存
         _document.Settings.EnableBorder = borderToggle.IsOn;
+        _document.Settings.PaperSize = paperSizeBox.SelectedIndex == 1 ? PaperSize.A3 : PaperSize.A4;
 
         // 改定履歴を保存（現在のUIの並び順で上書き）
         info.Revisions.Clear();

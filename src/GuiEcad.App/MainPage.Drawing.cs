@@ -48,7 +48,12 @@ public sealed partial class MainPage : Page
         var transform = Matrix3x2.CreateScale((float)scale) * Matrix3x2.CreateTranslation((float)_viewport.PanX, (float)_viewport.PanY);
 
         var renderer = new Win2DRenderer(args.DrawingSession, transform);
-        var dr = new DiagramRenderer(_drawingTheme, new RenderOptions { ConnectivityCheck = _connectivityCheck, ShowGrid = _showGrid });
+        var dr = new DiagramRenderer(_drawingTheme, new RenderOptions
+        {
+            ConnectivityCheck = _connectivityCheck,
+            ShowGrid = _showGrid,
+            PaperSize = _document.Settings.PaperSize,
+        });
         dr.Render(renderer, _sheet, _document.Library, _testSession?.State);
 
         // 図面枠ON時は、PDF出力1ページ分（A4縦）の範囲を仮枠ガイドで表示する。
@@ -260,20 +265,21 @@ public sealed partial class MainPage : Page
         r.FillRectangle(new(x, y, w, h), color);
     }
 
-    // 図面枠ON時の PDF 1ページ分（A4縦 210x297mm）の境界を仮枠として描く。
+    // 図面枠ON時の PDF 1ページ分（用紙縦）の境界を仮枠として描く。
     // 内容の高さに応じて縦方向にページ境界を繰り返し、どこがページ境界か作図中に分かるようにする。
-    // ページ数は DiagramRenderer.RenderPageCount と一致させる（主回路シートは mm 座標の内容も加味）。
+    // 用紙幅・1ページ行数・ページ数はいずれも DiagramRenderer（現在の PaperSize 設定）から取る
+    // （ローカルに固定値を持つとA4/A3切替時にガイドだけずれるため）。
     private void DrawPageGuides(Win2DRenderer r, DiagramRenderer dr)
     {
-        const double a4w = 210.0;                       // A4縦の幅 (mm)
-        int rpp = DiagramRenderer.RowsPerPage;          // 1ページの行数（PDF分割と一致）
+        double pageW = dr.PageSize(_sheet, enableBorder: true).Width;
+        int rpp = dr.RowsPerPage;
         double cell = _geo.CellMm, margin = _geo.MarginMm;
         int pages = dr.RenderPageCount(_sheet);
         double bandH = rpp * cell;
         var guide = new StrokeStyle(new Color(150, 40, 90, 200), 0.3, LineStyle.Dashed);
-        // A4幅 × 30行 の帯を縦に積み、各帯が1ページに相当することを示す。
+        // 用紙幅 × rpp行 の帯を縦に積み、各帯が1ページに相当することを示す。
         for (int p = 0; p < pages; p++)
-            r.DrawRectangle(new(0, margin + p * bandH, a4w, bandH), guide);
+            r.DrawRectangle(new(0, margin + p * bandH, pageW, bandH), guide);
     }
 
     // ===== ツール選択 =====
