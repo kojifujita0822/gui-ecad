@@ -233,6 +233,7 @@ public sealed partial class MainPage : Page
         StartAutosaveTimer();
         LoadKeyBindings();   // ショートカットキー割り当ての復元（既定値で補完）
         ApplyKeyBindings();  // 動的 KeyboardAccelerator を RootGrid へ登録
+        RegisterKeyboardModeAccelerators();   // キーボード配置モードの矢印/数字キーを RootGrid へ登録
 #if !DEBUG
         RestartMenuItem.Visibility = Visibility.Collapsed;   // 開発用「再ビルドして再起動」は配布版で隠す
 #endif
@@ -669,11 +670,8 @@ public sealed partial class MainPage : Page
                 }
                 break;
 
-            // キーボード配置モード中の矢印キー（フォーカスセル移動）・数字キー（ツール選択）。
-            // 既存ハンドラの無い組み合わせのため default に集約する。
-            default:
-                if (HandleKeyboardModeKey(e.Key)) e.Handled = true;
-                break;
+            // キーボード配置モード中の矢印キー・数字キーは RootGrid の KeyboardAccelerator
+            // （RegisterKeyboardModeAccelerators）で処理する。ここでの二重処理は避ける。
         }
     }
 

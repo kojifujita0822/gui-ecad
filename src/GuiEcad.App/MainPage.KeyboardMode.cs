@@ -36,17 +36,9 @@ public sealed partial class MainPage : Page
         {
             // 初期フォーカスセルは直近のマウスホバーセルを再利用（無ければ左上）。
             _focusCell = _hoverCell.Row >= 0 && _hoverCell.Column >= 0 ? _hoverCell : new GridPos(0, 0);
-            FocusCanvasForKeyboardMode();
         }
         Canvas.Invalidate();
     }
-
-    // Canvas へフォーカスを移す。ボタンのクリック直後に呼ぶと、WinUI がクリックしたボタン自身へ
-    // フォーカスを割り当てる既定動作と競合し、同期呼び出しでは負けてボタン側にフォーカスが残ることがある
-    // （その状態で Enter を押すと、配置ではなくボタン自身のトグルOFFが先に処理されてしまう）。
-    // DispatcherQueue に積んで既定のフォーカス割り当てが終わった後に実行することで確実に Canvas へ移す。
-    private void FocusCanvasForKeyboardMode()
-        => DispatcherQueue.TryEnqueue(() => Canvas.Focus(FocusState.Programmatic));
 
     private void ExitKeyboardMode()
     {
@@ -65,15 +57,20 @@ public sealed partial class MainPage : Page
         Canvas.Invalidate();
     }
 
-    // Canvas 自身の KeyDown（Canvas.xaml の KeyDown="OnCanvasKeyDown"）。
-    // 隠密の調査で判明: CanvasControl がフォーカスを保持していると Page.OnKeyDown の default
-    // ケース（旧 HandleKeyboardModeKey 呼び出し）が届かないことがある（MainPage.xaml.cs 606-607 に
-    // 既知の制約として明記済み）。キーボード配置モードでは Canvas.Focus() が確実に成功するため
-    // （FocusCanvasForKeyboardMode）、Canvas 自身の KeyDown に直接アタッチして確実に処理する。
-    // Handled=true にしてバブリングを止めることで、Page.OnKeyDown 側の同キー二重処理も防ぐ。
-    private void OnCanvasKeyDown(object sender, KeyRoutedEventArgs e)
+    // 矢印キー・数字キーを RootGrid の KeyboardAccelerator（Modifiers=None）として登録する。
+    // KeyboardAccelerator はバブリング経路の外側までフレームワークが独自に解決するため、
+    // Canvas 等どの要素がフォーカスを持っていても確実に拾える（Canvas.Focus() の成否に依存しない）。
+    // 起動時に1回だけ呼ぶ（常時登録し、有効/無効は HandleKeyboardModeKey 内の _keyboardModeActive で制御）。
+    private void RegisterKeyboardModeAccelerators()
     {
-        if (HandleKeyboardModeKey(e.Key)) e.Handled = true;
+        var keys = new[] { VirtualKey.Up, VirtualKey.Down, VirtualKey.Left, VirtualKey.Right }
+            .Concat(KeyboardModeDigitTools.Select(t => t.Key));
+        foreach (var key in keys)
+        {
+            var acc = new KeyboardAccelerator { Key = key, Modifiers = VirtualKeyModifiers.None };
+            acc.Invoked += (_, args) => { if (HandleKeyboardModeKey(key)) args.Handled = true; };
+            RootGrid.KeyboardAccelerators.Add(acc);
+        }
     }
 
     /// <summary>キーボード配置モード中の矢印キー・数字キーを処理する。処理したら true（呼び出し側で e.Handled にする）。

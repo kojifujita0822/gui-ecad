@@ -285,7 +285,12 @@ public sealed partial class MainPage : Page
         }
 
         border.KeyDown += OnCapturedKeyDown;
-        border.Loaded += (_, _) => border.Focus(FocusState.Programmatic);
+        // ContentDialog は表示時に既定ボタンへ自動フォーカスを割り当てる内部処理を持つため、
+        // Border.Loaded（ビジュアルツリー装着直後）で Focus() すると、その後に走る既定フォーカス
+        // 割り当てとの競合で border からフォーカスが奪われることがある。ContentDialog.Opened
+        // （表示アニメーション・既定フォーカス処理が完了した後に発火）に移すことで競合を避ける。
+        // FocusState も Programmatic → Keyboard に変更（コミュニティ実例で有効性が確認されている値）。
+        dialog.Opened += (_, _) => border.Focus(FocusState.Keyboard);
 
         await ShowDialogAsync(dialog);
         border.KeyDown -= OnCapturedKeyDown;
