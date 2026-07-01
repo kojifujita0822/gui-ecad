@@ -85,7 +85,11 @@ public sealed partial class MainWindow : Window
         await page.LoadFileAsync(file.Path);
     }
 
-    /// <summary>起動引数・ファイル関連付けによる初回ファイルオープン。未保存確認は不要（起動直後のため）。</summary>
+    /// <summary>起動引数・ファイル関連付けによる初回ファイルオープン。未保存確認は不要（起動直後のため）。
+    /// LoadFileAsync はオートセーブ復元確認等で ContentDialog.ShowAsync を呼びうるため、
+    /// MainPage が Content にセットされるだけでなく、ビジュアルツリーへ接続され XamlRoot が
+    /// 確定するまで待つ（未確定のまま ShowAsync すると XamlRoot 例外で握りつぶされ、
+    /// 復元ダイアログもエラー表示も出ないまま無題で起動してしまう）。</summary>
     public async Task OpenFileOnStartupAsync(string path)
     {
         // MainPage が Content にセットされるまで最大 30 tick 待つ
@@ -96,6 +100,19 @@ public sealed partial class MainWindow : Window
             page = RootFrame.Content as MainPage;
         }
         if (page is null) return;
+
+        // 続けて XamlRoot が確定する（Loaded）まで待つ。二重チェックで取りこぼしを防ぐ
+        // （Loaded 購読前に発火済みでも、購読直後の XamlRoot 確認で捕捉できる）。
+        if (page.XamlRoot is null)
+        {
+            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            void OnLoaded(object s, RoutedEventArgs e) => tcs.TrySetResult();
+            page.Loaded += OnLoaded;
+            if (page.XamlRoot is not null) tcs.TrySetResult();
+            await tcs.Task;
+            page.Loaded -= OnLoaded;
+        }
+
         await page.LoadFileAsync(path);
     }
 
