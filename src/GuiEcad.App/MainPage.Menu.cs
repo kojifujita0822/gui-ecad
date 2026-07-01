@@ -104,26 +104,9 @@ public sealed partial class MainPage
     private async void OnMenuNew(object sender, RoutedEventArgs e)
     {
         if (!await ConfirmDiscardIfDirtyAsync()) return;
-        _document = new LadderDocument();
-        var sheet = CreateEmptySheet();
-        _document.Sheets.Add(sheet);
-        _sheet = sheet;
-        _currentPath = null;
-        _selected = null;
-        _history.Clear();
-        _savedUndoDepth = 0;
-        _testSessions.Clear();
-        _testSession = null;
-        _testMode = false;
-        TestModeBtn.IsChecked = false;
-        StopRealtimeTimer();
-        TimerTickPanel.Visibility = Visibility.Collapsed;
-        StatusMode.Text = "作画モード";
-        _find.Clear();
-        RebuildNavTree();
-        RebuildOtherPartMenu();
-        RefreshDevicePanel();
-        Canvas.Invalidate();
+        var doc = new LadderDocument();
+        doc.Sheets.Add(CreateEmptySheet());
+        ApplyNewDocument(doc, markDirty: false);
     }
 
     private async void OnMenuOpen(object sender, RoutedEventArgs e)

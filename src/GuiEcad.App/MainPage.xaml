@@ -116,10 +116,12 @@
         <MenuBar x:Name="TopMenuBar" Grid.Row="0" Background="{ThemeResource AppToolbarBackgroundBrush}">
             <MenuBarItem Title="ファイル(F)">
                 <MenuFlyoutItem Text="新規(N)" KeyboardAcceleratorTextOverride="Ctrl+N" Click="OnMenuNew" />
+                <MenuFlyoutItem Text="テンプレートから新規作成..." Click="OnMenuNewFromTemplate" />
                 <MenuFlyoutItem Text="開く(O)..." KeyboardAcceleratorTextOverride="Ctrl+O" Click="OnMenuOpen" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="上書き保存(S)" KeyboardAcceleratorTextOverride="Ctrl+S" Click="OnMenuSave" />
                 <MenuFlyoutItem Text="名前を付けて保存(A)..." Click="OnMenuSaveAs" />
+                <MenuFlyoutItem Text="テンプレートとして保存..." Click="OnMenuSaveAsTemplate" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="PDF プレビュー..." Click="OnMenuPreviewPdf" />
                 <MenuFlyoutItem Text="PDF出力..." Click="OnMenuExportPdf" />
