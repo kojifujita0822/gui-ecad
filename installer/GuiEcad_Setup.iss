@@ -2,7 +2,7 @@
 ; ビルド前に dotnet publish を実行しておくこと（docs/packaging.md 参照）
 
 #define AppName      "GuiEcad"
-#define AppVersion   "1.0.6"
+#define AppVersion   "1.0.7"
 #define AppPublisher "FK TEQUNO"
 #define AppExeName   "GuiEcad.App.exe"
 ; publish/ フォルダへの相対パス（インストーラーの 1 つ上がリポジトリルート）
