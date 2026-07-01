@@ -531,7 +531,8 @@
                     PointerReleased="OnPointerReleased"
                     PointerWheelChanged="OnPointerWheel"
                     PointerCaptureLost="OnPointerCaptureLost"
-                    RightTapped="OnCanvasRightTapped" />
+                    RightTapped="OnCanvasRightTapped"
+                    KeyDown="OnCanvasKeyDown" />
                 <!-- 機器名インライン入力 -->
                 <TextBox
                     x:Name="DeviceNameBox"

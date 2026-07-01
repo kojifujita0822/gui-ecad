@@ -1,6 +1,7 @@
 using GuiEcad.Model;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Windows.System;
 
 namespace GuiEcad_App;
@@ -62,6 +63,17 @@ public sealed partial class MainPage : Page
         _focusCell = new GridPos(row, col);
         StatusPos.Text = $"行: {row + 1}  列: {col + 1}";
         Canvas.Invalidate();
+    }
+
+    // Canvas 自身の KeyDown（Canvas.xaml の KeyDown="OnCanvasKeyDown"）。
+    // 隠密の調査で判明: CanvasControl がフォーカスを保持していると Page.OnKeyDown の default
+    // ケース（旧 HandleKeyboardModeKey 呼び出し）が届かないことがある（MainPage.xaml.cs 606-607 に
+    // 既知の制約として明記済み）。キーボード配置モードでは Canvas.Focus() が確実に成功するため
+    // （FocusCanvasForKeyboardMode）、Canvas 自身の KeyDown に直接アタッチして確実に処理する。
+    // Handled=true にしてバブリングを止めることで、Page.OnKeyDown 側の同キー二重処理も防ぐ。
+    private void OnCanvasKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (HandleKeyboardModeKey(e.Key)) e.Handled = true;
     }
 
     /// <summary>キーボード配置モード中の矢印キー・数字キーを処理する。処理したら true（呼び出し側で e.Handled にする）。
