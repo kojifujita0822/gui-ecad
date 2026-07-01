@@ -253,21 +253,59 @@ public sealed partial class MainPage
             return;
         }
 
-        // 作画モード：配置
+        // 作画モード：配置（drawing-spec.md の仕様どおり「挿入」＝挿入位置(col)以降の既設要素は右へシフト。
+        // シフトで行末（母線）からはみ出す場合は警告して拒否。自動の列拡張・折り返しはしない）。
         if (PlaceKind is ElementKind kind)
         {
-            if (row >= 0 && col >= 0 && col < _sheet.Grid.Columns && CellEmpty(row, col, null))
+            if (row >= 0 && col >= 0 && col < _sheet.Grid.Columns)
             {
                 var part = _document.Library?.Get(PlacePartId);
+                int newWidth = part?.WidthCells ?? ElementCatalog.DefaultCellWidth(kind);
+
+                // 同一行内、挿入位置(col)以降の要素を右シフト対象にする。
+                // col が既存要素の途中に重なる場合（要素を分割できない）は挿入不可。
+                var toShift = new List<ElementInstance>();
+                foreach (var rowElem in _sheet.Elements.Where(elem => elem.Pos.Row == row))
+                {
+                    var (l, r) = PartResolver.BoundarySpan(rowElem, _document.Library);
+                    if (col > l && col < r)
+                    {
+                        _ = ShowErrorAsync("既存の要素の途中には挿入できません。");
+                        return;
+                    }
+                    if (l >= col) toShift.Add(rowElem);
+                }
+                foreach (var rowElem in toShift)
+                {
+                    var (_, r) = PartResolver.BoundarySpan(rowElem, _document.Library);
+                    if (r + newWidth > _sheet.Grid.Columns)
+                    {
+                        _ = ShowErrorAsync("行末をはみ出すため挿入できません。");
+                        return;
+                    }
+                }
+
                 var el = new ElementInstance
                 {
                     Kind = kind,
                     Pos = new GridPos(row, col),
                     PartId = part is not null ? PlacePartId : null,
-                    CellWidth = part?.WidthCells ?? ElementCatalog.DefaultCellWidth(kind),
+                    CellWidth = newWidth,
                 };
                 if (PlaceOrient is not null) el.Params[ParamKeys.Orient] = PlaceOrient;   // 主回路記号の向き
-                _history.Execute(new PlaceElementCommand(_sheet, el));
+
+                if (toShift.Count > 0)
+                {
+                    var cmds = toShift
+                        .Select(rowElem => (IUndoCommand)new MoveElementCommand(_sheet, rowElem, rowElem.Pos, rowElem.Pos with { Column = rowElem.Pos.Column + newWidth }))
+                        .Append((IUndoCommand)new PlaceElementCommand(_sheet, el))
+                        .ToList();
+                    _history.Execute(new BatchCommand(_sheet, cmds));
+                }
+                else
+                {
+                    _history.Execute(new PlaceElementCommand(_sheet, el));
+                }
                 _selected = el;
                 RefreshDevicePanel();
                 RefreshPropertiesPanel();
