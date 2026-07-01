@@ -20,6 +20,8 @@ public sealed class Sheet
     public List<FreeLine> FreeLines { get; set; } = new();
     /// <summary>手動で配置する接続点（●）。mm 実座標。</summary>
     public List<ConnectionDot> ConnectionDots { get; set; } = new();
+    /// <summary>挿入した画像（BMP/PNG）。mm 実座標。旧ファイルは空配列で互換。</summary>
+    public List<ImageInsert> Images { get; set; } = new();
     /// <summary>主回路（動力回路）モード: 左右母線・母線名・自動横配線を描かず、自由直線で結線する。
     /// 旧ファイルは false（=従来の制御回路）で互換。</summary>
     public bool MainCircuit { get; set; }

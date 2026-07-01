@@ -155,6 +155,11 @@ public sealed partial class MainPage : Page
     private bool _movingDot;
     private (double X, double Y) _dotMoveClick;
     private (double X, double Y) _dotOrig;
+    // 挿入画像。単体選択・ドラッグ移動のみ対応（複数選択の一括移動は対象外）。
+    private ImageInsert? _selectedImage;
+    private bool _movingImage;
+    private (double X, double Y) _imageMoveClick;
+    private (double X, double Y) _imageOrig;
     // 自由直線のドラッグ移動
     private bool _movingLine;
     private (double X, double Y) _lineMoveClick;
@@ -539,6 +544,21 @@ public sealed partial class MainPage : Page
             _selectedDot = null;
             Canvas.Invalidate();
         }
+        else if (_selectedImage is not null)
+        {
+            string path = _selectedImage.FilePath;
+            _history.Execute(new DeleteImageCommand(_sheet, _selectedImage));
+            _selectedImage = null;
+            EvictImageCacheIfUnused(path);
+            Canvas.Invalidate();
+        }
+    }
+
+    // 画像キャッシュ（Win2DRenderer 静的）から、シート全体に他に参照者がいなくなったファイルだけ破棄する。
+    private void EvictImageCacheIfUnused(string filePath)
+    {
+        bool stillUsed = _document.Sheets.Any(s => s.Images.Any(i => i.FilePath == filePath));
+        if (!stillUsed) Win2DRenderer.EvictImage(filePath);
     }
 
     // 点(xMm,yMm)に最も近い接続点を当たり判定半径内で返す。
@@ -595,6 +615,19 @@ public sealed partial class MainPage : Page
                 hits.Add(f);
         }
         return hits.Count == 0 ? null : hits.MinBy(f => f.Width * f.Height);
+    }
+
+    // 画像は矩形塗りつぶし相当として全域がヒット対象（枠のように境界のみではない）。
+    // 重なりは配列末尾（描画順で手前）を優先する。
+    private ImageInsert? HitTestImage(double xMm, double yMm)
+    {
+        for (int i = _sheet.Images.Count - 1; i >= 0; i--)
+        {
+            var img = _sheet.Images[i];
+            if (xMm >= img.XMm && xMm <= img.XMm + img.WidthMm && yMm >= img.YMm && yMm <= img.YMm + img.HeightMm)
+                return img;
+        }
+        return null;
     }
 
     // ===== キーボード =====

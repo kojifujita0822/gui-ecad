@@ -53,6 +53,28 @@ public class RenderingTests
         public void DrawArc(Point2D c, double r, double sd, double sw, StrokeStyle s) { }
         public void DrawText(string t, Point2D p, TextStyle s) { }
         public Size2D MeasureText(string t, TextStyle s) => new(t.Length * s.FontSizeMm * 0.5, s.FontSizeMm);
+        public readonly List<string> DrawnImages = new();
+        public void DrawImage(string filePath, Rect2D bounds) => DrawnImages.Add(filePath);
+    }
+
+    // 挿入画像: トレース用下絵は画面表示（IncludeTracingImages=true 既定）でのみ描画され、
+    // PDF出力（IncludeTracingImages=false）では除外される。恒久貼付はどちらでも描画される。
+    [Fact]
+    public void DrawImages_TracingOnlyExcludedWhenIncludeTracingImagesFalse()
+    {
+        var sheet = new Sheet { Grid = new GridSpec { Columns = 8, Rows = 8 } };
+        sheet.Images.Add(new ImageInsert { FilePath = "trace.png", XMm = 0, YMm = 0, WidthMm = 50, HeightMm = 50, IsTracingOnly = true });
+        sheet.Images.Add(new ImageInsert { FilePath = "permanent.png", XMm = 0, YMm = 0, WidthMm = 50, HeightMm = 50, IsTracingOnly = false });
+
+        var recScreen = new RecordingRenderer();
+        new DiagramRenderer(options: new RenderOptions { IncludeTracingImages = true }).Render(recScreen, sheet);
+        Assert.Contains("trace.png", recScreen.DrawnImages);
+        Assert.Contains("permanent.png", recScreen.DrawnImages);
+
+        var recPdf = new RecordingRenderer();
+        new DiagramRenderer(options: new RenderOptions { IncludeTracingImages = false }).Render(recPdf, sheet);
+        Assert.DoesNotContain("trace.png", recPdf.DrawnImages);
+        Assert.Contains("permanent.png", recPdf.DrawnImages);
     }
 
     // 末尾要素の横線が、母線延長区間にある縦コネクタ(分岐点)で終端し、母線まで伸びないこと。

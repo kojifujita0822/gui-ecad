@@ -281,5 +281,6 @@ public class NewPartsTests
         public void DrawArc(Point2D c, double r, double sd, double sw, StrokeStyle s) { }
         public void DrawText(string t, Point2D p, TextStyle s) { }
         public Size2D MeasureText(string t, TextStyle s) => new(t.Length * s.FontSizeMm * 0.5, s.FontSizeMm);
+        public void DrawImage(string filePath, Rect2D bounds) { }
     }
 }

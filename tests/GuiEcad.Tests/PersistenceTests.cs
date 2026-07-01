@@ -256,6 +256,48 @@ public class PersistenceTests
         Assert.Equal("起動（運転中）", e.Params["Label"]);
     }
 
+    // C-6: 挿入画像（ImageInsert）のラウンドトリップ。旧ファイル（Images なし）は空配列で互換。
+    [Fact]
+    public void ImageInsert_RoundTrips()
+    {
+        var doc = MakeSampleDocument();
+        doc.Sheets[0].Images.Add(new ImageInsert
+        {
+            FilePath = @"C:\drawings\background.png",
+            XMm = 10.5, YMm = 20.0, WidthMm = 80.0, HeightMm = 60.0, IsTracingOnly = false,
+        });
+
+        var json = GcadSerializer.Serialize(doc);
+        var back = GcadSerializer.Deserialize(json);
+
+        var img = Assert.Single(back.Sheets[0].Images);
+        Assert.Equal(@"C:\drawings\background.png", img.FilePath);
+        Assert.Equal(10.5, img.XMm);
+        Assert.Equal(80.0, img.WidthMm);
+        Assert.False(img.IsTracingOnly);
+    }
+
+    [Fact]
+    public void ImageInsert_DefaultIsTracingOnly()
+    {
+        var img = new ImageInsert();
+        Assert.True(img.IsTracingOnly);
+    }
+
+    [Fact]
+    public void Deserialize_NoImagesField_ReturnsEmptyList()
+    {
+        // 旧ファイル互換: images フィールドが無い JSON（FreeLines 追加前の形式を模す）でも
+        // 例外なく空リストで復元される（Sheet.Images の既定値 = new()）。
+        var doc = MakeSampleDocument();
+        var json = GcadSerializer.Serialize(doc);
+        string jsonWithoutImages = System.Text.RegularExpressions.Regex.Replace(
+            json, "\"images\"\\s*:\\s*\\[\\s*\\]\\s*,?", "");
+
+        var back = GcadSerializer.Deserialize(jsonWithoutImages);
+        Assert.Empty(back.Sheets[0].Images);
+    }
+
     // C-5: 大量ドキュメント（20シート×100要素）→ 3 秒以内にシリアライズ・デシリアライズ完了
     [Fact]
     public void LargeDocument_SerializesInReasonableTime()

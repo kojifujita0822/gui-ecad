@@ -86,6 +86,7 @@ public sealed partial class MainPage : Page
         RebuildNavTree();
         RebuildOtherPartMenu();
         RefreshDevicePanel();
+        ReloadImageCacheForDocument(doc);
         if (markDirty) MarkDirty();   // テンプレートは未保存の新規文書として扱う（保存を促す）
         Canvas.Invalidate();
     }

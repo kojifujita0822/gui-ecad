@@ -406,6 +406,13 @@
                                 <TextBlock FontSize="10" HorizontalAlignment="Center" Text="点" />
                             </StackPanel>
                         </RadioButton>
+                        <Button HorizontalAlignment="Center" FontSize="11" Click="OnInsertImageClick"
+                                ToolTipService.ToolTip="画像挿入（BMP/PNG）：トレース用下絵または恒久貼付として配置">
+                            <StackPanel>
+                                <TextBlock Width="44" Height="32" FontSize="20" HorizontalAlignment="Center" TextAlignment="Center" Text="画" />
+                                <TextBlock FontSize="10" HorizontalAlignment="Center" Text="画像" />
+                            </StackPanel>
+                        </Button>
                         <Rectangle Height="1" Margin="4,1" Fill="{ThemeResource AppDividerBrush}" />
                         <!-- その他 -->
                         <DropDownButton x:Name="OtherPartButton" HorizontalAlignment="Center" FontSize="11" Content="その他▼"

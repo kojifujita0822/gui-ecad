@@ -126,6 +126,13 @@ public sealed partial class MainPage : Page
         _refreshingProps = true;
         PropertiesPanel.Children.Clear();
 
+        if (_selectedImage is ImageInsert img)
+        {
+            BuildImageProperties(img);
+            _refreshingProps = false;
+            return;
+        }
+
         if (_selected is null)
         {
             PropertiesPanel.Children.Add(new TextBlock
@@ -297,6 +304,81 @@ public sealed partial class MainPage : Page
         double secs = Math.Round(value);
         _history.Execute(new SetParamCommand(_sheet, target, ParamKeys.Setpoint,
             secs.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        Canvas.Invalidate();
+    }
+
+    // ===== 画像プロパティ =====
+
+    private void BuildImageProperties(ImageInsert img)
+    {
+        PropertiesPanel.Children.Add(new TextBlock { Text = "画像", FontSize = 12 });
+        PropertiesPanel.Children.Add(new TextBlock
+        {
+            Text = System.IO.Path.GetFileName(img.FilePath),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.8,
+            Margin = new Thickness(0, 4, 0, 8),
+        });
+
+        var tracingCheck = new CheckBox
+        {
+            Content = "トレース用下絵（画面のみ・PDF出力対象外）",
+            IsChecked = img.IsTracingOnly,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        tracingCheck.Checked += (_, _) => CommitImageTracingOnly(img, true);
+        tracingCheck.Unchecked += (_, _) => CommitImageTracingOnly(img, false);
+        PropertiesPanel.Children.Add(tracingCheck);
+
+        PropertiesPanel.Children.Add(new TextBlock { Text = "幅 (mm)", FontSize = 11, Margin = new Thickness(0, 8, 0, 2) });
+        var widthBox = new NumberBox
+        {
+            Value = Math.Round(img.WidthMm, 1),
+            Minimum = 1,
+            Maximum = 2000,
+            SmallChange = 1,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        PropertiesPanel.Children.Add(widthBox);
+
+        PropertiesPanel.Children.Add(new TextBlock { Text = "高さ (mm)", FontSize = 11, Margin = new Thickness(0, 8, 0, 2) });
+        var heightBox = new NumberBox
+        {
+            Value = Math.Round(img.HeightMm, 1),
+            Minimum = 1,
+            Maximum = 2000,
+            SmallChange = 1,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        PropertiesPanel.Children.Add(heightBox);
+
+        widthBox.ValueChanged += (_, a) =>
+        {
+            if (_refreshingProps || double.IsNaN(a.NewValue)) return;
+            CommitImageResize(img, a.NewValue, img.HeightMm);
+        };
+        heightBox.ValueChanged += (_, a) =>
+        {
+            if (_refreshingProps || double.IsNaN(a.NewValue)) return;
+            CommitImageResize(img, img.WidthMm, a.NewValue);
+        };
+    }
+
+    private void CommitImageTracingOnly(ImageInsert img, bool value)
+    {
+        if (_refreshingProps || img.IsTracingOnly == value) return;
+        _history.Execute(new SetImageTracingOnlyCommand(_sheet, img, img.IsTracingOnly, value));
+        Canvas.Invalidate();
+    }
+
+    private void CommitImageResize(ImageInsert img, double newW, double newH)
+    {
+        double ow = img.WidthMm, oh = img.HeightMm;
+        if (Math.Abs(newW - ow) < 0.05 && Math.Abs(newH - oh) < 0.05) return;
+        _history.Execute(new ResizeImageCommand(_sheet, img, ow, oh, newW, newH));
         Canvas.Invalidate();
     }
 

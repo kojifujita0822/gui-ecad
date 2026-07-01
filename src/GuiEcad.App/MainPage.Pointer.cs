@@ -27,13 +27,14 @@ public sealed partial class MainPage
 {
     // ===== ポインタ =====
 
-    // 要素／縦コネクタ／枠／自由直線の選択は相互排他。選んだ1種以外を null にする（分岐ごとの重複クリアを集約）。
-    private void SelectElement(ElementInstance e) { _selected = e; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; }
-    private void SelectConnector(VerticalConnector c) { _selectedConnector = c; _selected = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; }
-    private void SelectFrame(GroupFrame f) { _selectedFrame = f; _selected = null; _selectedConnector = null; _selectedLine = null; _selectedDot = null; }
-    private void SelectLine(FreeLine l) { _selectedLine = l; _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedDot = null; }
-    private void SelectDot(ConnectionDot d) { _selectedDot = d; _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; }
-    private void ClearSelection() { _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; }
+    // 要素／縦コネクタ／枠／自由直線／画像の選択は相互排他。選んだ1種以外を null にする（分岐ごとの重複クリアを集約）。
+    private void SelectElement(ElementInstance e) { _selected = e; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; _selectedImage = null; }
+    private void SelectConnector(VerticalConnector c) { _selectedConnector = c; _selected = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; _selectedImage = null; }
+    private void SelectFrame(GroupFrame f) { _selectedFrame = f; _selected = null; _selectedConnector = null; _selectedLine = null; _selectedDot = null; _selectedImage = null; }
+    private void SelectLine(FreeLine l) { _selectedLine = l; _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedDot = null; _selectedImage = null; }
+    private void SelectDot(ConnectionDot d) { _selectedDot = d; _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; _selectedImage = null; }
+    private void SelectImage(ImageInsert img) { _selectedImage = img; _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; }
+    private void ClearSelection() { _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; _selectedImage = null; }
 
     // 範囲選択の一括移動：基準セル位置からのデルタ(行/列)を全選択要素・分岐線・自由直線・枠・接続点へ適用する。
     // 移動先が範囲外（行<0・列<0・列>=Columns）になる要素が1つでもあれば何もせず false を返す。
@@ -396,6 +397,13 @@ public sealed partial class MainPage
             _lineMoveClick = (xMm, yMm);
             _lineOrig = (hitLine.X1Mm, hitLine.Y1Mm, hitLine.X2Mm, hitLine.Y2Mm);
         }
+        else if (HitTestImage(xMm, yMm) is ImageInsert hitImage)   // 背面固定描画のため当たり判定は最後
+        {
+            SelectImage(hitImage);
+            _movingImage = true;
+            _imageMoveClick = (xMm, yMm);
+            _imageOrig = (hitImage.XMm, hitImage.YMm);
+        }
         else
         {
             ClearSelection();
@@ -492,6 +500,17 @@ public sealed partial class MainPage
             double dx = Math.Round((sxMm - _dotMoveClick.X) / step) * step;
             double dy = Math.Round((syMm - _dotMoveClick.Y) / step) * step;
             md.XMm = _dotOrig.X + dx; md.YMm = _dotOrig.Y + dy;
+            Canvas.Invalidate();
+            return;
+        }
+
+        // 画像のドラッグ移動（自由直線と同じく細分格子スナップで平行移動）
+        if (_movingImage && _selectedImage is ImageInsert mi)
+        {
+            double step = _geo.CellMm / LineSnapDiv;
+            double dx = Math.Round((sxMm - _imageMoveClick.X) / step) * step;
+            double dy = Math.Round((syMm - _imageMoveClick.Y) / step) * step;
+            mi.XMm = _imageOrig.X + dx; mi.YMm = _imageOrig.Y + dy;
             Canvas.Invalidate();
             return;
         }
@@ -688,6 +707,15 @@ public sealed partial class MainPage
         }
         _movingDot = false;
 
+        // 画像のドラッグ移動の確定（位置が変わっていれば）
+        if (_movingImage && _selectedImage is ImageInsert ri)
+        {
+            var (ox, oy) = _imageOrig;
+            if (ri.XMm != ox || ri.YMm != oy)
+                _history.Execute(new MoveImageCommand(_sheet, ri, ox, oy, ri.XMm, ri.YMm));
+        }
+        _movingImage = false;
+
         // ドラッグ移動のコマンド登録（位置が変わっていれば）。
         // グループドラッグの起点が要素(_moving)でも接続点(_groupMoveDotAnchor)でもここに来る
         // （接続点起点の場合、選択に要素が1件も無ければ _multiMoveOrigins は空になりうる点に注意）。
@@ -753,6 +781,7 @@ public sealed partial class MainPage
         _lineStartMm = null;
         _movingLine = false;
         _movingDot = false;
+        _movingImage = false;
     }
 
     // キャプチャ喪失（フライアウト表示・フォーカス移動等）で PointerReleased が来ないと

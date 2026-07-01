@@ -136,6 +136,7 @@ public sealed partial class MainPage
         RebuildNavTree();
         RebuildOtherPartMenu();
         RefreshDevicePanel();
+        ReloadImageCacheForDocument(doc);
         if (markDirty) MarkDirty();
         Canvas.Invalidate();
     }
@@ -243,7 +244,7 @@ public sealed partial class MainPage
             var info = _document.Info;
             bool enableBorder = _document.Settings.EnableBorder;
             var dr = new DiagramRenderer(DrawingTheme.Default,
-                new RenderOptions { PaperSize = _document.Settings.PaperSize });
+                new RenderOptions { PaperSize = _document.Settings.PaperSize, IncludeTracingImages = false });
             using var surface = new PdfRenderSurface(file.Path);
 
             // 物理ページ総数（枠あり時は長い図面を RowsPerPage 行ごとに複数ページへ分割する。

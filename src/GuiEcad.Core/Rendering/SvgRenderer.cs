@@ -102,6 +102,9 @@ public sealed class SvgRenderer : IRenderer
     public Size2D MeasureText(string text, TextStyle style)
         => new(text.Length * style.FontSizeMm * 0.6 * _scale, style.FontSizeMm * _scale);
 
+    // 画像埋め込みは非対応（アイコン生成に画像不要）。契約上 no-op。
+    public void DrawImage(string filePath, Rect2D bounds) { }
+
     // ツールバーアイコン用 SVG 文字列を生成する。
     // cell=8mm, vpad=cell*0.62 でタイマ△(高さ cell*0.58)まで収まる。
     public static string GenerateSymbolSvg(ElementKind kind, double strokeWidthMm = 0.35, Color? color = null)

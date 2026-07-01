@@ -41,7 +41,7 @@ internal sealed partial class PdfPreviewDialog : ContentDialog
         _xref = xref;
         _enableBorder = enableBorder;
         _dr = new DiagramRenderer(DrawingTheme.Default,
-            new RenderOptions { PaperSize = document.Settings.PaperSize });
+            new RenderOptions { PaperSize = document.Settings.PaperSize, IncludeTracingImages = false });
 
         InitializeComponent();
 

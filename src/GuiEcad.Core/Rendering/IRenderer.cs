@@ -41,6 +41,9 @@ public interface IRenderer
     void DrawArc(Point2D center, double radius, double startDeg, double sweepDeg, StrokeStyle stroke);
     void DrawText(string text, Point2D position, TextStyle style);        // 配置は HAlign/VAlign 基準
     Size2D MeasureText(string text, TextStyle style);                    // レイアウト用計測
+    /// <summary>画像ファイル（BMP/PNG）を bounds（mm）に収まるよう描画する。
+    /// ファイルが読めない/未ロードの場合は何も描画しない（例外を投げない）。</summary>
+    void DrawImage(string filePath, Rect2D bounds);
 }
 
 /// <summary>複数ページ出力（主にPDF）用の上位抽象。画面は CanvasControl 側で IRenderer を直接生成する。</summary>

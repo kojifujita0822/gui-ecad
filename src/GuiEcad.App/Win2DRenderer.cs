@@ -15,6 +15,11 @@ namespace GuiEcad_App;
 /// </summary>
 internal sealed class Win2DRenderer : IRenderer
 {
+    // 挿入画像のビットマップキャッシュ（ファイルパス→CanvasBitmap）。
+    // CanvasBitmap.LoadAsync は非同期のため、Draw イベント（同期）内では読み込めない。
+    // 画像追加時・ドキュメント読込時に PreloadImageAsync で事前ロードし、Draw では同期参照のみ行う。
+    private static readonly Dictionary<string, CanvasBitmap> _bitmapCache = new();
+
     private readonly CanvasDrawingSession _g;
     private readonly Stack<Matrix3x2> _stack = new();
     private readonly Stack<CanvasActiveLayer> _layers = new();
@@ -106,6 +111,37 @@ internal sealed class Win2DRenderer : IRenderer
     {
         using var layout = Layout(text, style);
         return new Size2D(layout.LayoutBounds.Width, layout.LayoutBounds.Height);
+    }
+
+    public void DrawImage(string filePath, Rect2D bounds)
+    {
+        if (_bitmapCache.TryGetValue(filePath, out var bmp))
+            _g.DrawImage(bmp, new Windows.Foundation.Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height));
+    }
+
+    /// <summary>画像ファイルを事前ロードしてキャッシュに格納する。画像追加時・ドキュメント読込時に呼ぶ。</summary>
+    public static async Task PreloadImageAsync(CanvasDevice device, string filePath)
+    {
+        if (_bitmapCache.ContainsKey(filePath)) return;
+        var bmp = await CanvasBitmap.LoadAsync(device, filePath);
+        _bitmapCache[filePath] = bmp;
+    }
+
+    /// <summary>画像の px サイズを取得する（事前ロード後に呼ぶ）。未ロードなら null。</summary>
+    public static Size2D? GetImagePixelSize(string filePath)
+        => _bitmapCache.TryGetValue(filePath, out var bmp) ? new Size2D(bmp.SizeInPixels.Width, bmp.SizeInPixels.Height) : null;
+
+    /// <summary>キャッシュ済み画像を破棄する（同じファイルを参照する画像が他になくなったとき呼ぶ）。</summary>
+    public static void EvictImage(string filePath)
+    {
+        if (_bitmapCache.Remove(filePath, out var bmp)) bmp.Dispose();
+    }
+
+    /// <summary>全キャッシュを破棄する（新規作成・別ファイルを開くとき呼ぶ）。</summary>
+    public static void ClearImageCache()
+    {
+        foreach (var bmp in _bitmapCache.Values) bmp.Dispose();
+        _bitmapCache.Clear();
     }
 
     private CanvasTextLayout Layout(string text, TextStyle style)

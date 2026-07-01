@@ -178,6 +178,10 @@ public sealed partial class MainPage : Page
             renderer.DrawRectangle(new(fx, fy, fw, fh), new StrokeStyle(DrawingTheme.Blue, 0.4));
         }
 
+        // 選択中の画像ハイライト
+        if (_selectedImage is ImageInsert si)
+            renderer.DrawRectangle(new(si.XMm, si.YMm, si.WidthMm, si.HeightMm), new StrokeStyle(DrawingTheme.Blue, 0.4));
+
         // DRC ジャンプ先ハイライト（選択した診断の行を半透明オレンジで強調）
         if (_drcHighlightRow >= 0)
             DrawDrcRowHighlight(renderer, _drcHighlightRow);

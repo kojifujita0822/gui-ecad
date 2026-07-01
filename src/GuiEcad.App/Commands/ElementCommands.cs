@@ -566,6 +566,62 @@ internal sealed class SetParamCommand : IUndoCommand
     }
 }
 
+internal sealed class AddImageCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly ImageInsert _image;
+    public AddImageCommand(Sheet sheet, ImageInsert image) { _sheet = sheet; _image = image; }
+    public Sheet Target => _sheet;
+    public void Execute() => _sheet.Images.Add(_image);
+    public void Undo() => _sheet.Images.Remove(_image);
+}
+
+internal sealed class DeleteImageCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly ImageInsert _image;
+    public DeleteImageCommand(Sheet sheet, ImageInsert image) { _sheet = sheet; _image = image; }
+    public Sheet Target => _sheet;
+    public void Execute() => _sheet.Images.Remove(_image);
+    public void Undo() => _sheet.Images.Add(_image);
+}
+
+internal sealed class MoveImageCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly ImageInsert _image;
+    private readonly double _ox, _oy, _nx, _ny;
+    public MoveImageCommand(Sheet sheet, ImageInsert image, double ox, double oy, double nx, double ny)
+    { _sheet = sheet; _image = image; _ox = ox; _oy = oy; _nx = nx; _ny = ny; }
+    public Sheet Target => _sheet;
+    public void Execute() { _image.XMm = _nx; _image.YMm = _ny; }
+    public void Undo() { _image.XMm = _ox; _image.YMm = _oy; }
+}
+
+internal sealed class ResizeImageCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly ImageInsert _image;
+    private readonly double _ow, _oh, _nw, _nh;
+    public ResizeImageCommand(Sheet sheet, ImageInsert image, double ow, double oh, double nw, double nh)
+    { _sheet = sheet; _image = image; _ow = ow; _oh = oh; _nw = nw; _nh = nh; }
+    public Sheet Target => _sheet;
+    public void Execute() { _image.WidthMm = _nw; _image.HeightMm = _nh; }
+    public void Undo() { _image.WidthMm = _ow; _image.HeightMm = _oh; }
+}
+
+internal sealed class SetImageTracingOnlyCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly ImageInsert _image;
+    private readonly bool _from, _to;
+    public SetImageTracingOnlyCommand(Sheet sheet, ImageInsert image, bool from, bool to)
+    { _sheet = sheet; _image = image; _from = from; _to = to; }
+    public Sheet Target => _sheet;
+    public void Execute() => _image.IsTracingOnly = _to;
+    public void Undo() => _image.IsTracingOnly = _from;
+}
+
 internal sealed class BatchCommand : IUndoCommand
 {
     private readonly IReadOnlyList<IUndoCommand> _commands;

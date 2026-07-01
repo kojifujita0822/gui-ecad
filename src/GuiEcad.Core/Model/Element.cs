@@ -97,6 +97,27 @@ public sealed class ConnectionDot
     public ConnectionDot DeepClone() => new() { XMm = XMm, YMm = YMm };
 }
 
+/// <summary>図面に挿入する画像（BMP/PNG）。グリッドに依存しない自由配置、座標は mm 実座標。
+/// <see cref="IsTracingOnly"/> = true: トレース用下絵（画面表示のみ、PDF出力に含めない）。
+/// false: 恒久貼付（画面・PDF両方に出力）。</summary>
+public sealed class ImageInsert
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    /// <summary>画像ファイルの絶対パス（外部参照。.GCAD には埋め込まない）。</summary>
+    public string FilePath { get; set; } = "";
+    public double XMm { get; set; }
+    public double YMm { get; set; }
+    public double WidthMm { get; set; }
+    public double HeightMm { get; set; }
+    public bool IsTracingOnly { get; set; } = true;
+
+    public ImageInsert DeepClone() => new()
+    {
+        FilePath = FilePath, XMm = XMm, YMm = YMm,
+        WidthMm = WidthMm, HeightMm = HeightMm, IsTracingOnly = IsTracingOnly,
+    };
+}
+
 /// <summary>同一列で複数行をつなぐ縦渡り（分岐）。接点に黒ドット● を描画して明示。</summary>
 public sealed class VerticalConnector
 {

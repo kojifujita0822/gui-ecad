@@ -217,6 +217,16 @@ internal sealed class PdfRenderer : IRenderer, IDisposable
         return new Size2D(sz.Width / K, sz.Height / K);
     }
 
+    public void DrawImage(string filePath, Rect2D bounds)
+    {
+        try
+        {
+            using var img = XImage.FromFile(filePath);
+            _g.DrawImage(img, bounds.X * K, bounds.Y * K, bounds.Width * K, bounds.Height * K);
+        }
+        catch (Exception) { /* ファイル欠損・読込不可は無視してスキップ（PDF出力全体は継続） */ }
+    }
+
     private static XPen Pen(StrokeStyle s)
     {
         var pen = new XPen(XColor.FromArgb(s.Color.A, s.Color.R, s.Color.G, s.Color.B), Math.Max(s.Width, DrawingTheme.MinStrokeWidthMm) * K)

@@ -18,6 +18,9 @@ public sealed class RenderOptions
     public bool ConnectivityCheck { get; init; }
     /// <summary>枠あり出力（PDF/画面ガイド）の用紙サイズ。既定 A4縦。</summary>
     public PaperSize PaperSize { get; init; } = PaperSize.A4;
+    /// <summary>トレース用下絵画像（<see cref="ImageInsert.IsTracingOnly"/>=true）を描画するか。
+    /// 画面表示は true、PDF出力は false（トレース用は画面のみ・恒久貼付のみPDFに出力）。</summary>
+    public bool IncludeTracingImages { get; init; } = true;
 }
 
 /// <summary>
@@ -177,6 +180,7 @@ public sealed class DiagramRenderer
         _rowBase = rowStart;   // 以降の YRow はページ内ローカル座標になる
         bool InWindow(int row) => row >= rowStart && row < rowEnd;
 
+        DrawImages(r, sheet, rowStart, rowEnd);   // 背面固定：他の描画要素より先に描く
         if (_opt.ShowGrid) DrawGrid(r, columns, localRows);
 
         // 主回路（動力回路）モードでは左右母線・母線名・自動横配線を描かない（自由直線で結線する）。
@@ -452,6 +456,20 @@ public sealed class DiagramRenderer
         foreach (var d in sheet.ConnectionDots)
             if (d.YMm >= bandTop && d.YMm <= bandBot)
                 r.FillCircle(new(d.XMm, PageY(d.YMm)), Cell * 0.10, col);
+    }
+
+    // 挿入画像。トレース用下絵は IncludeTracingImages=false（PDF出力）のとき描かない。
+    // ページ分割時は画像の Y 範囲が当該ページの行ウィンドウと重なるものだけ、PageY でローカル座標へ補正して描く。
+    private void DrawImages(IRenderer r, Sheet sheet, int rowStart, int rowEnd)
+    {
+        if (sheet.Images.Count == 0) return;
+        double bandTop = _opt.MarginMm + rowStart * Cell, bandBot = _opt.MarginMm + rowEnd * Cell;
+        foreach (var img in sheet.Images)
+        {
+            if (img.IsTracingOnly && !_opt.IncludeTracingImages) continue;
+            if (img.YMm + img.HeightMm < bandTop || img.YMm > bandBot) continue;
+            r.DrawImage(img.FilePath, new Rect2D(img.XMm, PageY(img.YMm), img.WidthMm, img.HeightMm));
+        }
     }
 
     // 設置場所グルーピング枠。DrawFreeLines と同じくページ行ウィンドウへ縦クリップする
