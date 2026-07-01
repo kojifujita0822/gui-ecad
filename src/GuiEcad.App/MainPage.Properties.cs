@@ -124,6 +124,10 @@ public sealed partial class MainPage : Page
     private void RefreshPropertiesPanel()
     {
         _refreshingProps = true;
+        // Children.Clear() でパネル内の NumberBox 等がフォーカスを持っていた場合、既定のフォーカス
+        // 委譲で親 ScrollViewer（IsTabStop 既定 True）へフォーカスが逃げてしまうのを防ぐため、
+        // Clear() 前に Commit系4箇所と同じ退避先へ明示的にフォーカスを移しておく。
+        FocusSinkButton.Focus(FocusState.Programmatic);
         PropertiesPanel.Children.Clear();
 
         if (_selectedImage is ImageInsert img)
