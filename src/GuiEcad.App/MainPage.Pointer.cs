@@ -153,10 +153,7 @@ public sealed partial class MainPage
         _connStartRow = null;
         _frameStartMm = null;
         if (_editingElement is null && _editingComment is null && _editingRungComment is null && _editingFrame is null)
-        {
-            bool focused155 = Canvas.Focus(FocusState.Programmatic);
-            AppendFocusDebugLog($"OnPointerPressed:155 Canvas.Focus()={focused155}");
-        }
+            Canvas.Focus(FocusState.Programmatic);
 
         var pos = e.GetCurrentPoint(Canvas).Position;
         var (xMm, yMm) = ToWorld(pos);
@@ -801,8 +798,7 @@ public sealed partial class MainPage
         double y = (_geo.YRow(frame.TopLeft.Row) - _geo.CellMm * 0.4) * scale + _viewport.PanY - 18;
         FrameLabelBox.Margin = new Thickness(x, Math.Max(0, y), 0, 0);
         FrameLabelBox.Visibility = Visibility.Visible;
-        bool focused800 = FrameLabelBox.Focus(FocusState.Programmatic);
-        AppendFocusDebugLog($"ShowFrameLabelEditor:800 FrameLabelBox.Focus()={focused800}");
+        FrameLabelBox.Focus(FocusState.Programmatic);
         FrameLabelBox.SelectAll();
     }
 
@@ -830,36 +826,8 @@ public sealed partial class MainPage
         { CommitFrameLabel(accept: false); e.Handled = true; }
     }
 
-    // 枠ラベル即Commit不具合の一時切り分け用ログ出力先。Debug.WriteLineはDebugView/実機での
-    // 採取に難航したため、既存の palette-pos.txt 等と同じ MyDocuments\GuiEcad\ 配下へファイル出力する。
-    private static string FocusDebugLogPath =>
-        System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "GuiEcad", "focus-debug.log");
-
-    // 全ログ行に共通の連番を振り、複数箇所のFocus呼び出しとLostFocus発火の前後関係を時系列で追えるようにする。
-    private static int _focusLogSeq;
-
-    private static void AppendFocusDebugLog(string message)
-    {
-        try
-        {
-            int seq = System.Threading.Interlocked.Increment(ref _focusLogSeq);
-            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(FocusDebugLogPath)!);
-            System.IO.File.AppendAllText(FocusDebugLogPath,
-                $"[{DateTime.Now:HH:mm:ss.fff}] #{seq} {message}{Environment.NewLine}");
-        }
-        catch { /* デバッグ用途のためログ書き込み失敗は無視 */ }
-    }
-
     private void OnFrameLabelBoxLostFocus(object sender, RoutedEventArgs e)
     {
-        var newFocus = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(this.XamlRoot) as FrameworkElement;
-        AppendFocusDebugLog(
-            $"OnFrameLabelBoxLostFocus: _editingFrame={_editingFrame is not null}, " +
-            $"OriginalSource={(e.OriginalSource as FrameworkElement)?.Name ?? e.OriginalSource?.GetType().Name ?? "null"}, " +
-            $"newFocus.Name=\"{newFocus?.Name}\", newFocus.Type={newFocus?.GetType().FullName ?? "null"}, " +
-            $"newFocus.Size=({newFocus?.ActualWidth},{newFocus?.ActualHeight})\n" +
-            new System.Diagnostics.StackTrace().ToString());
         if (_editingFrame is not null) CommitFrameLabel(accept: true);
     }
 
