@@ -224,6 +224,8 @@ public sealed partial class MainPage : Page
         LoadTheme();
         LoadCanvasTheme();   // ダークモード(作図色)の復元＋キャンバス背景反映
         LoadPaletteState();   // ツールパレットのドック/フロート状態・位置を復元
+        LoadAutosaveInterval();   // オートセーブ間隔設定の復元（既定5分）
+        StartAutosaveTimer();
 #if !DEBUG
         RestartMenuItem.Visibility = Visibility.Collapsed;   // 開発用「再ビルドして再起動」は配布版で隠す
 #endif

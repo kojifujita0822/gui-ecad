@@ -123,32 +123,55 @@ public sealed partial class MainPage
         await LoadFileAsync(file.Path);
     }
 
-    /// <summary>パスを指定してファイルを読み込む。D&amp;D・起動引数からも呼ばれる。未保存確認は呼び出し元で行うこと。</summary>
+    /// <summary>パスを指定してファイルを読み込む。D&amp;D・起動引数からも呼ばれる。未保存確認は呼び出し元で行うこと。
+    /// 自動保存(オートセーブ)ファイルが本体より新しければ、読込前に復元するか確認する。</summary>
     internal async Task LoadFileAsync(string path)
     {
         try
         {
+            string autosavePath = AutosavePath(path);
+            if (File.Exists(autosavePath) && File.Exists(path)
+                && File.GetLastWriteTimeUtc(autosavePath) > File.GetLastWriteTimeUtc(path))
+            {
+                bool restore = await ConfirmRestoreAutosaveAsync(File.GetLastWriteTimeUtc(autosavePath));
+                if (restore)
+                {
+                    var restored = GcadSerializer.Load(autosavePath);
+                    ApplyLoadedDocument(restored, path, markDirty: true);
+                    File.Delete(autosavePath);
+                    return;
+                }
+                File.Delete(autosavePath);   // 復元しない場合は次回以降誤検知しないよう削除
+            }
+
             var doc = GcadSerializer.Load(path);
-            _document = doc;
-            if (doc.Sheets.Count == 0) doc.Sheets.Add(new Sheet());
-            _sheet = doc.Sheets[0];
-            _currentPath = path;
-            _selected = null;
-            _history.Clear();
-            _savedUndoDepth = 0;
-            _testSessions.Clear();
-            _testSession = _testMode ? GetOrCreateTestSession(_sheet) : null;
-            _find.Clear();
-            RebuildNavTree();
-            RebuildOtherPartMenu();
-            RefreshDevicePanel();
-            Canvas.Invalidate();
+            ApplyLoadedDocument(doc, path, markDirty: false);
         }
         catch (Exception ex)
         {
             AppLog.Debug($"[OPEN-ERROR] {ex}");
             await ShowErrorAsync(ex.Message);
         }
+    }
+
+    /// <summary>読み込んだドキュメントを反映する共通処理（通常の読込・オートセーブ復元の両方から使う）。</summary>
+    private void ApplyLoadedDocument(LadderDocument doc, string path, bool markDirty)
+    {
+        if (doc.Sheets.Count == 0) doc.Sheets.Add(new Sheet());
+        _document = doc;
+        _sheet = doc.Sheets[0];
+        _currentPath = path;
+        _selected = null;
+        _history.Clear();
+        _savedUndoDepth = 0;
+        _testSessions.Clear();
+        _testSession = _testMode ? GetOrCreateTestSession(_sheet) : null;
+        _find.Clear();
+        RebuildNavTree();
+        RebuildOtherPartMenu();
+        RefreshDevicePanel();
+        if (markDirty) MarkDirty();
+        Canvas.Invalidate();
     }
 
     private async void OnMenuSave(object sender, RoutedEventArgs e) => await SaveCurrentAsync();
@@ -160,7 +183,14 @@ public sealed partial class MainPage
     {
         if (_currentPath is not null)
         {
-            try { GcadSerializer.Save(_document, _currentPath); _savedUndoDepth = _history.UndoDepth; UpdateStatusExtras(); return true; }
+            try
+            {
+                GcadSerializer.Save(_document, _currentPath);
+                _savedUndoDepth = _history.UndoDepth;
+                UpdateStatusExtras();
+                DeleteAutosaveIfExists(_currentPath);   // 本体を保存できたのでオートセーブの控えは不要
+                return true;
+            }
             catch (Exception ex) { await ShowErrorAsync(ex.Message); return false; }
         }
         return await SaveAsAsync();
@@ -178,7 +208,15 @@ public sealed partial class MainPage
         var file = await picker.PickSaveFileAsync();
         if (file is null) return false;
 
-        try { GcadSerializer.Save(_document, file.Path); _currentPath = file.Path; _savedUndoDepth = _history.UndoDepth; UpdateStatusExtras(); return true; }
+        try
+        {
+            GcadSerializer.Save(_document, file.Path);
+            _currentPath = file.Path;
+            _savedUndoDepth = _history.UndoDepth;
+            UpdateStatusExtras();
+            DeleteAutosaveIfExists(file.Path);
+            return true;
+        }
         catch (Exception ex) { await ShowErrorAsync(ex.Message); return false; }
     }
 

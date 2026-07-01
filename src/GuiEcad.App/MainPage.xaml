@@ -122,6 +122,7 @@
                 <MenuFlyoutItem Text="上書き保存(S)" KeyboardAcceleratorTextOverride="Ctrl+S" Click="OnMenuSave" />
                 <MenuFlyoutItem Text="名前を付けて保存(A)..." Click="OnMenuSaveAs" />
                 <MenuFlyoutItem Text="テンプレートとして保存..." Click="OnMenuSaveAsTemplate" />
+                <MenuFlyoutItem Text="オートセーブ設定..." Click="OnMenuAutosaveSettings" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="PDF プレビュー..." Click="OnMenuPreviewPdf" />
                 <MenuFlyoutItem Text="PDF出力..." Click="OnMenuExportPdf" />
