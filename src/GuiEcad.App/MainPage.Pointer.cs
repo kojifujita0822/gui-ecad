@@ -825,14 +825,31 @@ public sealed partial class MainPage
         { CommitFrameLabel(accept: false); e.Handled = true; }
     }
 
+    // 枠ラベル即Commit不具合の一時切り分け用ログ出力先。Debug.WriteLineはDebugView/実機での
+    // 採取に難航したため、既存の palette-pos.txt 等と同じ MyDocuments\GuiEcad\ 配下へファイル出力する。
+    private static string FocusDebugLogPath =>
+        System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "GuiEcad", "focus-debug.log");
+
+    private static void AppendFocusDebugLog(string message)
+    {
+        try
+        {
+            System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(FocusDebugLogPath)!);
+            System.IO.File.AppendAllText(FocusDebugLogPath,
+                $"[{DateTime.Now:HH:mm:ss.fff}] {message}{Environment.NewLine}");
+        }
+        catch { /* デバッグ用途のためログ書き込み失敗は無視 */ }
+    }
+
     private void OnFrameLabelBoxLostFocus(object sender, RoutedEventArgs e)
     {
         var newFocus = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(this.XamlRoot) as FrameworkElement;
-        System.Diagnostics.Debug.WriteLine(
-            $"[KeyboardFocusFix] OnFrameLabelBoxLostFocus: _editingFrame={_editingFrame is not null}, " +
+        AppendFocusDebugLog(
+            $"OnFrameLabelBoxLostFocus: _editingFrame={_editingFrame is not null}, " +
             $"OriginalSource={(e.OriginalSource as FrameworkElement)?.Name ?? e.OriginalSource?.GetType().Name ?? "null"}, " +
-            $"newFocus={newFocus?.Name ?? newFocus?.GetType().Name ?? "null"}");
-        System.Diagnostics.Debug.WriteLine(new System.Diagnostics.StackTrace().ToString());
+            $"newFocus={newFocus?.Name ?? newFocus?.GetType().Name ?? "null"}\n" +
+            new System.Diagnostics.StackTrace().ToString());
         if (_editingFrame is not null) CommitFrameLabel(accept: true);
     }
 
