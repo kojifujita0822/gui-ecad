@@ -54,7 +54,7 @@ internal sealed partial class PdfPreviewDialog : ContentDialog
     private void BuildPageList()
     {
         int sheetPages = _enableBorder
-            ? _document.Sheets.Sum(DiagramRenderer.PageCount)
+            ? _document.Sheets.Sum(_dr.RenderPageCount)
             : _document.Sheets.Count;
         int crPages = _dr.CrossRefPageCount(_xref);
         bool hasBom = _document.Devices.ByName.Count > 0;
@@ -63,7 +63,7 @@ internal sealed partial class PdfPreviewDialog : ContentDialog
         int physical = 0;
         foreach (var sheet in _document.Sheets)
         {
-            int pages = _enableBorder ? DiagramRenderer.PageCount(sheet) : 1;
+            int pages = _enableBorder ? _dr.RenderPageCount(sheet) : 1;
             for (int p = 0; p < pages; p++)
             {
                 physical++;

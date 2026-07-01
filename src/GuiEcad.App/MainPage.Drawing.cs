@@ -54,7 +54,7 @@ public sealed partial class MainPage : Page
         // 図面枠ON時は、PDF出力1ページ分（A4縦）の範囲を仮枠ガイドで表示する。
         // 長い図面でどこがページ境界かを作図中に把握できるようにする。
         if (_document.Settings.EnableBorder)
-            DrawPageGuides(renderer);
+            DrawPageGuides(renderer, dr);
 
         // 検索ハイライト（現在シートの一致のみ描画）
         for (int i = 0; i < _find.Results.Count; i++)
@@ -252,14 +252,13 @@ public sealed partial class MainPage : Page
 
     // 図面枠ON時の PDF 1ページ分（A4縦 210x297mm）の境界を仮枠として描く。
     // 内容の高さに応じて縦方向にページ境界を繰り返し、どこがページ境界か作図中に分かるようにする。
-    private void DrawPageGuides(Win2DRenderer r)
+    // ページ数は DiagramRenderer.RenderPageCount と一致させる（主回路シートは mm 座標の内容も加味）。
+    private void DrawPageGuides(Win2DRenderer r, DiagramRenderer dr)
     {
         const double a4w = 210.0;                       // A4縦の幅 (mm)
         int rpp = DiagramRenderer.RowsPerPage;          // 1ページの行数（PDF分割と一致）
         double cell = _geo.CellMm, margin = _geo.MarginMm;
-        int maxRow = _sheet.Elements.Count > 0 ? _sheet.Elements.Max(e => e.Pos.Row) : 0;
-        int totalRows = Math.Max(_sheet.Grid.Rows, maxRow + 1);
-        int pages = Math.Max(1, (totalRows + rpp - 1) / rpp);
+        int pages = dr.RenderPageCount(_sheet);
         double bandH = rpp * cell;
         var guide = new StrokeStyle(new Color(150, 40, 90, 200), 0.3, LineStyle.Dashed);
         // A4幅 × 30行 の帯を縦に積み、各帯が1ページに相当することを示す。

@@ -258,16 +258,17 @@ public sealed partial class MainPage
             var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions());
             using var surface = new PdfRenderSurface(file.Path);
 
-            // 物理ページ総数（枠あり時は長い図面を RowsPerPage 行ごとに複数ページへ分割する）。
+            // 物理ページ総数（枠あり時は長い図面を RowsPerPage 行ごとに複数ページへ分割する。
+            // 主回路シートは mm ベースの内容の広がりも加味する＝RenderPageCount）。
             int totalPages = enableBorder
-                ? _document.Sheets.Sum(DiagramRenderer.PageCount)
+                ? _document.Sheets.Sum(dr.RenderPageCount)
                 : _document.Sheets.Count;
 
             int physical = 0;
             foreach (var sheet in _document.Sheets)
             {
                 // クロスリファレンス表はシート図面には描かず、専用ページに分ける（最小2ページ）。
-                int pages = enableBorder ? DiagramRenderer.PageCount(sheet) : 1;
+                int pages = enableBorder ? dr.RenderPageCount(sheet) : 1;
                 for (int p = 0; p < pages; p++)
                 {
                     physical++;

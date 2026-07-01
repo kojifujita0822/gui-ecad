@@ -63,6 +63,38 @@ public sealed class DiagramRenderer
     /// <summary>枠出力時にこのシートが必要とする物理ページ数（行分割）。</summary>
     public static int PageCount(Sheet sheet) =>
         Math.Max(1, (TotalRows(sheet) + RowsPerPage - 1) / RowsPerPage);
+
+    /// <summary>主回路（Sheet.MainCircuit）シートの仮想行数。自由直線・接続点・枠は mm 実座標で
+    /// グリッド行範囲を超えて広がりうるため、その最大 Y を行数換算してページ分割に使う。
+    /// ページ分割の内部計算専用の値であり、要素の描画位置には影響しない。</summary>
+    private int MainCircuitVirtualRows(Sheet sheet)
+    {
+        double maxYmm = _opt.MarginMm;
+        foreach (var fl in sheet.FreeLines) maxYmm = Math.Max(maxYmm, Math.Max(fl.Y1Mm, fl.Y2Mm));
+        foreach (var d in sheet.ConnectionDots) maxYmm = Math.Max(maxYmm, d.YMm);
+        foreach (var f in sheet.Frames)
+        {
+            double fy = f.VisualYMm ?? (_geo.YRow(f.TopLeft.Row) - Cell * 0.4);
+            double fh = f.VisualHeightMm ?? f.Height * Cell;
+            maxYmm = Math.Max(maxYmm, fy + fh);
+        }
+        return (int)Math.Ceiling((maxYmm - _opt.MarginMm) / Cell);
+    }
+
+    /// <summary>シートが実際に描画する総行数。主回路シートは <see cref="MainCircuitVirtualRows"/> も加味する。</summary>
+    private int EffectiveTotalRows(Sheet sheet)
+    {
+        int rows = TotalRows(sheet);
+        return sheet.MainCircuit ? Math.Max(rows, MainCircuitVirtualRows(sheet)) : rows;
+    }
+
+    /// <summary>枠出力時の物理ページ数。制御回路シートは静的 <see cref="PageCount"/> と同じ結果を返し、
+    /// 主回路シートは自由直線・接続点・枠の mm 座標による内容の広がりも考慮する。</summary>
+    public int RenderPageCount(Sheet sheet)
+    {
+        if (!sheet.MainCircuit) return PageCount(sheet);
+        return Math.Max(1, (EffectiveTotalRows(sheet) + RowsPerPage - 1) / RowsPerPage);
+    }
     private double LeftBusX => X(0) - BusPad;
     private double RightBusX(int columns) => X(columns) + BusPad;
 
@@ -128,7 +160,8 @@ public sealed class DiagramRenderer
         int columns = sheet.Grid.Columns;
 
         // ページの行ウィンドウ [rowStart, rowEnd)。pageRowCount=MaxValue なら全行（単一ページ）。
-        int totalRows = TotalRows(sheet);
+        // 主回路シートは EffectiveTotalRows が自由直線・接続点・枠の広がりも加味した仮想行数を返す。
+        int totalRows = EffectiveTotalRows(sheet);
         int rowStart = Math.Clamp(pageRowStart, 0, Math.Max(0, totalRows - 1));
         int rowEnd = pageRowCount == int.MaxValue
             ? totalRows

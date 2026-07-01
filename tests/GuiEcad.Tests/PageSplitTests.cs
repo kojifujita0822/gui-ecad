@@ -46,4 +46,82 @@ public class PageSplitTests
         Assert.Equal(contentRows, DiagramRenderer.TotalRows(sheet));
         Assert.Equal(expectedPages, DiagramRenderer.PageCount(sheet));
     }
+
+    // ---- 主回路（MainCircuit）シートの mm ベース分割（RenderPageCount） ----
+
+    [Fact]
+    public void RenderPageCount_NonMainCircuit_MatchesStaticPageCount()
+    {
+        // 制御回路シートは従来どおり静的 PageCount と同じ結果を返す（互換性の確認）。
+        var sheet = new Sheet { Grid = new GridSpec { Columns = 4, Rows = 40 } };
+        var dr = new DiagramRenderer();
+
+        Assert.Equal(DiagramRenderer.PageCount(sheet), dr.RenderPageCount(sheet));
+    }
+
+    [Fact]
+    public void RenderPageCount_MainCircuit_GridRowsSmall_UsesFreeLineExtent()
+    {
+        // Grid.Rows は小さいが、自由直線（母線）が RowsPerPage を大きく超えて伸びるケース。
+        // 既定 CellMm=9.0 / MarginMm=20.0 前提: Y = 20 + 40*9 = 380mm ぶんの母線 → 40行相当 → 2ページ。
+        var sheet = new Sheet { MainCircuit = true, Grid = new GridSpec { Columns = 6, Rows = 3 } };
+        sheet.FreeLines.Add(new FreeLine { X1Mm = 30, Y1Mm = 20, X2Mm = 30, Y2Mm = 20 + 40 * 9 });
+        var dr = new DiagramRenderer();
+
+        // 要素グリッド行だけを見る静的 PageCount では1ページ扱いになってしまう（旧挙動）。
+        Assert.Equal(1, DiagramRenderer.PageCount(sheet));
+        // mm 座標の内容を加味した RenderPageCount は 2ページと判定する。
+        Assert.Equal(2, dr.RenderPageCount(sheet));
+    }
+
+    [Fact]
+    public void RenderPageCount_MainCircuit_ConnectionDotExtent_Counted()
+    {
+        // 接続点（●）だけが下方に伸びているケースも仮想行数に加味される。
+        var sheet = new Sheet { MainCircuit = true, Grid = new GridSpec { Columns = 6, Rows = 2 } };
+        sheet.ConnectionDots.Add(new ConnectionDot { XMm = 30, YMm = 20 + 35 * 9 });
+        var dr = new DiagramRenderer();
+
+        Assert.Equal(2, dr.RenderPageCount(sheet));
+    }
+
+    [Fact]
+    public void RenderPageCount_MainCircuit_FrameVisualExtent_Counted()
+    {
+        // 枠（GroupFrame）の VisualYMm/VisualHeightMm による広がりも仮想行数に加味される。
+        var sheet = new Sheet { MainCircuit = true, Grid = new GridSpec { Columns = 6, Rows = 2 } };
+        sheet.Frames.Add(new GroupFrame
+        {
+            TopLeft = new GridPos(0, 0), Width = 2, Height = 2,
+            VisualYMm = 20, VisualHeightMm = 35 * 9,
+        });
+        var dr = new DiagramRenderer();
+
+        Assert.Equal(2, dr.RenderPageCount(sheet));
+    }
+
+    [Fact]
+    public void MainCircuit_MultiPage_FreeLineExtentOnly_RendersWithoutException()
+    {
+        // Grid.Rows は分割を意識しない小さい値のまま、自由直線の mm 座標だけで複数ページに
+        // またがる主回路シートを、RenderPageCount が返すページ数ぶん描画してもクリップが釣り合うこと。
+        var sheet = new Sheet { MainCircuit = true, Grid = new GridSpec { Columns = 6, Rows = 3 } };
+        for (int i = 0; i < 3; i++)
+            sheet.FreeLines.Add(new FreeLine { X1Mm = 30 + i * 9, Y1Mm = 20, X2Mm = 30 + i * 9, Y2Mm = 20 + 40 * 9 });
+
+        var dr = new DiagramRenderer();
+        var rec = new NullRenderer();
+        int pages = dr.RenderPageCount(sheet);
+        Assert.Equal(2, pages);
+
+        var ex = Record.Exception(() =>
+        {
+            for (int page = 0; page < pages; page++)
+                dr.Render(rec, sheet, enableBorder: true,
+                          pageRowStart: page * DiagramRenderer.RowsPerPage,
+                          pageRowCount: DiagramRenderer.RowsPerPage);
+        });
+        Assert.Null(ex);
+        Assert.Equal(0, rec.ClipDepth);
+    }
 }
