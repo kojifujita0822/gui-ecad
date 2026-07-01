@@ -35,10 +35,17 @@ public sealed partial class MainPage : Page
         {
             // 初期フォーカスセルは直近のマウスホバーセルを再利用（無ければ左上）。
             _focusCell = _hoverCell.Row >= 0 && _hoverCell.Column >= 0 ? _hoverCell : new GridPos(0, 0);
-            Canvas.Focus(FocusState.Programmatic);
+            FocusCanvasForKeyboardMode();
         }
         Canvas.Invalidate();
     }
+
+    // Canvas へフォーカスを移す。ボタンのクリック直後に呼ぶと、WinUI がクリックしたボタン自身へ
+    // フォーカスを割り当てる既定動作と競合し、同期呼び出しでは負けてボタン側にフォーカスが残ることがある
+    // （その状態で Enter を押すと、配置ではなくボタン自身のトグルOFFが先に処理されてしまう）。
+    // DispatcherQueue に積んで既定のフォーカス割り当てが終わった後に実行することで確実に Canvas へ移す。
+    private void FocusCanvasForKeyboardMode()
+        => DispatcherQueue.TryEnqueue(() => Canvas.Focus(FocusState.Programmatic));
 
     private void ExitKeyboardMode()
     {

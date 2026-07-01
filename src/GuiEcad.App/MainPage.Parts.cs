@@ -404,6 +404,10 @@ public sealed partial class MainPage
                 if (child is RadioButton rb && rb.Tag?.ToString() == tag)
                 { rb.IsChecked = true; break; }
         UpdateHintText();
+        // キーボード配置モード中の数字キーツール切替は、パレットのラジオボタンにフォーカスが
+        // 移ってしまうと以後の Enter キーがボタン自身に奪われる（配置されない／モードが解除される）。
+        // Canvas へフォーカスを戻す（既定のフォーカス割り当てと競合しないよう遅延実行）。
+        if (_keyboardModeActive) FocusCanvasForKeyboardMode();
         Canvas.Invalidate();
     }
 
