@@ -201,13 +201,21 @@ public sealed partial class MainPage : Page
             var changeBtn = new Button { Content = "変更" };
             changeBtn.Click += async (_, _) =>
             {
-                var captured = await CaptureKeyBindingAsync();
-                if (captured is not (VirtualKey key, VirtualKeyModifiers mods)) return;   // キャンセル
+                changeBtn.IsEnabled = false;
+                display.Text = "キーを押してください（Escでキャンセル）";
+                var captured = await CaptureKeyBindingInlineAsync(changeBtn);
+                changeBtn.IsEnabled = true;
+                if (captured is not (VirtualKey key, VirtualKeyModifiers mods))
+                {
+                    display.Text = FormatBinding(working[cmd.Id]);   // キャンセル時は表示を戻す
+                    return;
+                }
 
                 var conflict = working.FirstOrDefault(kv => kv.Key != cmd.Id && kv.Value == (key, mods));
                 if (conflict.Key is not null)
                 {
                     string conflictLabel = CommandDefs.First(c => c.Id == conflict.Key).Label;
+                    display.Text = FormatBinding(working[cmd.Id]);
                     await ShowErrorAsync($"「{conflictLabel}」({FormatBinding(conflict.Value)}) と競合しています。別のキーを選んでください。");
                     return;
                 }
@@ -251,26 +259,18 @@ public sealed partial class MainPage : Page
         ApplyKeyBindings();
     }
 
-    // 「キーを押してください」ダイアログを表示し、押されたキー(修飾キー込み)を返す。Escでキャンセル(null)。
-    private async Task<(VirtualKey Key, VirtualKeyModifiers Mods)?> CaptureKeyBindingAsync()
+    // 設定ダイアログ（外側）を開いたまま「変更」ボタン(target)自身に KeyDown を一時アタッチしてキーを
+    // 1つ捕まえる。別の ContentDialog を開かないため、_dialogGate（ShowDialogAsync の多重表示防止用
+    // セマフォ）の入れ子待ちで固まる問題が起きない。target は既に開いているダイアログ内の要素で
+    // フォーカス取得も確実（標準 Control のため IsTabStop は既定で有効）。Escでキャンセル(null)。
+    private async Task<(VirtualKey Key, VirtualKeyModifiers Mods)?> CaptureKeyBindingInlineAsync(Button target)
     {
-        (VirtualKey Key, VirtualKeyModifiers Mods)? result = null;
-
-        var text = new TextBlock { Text = "割り当てたいキーを押してください（Escでキャンセル）", TextWrapping = TextWrapping.Wrap };
-        var border = new Border { Child = text, Padding = new Thickness(16), MinWidth = 320, IsTabStop = true };
-
-        var dialog = new ContentDialog
-        {
-            Title = "キー割り当て",
-            Content = border,
-            CloseButtonText = "キャンセル",
-            XamlRoot = this.XamlRoot,
-        };
+        var tcs = new TaskCompletionSource<(VirtualKey Key, VirtualKeyModifiers Mods)?>();
 
         void OnCapturedKeyDown(object s, KeyRoutedEventArgs e)
         {
             e.Handled = true;
-            if (e.Key == VirtualKey.Escape) { dialog.Hide(); return; }
+            if (e.Key == VirtualKey.Escape) { tcs.TrySetResult(null); return; }
             // 修飾キー単体では確定しない（Ctrl+何か、のように非修飾キーが押されるまで待つ）。
             if (e.Key is VirtualKey.Control or VirtualKey.Shift or VirtualKey.Menu
                 or VirtualKey.LeftWindows or VirtualKey.RightWindows) return;
@@ -280,20 +280,13 @@ public sealed partial class MainPage : Page
             if ((InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift) & CoreVirtualKeyStates.Down) != 0) mods |= VirtualKeyModifiers.Shift;
             if ((InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Menu) & CoreVirtualKeyStates.Down) != 0) mods |= VirtualKeyModifiers.Menu;
 
-            result = (e.Key, mods);
-            dialog.Hide();
+            tcs.TrySetResult((e.Key, mods));
         }
 
-        border.KeyDown += OnCapturedKeyDown;
-        // ContentDialog は表示時に既定ボタンへ自動フォーカスを割り当てる内部処理を持つため、
-        // Border.Loaded（ビジュアルツリー装着直後）で Focus() すると、その後に走る既定フォーカス
-        // 割り当てとの競合で border からフォーカスが奪われることがある。ContentDialog.Opened
-        // （表示アニメーション・既定フォーカス処理が完了した後に発火）に移すことで競合を避ける。
-        // FocusState も Programmatic → Keyboard に変更（コミュニティ実例で有効性が確認されている値）。
-        dialog.Opened += (_, _) => border.Focus(FocusState.Keyboard);
-
-        await ShowDialogAsync(dialog);
-        border.KeyDown -= OnCapturedKeyDown;
+        target.KeyDown += OnCapturedKeyDown;
+        target.Focus(FocusState.Keyboard);   // 既にダイアログが開いている＝フォーカスツリー確定済みのため確実
+        var result = await tcs.Task;
+        target.KeyDown -= OnCapturedKeyDown;
         return result;
     }
 }

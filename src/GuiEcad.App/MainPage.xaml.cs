@@ -234,6 +234,7 @@ public sealed partial class MainPage : Page
         LoadKeyBindings();   // ショートカットキー割り当ての復元（既定値で補完）
         ApplyKeyBindings();  // 動的 KeyboardAccelerator を RootGrid へ登録
         RegisterKeyboardModeAccelerators();   // キーボード配置モードの矢印/数字キーを RootGrid へ登録
+        RegisterGlobalKeyAccelerators();      // Escape/Backspace/Space を RootGrid へ登録
 #if !DEBUG
         RestartMenuItem.Visibility = Visibility.Collapsed;   // 開発用「再ビルドして再起動」は配布版で隠す
 #endif
@@ -633,56 +634,13 @@ public sealed partial class MainPage : Page
 
     // ===== キーボード =====
 
-    private void OnKeyDown(object sender, KeyRoutedEventArgs e)
-    {
-        // Ctrl+Z/Y/C/V/F 等の修飾キー系は KeyboardAccelerator（RootGrid）側で処理する。
-        // CanvasControl がフォーカスを持つと Page の KeyDown が届かない場合があるため、
-        // 確実性が要るショートカットはアクセラレータに統一する。
-        switch (e.Key)
-        {
-            case VirtualKey.Back:
-                // テキスト入力中（インライン編集・プロパティパネル・検索バー）は要素削除しない。
-                if (IsInlineEditing || IsTextInputFocused()) break;
-                DeleteSelected(); e.Handled = true; break;
-
-            // F5-F8（ツール切替）はカスタマイズ可能コマンドとして MainPage.KeyBindings.cs が
-            // 動的 KeyboardAccelerator で処理する（ここでは扱わない）。
-
-            case VirtualKey.Escape:
-                if (_rangeSelecting) { _rangeSelecting = false; ClearMultiSelection(); Canvas.Invalidate(); e.Handled = true; break; }
-                if (_editingElement != null) CommitDeviceName(accept: false);
-                else if (_editingComment != null) CommitComment(accept: false);
-                else if (_editingRungComment != null) CommitRungComment(accept: false);
-                else if (_editingFrame != null) CommitFrameLabel(accept: false);
-                else if (FindBar.Visibility == Visibility.Visible) CloseFindBar();
-                else if (_tool.Mode != ToolMode.Select) ActivateTool("select");
-                else if (_keyboardModeActive) ExitKeyboardMode();
-                e.Handled = true;
-                break;
-
-            case VirtualKey.Space:
-                if (!_testMode && _editingElement is null && _editingComment is null
-                    && _editingRungComment is null && _editingFrame is null
-                    && FindBar.Visibility != Visibility.Visible)
-                {
-                    _spacePanActive = true;
-                    e.Handled = true;
-                }
-                break;
-
-            // キーボード配置モード中の矢印キー・数字キーは RootGrid の KeyboardAccelerator
-            // （RegisterKeyboardModeAccelerators）で処理する。ここでの二重処理は避ける。
-        }
-    }
-
-    private void OnKeyUp(object sender, KeyRoutedEventArgs e)
-    {
-        if (e.Key == VirtualKey.Space)
-        {
-            _spacePanActive = false;
-            e.Handled = true;
-        }
-    }
+    // Escape・Backspace・Space は RootGrid の KeyboardAccelerator（RegisterGlobalKeyAccelerators）
+    // で処理する。CanvasControl が通常のマウス操作でフォーカスを保持していると Page.OnKeyDown に
+    // キーが届かない場合があるため（既知の制約）、確実性が要るキーはアクセラレータに一本化する。
+    // F5-F8・Ctrl+Z/Y/C/V/F 等はカスタマイズ可能コマンドとして MainPage.KeyBindings.cs が、
+    // 矢印キー・数字キーは MainPage.KeyboardMode.cs の RegisterKeyboardModeAccelerators が扱う。
+    // Space のキー解放は KeyboardAccelerator に KeyUp 相当が無いため、MainPage.Pointer.cs の
+    // OnPointerMoved 内で GetKeyStateForCurrentThread によるポーリングに置き換えた（Page.KeyUp は不要）。
 
     // ===== 検索・置換 =====
 

@@ -7,8 +7,6 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:GuiEcad_App"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    KeyDown="OnKeyDown"
-    KeyUp="OnKeyUp"
     mc:Ignorable="d">
 
     <Page.Resources>

@@ -429,6 +429,13 @@ public sealed partial class MainPage
 
     private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
     {
+        // スペースキー解放をポーリング検知する（KeyboardAccelerator には KeyUp 相当が無いため）。
+        // 次にクリックした際の誤パン判定を防ぐためのフラグリセットであり、進行中のパン(_panning)
+        // 自体はマウスボタンを離すまで継続する（OnPointerPressed 内の同種チェックと同じ考え方）。
+        if (_spacePanActive &&
+            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Space) & CoreVirtualKeyStates.Down) == 0)
+            _spacePanActive = false;
+
         var pos = e.GetCurrentPoint(Canvas).Position;
 
         var (sxMm, syMm) = ToWorld(pos);

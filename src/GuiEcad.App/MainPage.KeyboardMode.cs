@@ -90,4 +90,59 @@ public sealed partial class MainPage : Page
             if (key == k) { ActivateTool(tag); return true; }
         return false;
     }
+
+    // ===== グローバルキー（Escape/Backspace/Space） =====
+    //
+    // 通常のマウス操作（MainPage.Pointer.cs の OnPointerPressed）は Canvas.Focus() を呼ぶため、
+    // Canvas 上を一度でもクリックした状態では Page.OnKeyDown にキーが届かないことがある
+    // （既知の制約）。矢印キー・数字キーと同じ理由で、これら3キーも Canvas のフォーカス状態に
+    // 依存しない RootGrid の KeyboardAccelerator へ移行する。
+
+    /// <summary>起動時に1回だけ呼ぶ。Escape・Backspace・Space を RootGrid の KeyboardAccelerator として登録する。</summary>
+    private void RegisterGlobalKeyAccelerators()
+    {
+        void Add(VirtualKey key, Func<bool> handler)
+        {
+            var acc = new KeyboardAccelerator { Key = key, Modifiers = VirtualKeyModifiers.None };
+            acc.Invoked += (_, args) => { if (handler()) args.Handled = true; };
+            RootGrid.KeyboardAccelerators.Add(acc);
+        }
+        Add(VirtualKey.Escape, HandleEscape);
+        Add(VirtualKey.Back, HandleBackspace);
+        Add(VirtualKey.Space, HandleSpaceDown);
+    }
+
+    // Escape の意味は文脈で7通りに分かれる（優先順位はコード順）。常に処理済み扱い（true）。
+    private bool HandleEscape()
+    {
+        if (_rangeSelecting) { _rangeSelecting = false; ClearMultiSelection(); Canvas.Invalidate(); return true; }
+        if (_editingElement != null) CommitDeviceName(accept: false);
+        else if (_editingComment != null) CommitComment(accept: false);
+        else if (_editingRungComment != null) CommitRungComment(accept: false);
+        else if (_editingFrame != null) CommitFrameLabel(accept: false);
+        else if (FindBar.Visibility == Visibility.Visible) CloseFindBar();
+        else if (_tool.Mode != ToolMode.Select) ActivateTool("select");
+        else if (_keyboardModeActive) ExitKeyboardMode();
+        return true;
+    }
+
+    // テキスト入力中（インライン編集・プロパティパネル・検索バー）は要素を削除せず、
+    // Handled=false のままにしてテキスト編集（文字削除）に委ねる。
+    private bool HandleBackspace()
+    {
+        if (IsInlineEditing || IsTextInputFocused()) return false;
+        DeleteSelected();
+        return true;
+    }
+
+    // Space 押下でパン開始。KeyboardAccelerator に KeyUp 相当が無いため、離した検知は
+    // MainPage.Pointer.cs の OnPointerMoved 内でポーリングする。編集中・検索バー表示中は無効。
+    private bool HandleSpaceDown()
+    {
+        if (_testMode || _editingElement != null || _editingComment != null
+            || _editingRungComment != null || _editingFrame != null
+            || FindBar.Visibility == Visibility.Visible) return false;
+        _spacePanActive = true;
+        return true;
+    }
 }
