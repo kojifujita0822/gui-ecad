@@ -1,3 +1,4 @@
+@prompts/startup-auto.md
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -60,6 +61,9 @@ dotnet test  GuiEcad.sln
 - **ステータスバー**: `StatusMode` / `StatusPos` / `StatusSheet` / `StatusDirty` / `StatusWarn`
 - Dirty フラグ: `_savedUndoDepth` vs `_history.UndoDepth` で判定。保存/新規/読込時にリセット。
 → 詳細: [docs/ui-gxworks3-plan.md](docs/ui-gxworks3-plan.md)
+
+## 並列セッション運用（claude-roleplay）
+複数ターミナルで `prompts/startup-auto.md` の起動プロンプトを貼ると、家老（采配）／侍（実装・ビルド）／忍者（実機確認）／隠密（コード・データ調査）の4役に自動で分かれる。役割定義は `docs-notes/roles/{karo,samurai,ninja,onmitsu}.md`、引き継ぎは `docs-notes/handover-next-session.md`。**実装ディレクトリ（`src/`・`tests/`）への書き込みは侍に一元化**し、他役は調査・確認に専念する。
 
 ## ドキュメント索引
 | ファイル | 内容 |
