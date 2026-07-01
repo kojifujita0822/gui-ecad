@@ -806,7 +806,8 @@ public sealed partial class MainPage
         var frame = _editingFrame;
         _editingFrame = null;
         FrameLabelBox.Visibility = Visibility.Collapsed;
-        RootGrid.Focus(FocusState.Programmatic);
+        bool focusedAfterFrameLabel = FocusSinkButton.Focus(FocusState.Programmatic);
+        System.Diagnostics.Debug.WriteLine($"[KeyboardFocusFix] CommitFrameLabel: FocusSinkButton.Focus()={focusedAfterFrameLabel}");
         if (accept)
         {
             string newLabel = FrameLabelBox.Text.Trim();
@@ -850,7 +851,8 @@ public sealed partial class MainPage
         var elem = _editingElement;
         _editingElement = null;
         DeviceNameBox.Visibility = Visibility.Collapsed;
-        RootGrid.Focus(FocusState.Programmatic);
+        bool focusedAfterDeviceName = FocusSinkButton.Focus(FocusState.Programmatic);
+        System.Diagnostics.Debug.WriteLine($"[KeyboardFocusFix] CommitDeviceName: FocusSinkButton.Focus()={focusedAfterDeviceName}");
 
         if (accept)
         {
@@ -899,7 +901,8 @@ public sealed partial class MainPage
         var elem = _editingComment;
         _editingComment = null;
         CommentBox.Visibility = Visibility.Collapsed;
-        RootGrid.Focus(FocusState.Programmatic);
+        bool focusedAfterComment = FocusSinkButton.Focus(FocusState.Programmatic);
+        System.Diagnostics.Debug.WriteLine($"[KeyboardFocusFix] CommitComment: FocusSinkButton.Focus()={focusedAfterComment}");
 
         if (accept)
         {
@@ -947,7 +950,8 @@ public sealed partial class MainPage
         var rc = _editingRungComment;
         _editingRungComment = null;
         RungCommentBox.Visibility = Visibility.Collapsed;
-        RootGrid.Focus(FocusState.Programmatic);
+        bool focusedAfterRungComment = FocusSinkButton.Focus(FocusState.Programmatic);
+        System.Diagnostics.Debug.WriteLine($"[KeyboardFocusFix] CommitRungComment: FocusSinkButton.Focus()={focusedAfterRungComment}");
 
         if (accept)
         {

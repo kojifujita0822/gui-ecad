@@ -104,6 +104,13 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <!-- インライン編集（機器名/枠ラベル/コメント/行コメント）確定後のフォーカス退避先。
+             RootGrid自体はGrid（Panel派生）でIsTabStopを持たずFocus()が効かないため、
+             標準Control（Button、IsTabStop既定True）へ明示的にFocusし、下部パネルTabViewや
+             MenuBar等の「組み込みキー処理を持つコントロール」へフォーカスが迷子にならないようにする。 -->
+        <Button x:Name="FocusSinkButton" Grid.Row="0" Width="0" Height="0" Opacity="0"
+                IsTabStop="True" IsHitTestVisible="False" XYFocusKeyboardNavigation="Disabled" />
+
         <!-- メニューバー -->
         <MenuBar x:Name="TopMenuBar" Grid.Row="0" Background="{ThemeResource AppToolbarBackgroundBrush}">
             <MenuBarItem Title="ファイル(F)">
