@@ -848,7 +848,8 @@ public sealed partial class MainPage
         AppendFocusDebugLog(
             $"OnFrameLabelBoxLostFocus: _editingFrame={_editingFrame is not null}, " +
             $"OriginalSource={(e.OriginalSource as FrameworkElement)?.Name ?? e.OriginalSource?.GetType().Name ?? "null"}, " +
-            $"newFocus={newFocus?.Name ?? newFocus?.GetType().Name ?? "null"}\n" +
+            $"newFocus.Name=\"{newFocus?.Name}\", newFocus.Type={newFocus?.GetType().FullName ?? "null"}, " +
+            $"newFocus.Size=({newFocus?.ActualWidth},{newFocus?.ActualHeight})\n" +
             new System.Diagnostics.StackTrace().ToString());
         if (_editingFrame is not null) CommitFrameLabel(accept: true);
     }
