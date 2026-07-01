@@ -55,6 +55,7 @@ public sealed partial class MainPage
         var info = _document.Info;
         var fields = new (string Header, string Value, Action<string> Set)[]
         {
+            ("社名",     info.CompanyName, v => info.CompanyName = v),
             ("図面名称", info.Title,    v => info.Title    = v),
             ("図番",     info.DrawingNo, v => info.DrawingNo = v),
             ("顧客",     info.Customer,  v => info.Customer  = v),

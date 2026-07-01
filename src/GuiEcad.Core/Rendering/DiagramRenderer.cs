@@ -98,7 +98,9 @@ public sealed class DiagramRenderer
     private double LeftBusX => X(0) - BusPad;
     private double RightBusX(int columns) => X(columns) + BusPad;
 
-    private const double TitleBlockH = 14.0;   // 表題欄の高さ (mm)
+    private const double TitleCompanyRowH = 6.0;                              // 社名欄の高さ (mm)
+    private const double TitleDetailRowsH = 14.0;                             // 図面名称/図番/ページ行＋顧客等行の高さ (mm)
+    private const double TitleBlockH = TitleCompanyRowH + TitleDetailRowsH;   // 表題欄全体の高さ (mm)
     private const double RevRowH     = 7.0;    // 改定欄 データ行の高さ (mm)
     private const double RevHdrH     = 5.0;    // 改定欄 ヘッダ行の高さ (mm)
     private const double A4W         = 210.0;  // A4縦 幅 (mm)
@@ -940,21 +942,32 @@ public sealed class DiagramRenderer
     }
 
     // 表題欄（タイトルブロック）を startY 位置に描画する。
-    // レイアウト: 2行×複数列のグリッド枠。行1=図面名称+図番、行2=顧客/設計/製図/確認/日付。
+    // レイアウト: 3行×複数列のグリッド枠。行0=社名（全幅）、行1=図面名称+図番+ページ、行2=顧客/設計/製図/確認/日付。
     private void DrawTitleBlock(IRenderer r, DocumentInfo info, double x0, double x1, double startY,
                                 int pageNumber = 1, int totalPages = 1)
     {
         double totalW = x1 - x0;
-        double h1 = TitleBlockH * 0.45;   // 1行目高さ
-        double h2 = TitleBlockH - h1;     // 2行目高さ
+        double h0 = TitleCompanyRowH;            // 0行目（社名）高さ
+        double h1 = TitleDetailRowsH * 0.45;      // 1行目高さ
+        double h2 = TitleDetailRowsH - h1;        // 2行目高さ
         var outline = _theme.Get(StrokeRole.SymbolOutline) with { Width = DrawingTheme.TableLineWidth };
         var labelStyle = _theme.Text(TextRole.CrossRef) with { FontSizeMm = 1.8, VAlign = VAlign.Middle, Bold = true };
         var dataStyle  = _theme.Text(TextRole.CrossRef) with { FontSizeMm = 2.2, VAlign = VAlign.Middle };
+        var companyStyle = _theme.Text(TextRole.CrossRef) with
+        {
+            FontSizeMm = 3.0, Bold = true, HAlign = HAlign.Center, VAlign = VAlign.Middle,
+        };
         double pad = 1.0;
+
+        // ---- 行0: 社名（全幅） ----
+        double y0 = startY;
+        r.DrawRectangle(new(x0, y0, totalW, h0), outline);
+        if (!string.IsNullOrEmpty(info.CompanyName))
+            r.DrawText(info.CompanyName, new(x0 + totalW / 2, y0 + h0 / 2), companyStyle);
 
         // ---- 行1: 図面名称 (50%) | 図番 (30%) | ページ (20%) ----
         double titleW = totalW * 0.50, drawNoW = totalW * 0.30, pageW = totalW * 0.20;
-        double y1 = startY;
+        double y1 = startY + h0;
         DrawTitleCell(r, outline, x0, y1, titleW, h1, "図面名称", info.Title, labelStyle, dataStyle, pad);
         DrawTitleCell(r, outline, x0 + titleW, y1, drawNoW, h1, "図番", info.DrawingNo, labelStyle, dataStyle, pad);
         DrawTitleCell(r, outline, x0 + titleW + drawNoW, y1, pageW, h1, "ページ",
@@ -964,7 +977,7 @@ public sealed class DiagramRenderer
         double[] ratios = { 0.28, 0.18, 0.18, 0.18, 0.18 };
         string[] labels = { "顧客", "設計", "製図", "確認", "日付" };
         string[] values = { info.Customer, info.Designer, info.Drafter, info.Checker, info.Date ?? "" };
-        double y2 = startY + h1;
+        double y2 = startY + h0 + h1;
         double cx = x0;
         for (int i = 0; i < labels.Length; i++)
         {

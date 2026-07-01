@@ -12,6 +12,7 @@ public class PersistenceTests
         {
             Info = new DocumentInfo
             {
+                CompanyName = "サンプル電機株式会社",
                 Title = "コンプレッサー遠方運転盤",
                 DrawingNo = "E-001",
                 Designer = "赤松",
@@ -68,6 +69,7 @@ public class PersistenceTests
         var back = GcadSerializer.Deserialize(json);
 
         Assert.Equal(1, back.SchemaVersion);
+        Assert.Equal("サンプル電機株式会社", back.Info.CompanyName);
         Assert.Equal("コンプレッサー遠方運転盤", back.Info.Title);
         Assert.Equal("赤松", back.Info.Designer);
         Assert.Equal("N24", back.Settings.DefaultBus.LeftName);

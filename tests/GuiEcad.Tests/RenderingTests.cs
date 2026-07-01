@@ -217,6 +217,7 @@ public class RenderingTests
         {
             Info = new DocumentInfo
             {
+                CompanyName = "テスト電機株式会社",
                 Title = "制御盤シーケンス回路図", DrawingNo = "E-001",
                 Customer = "株式会社テスト", Designer = "山田太郎",
                 Drafter = "鈴木一郎", Checker = "田中次郎", Date = "2026-06-19",
@@ -236,6 +237,36 @@ public class RenderingTests
         surface.EndPage();
 
         Assert.True(File.Exists(Path.Combine(dir, "titleblock_test.pdf")));
+    }
+
+    [Fact]
+    public void TitleBlock_WithBorder_RendersCompanyRowWithoutException()
+    {
+        // 図面枠あり（A4縦・右下固定配置）でも社名行を含む3行構成の表題欄が例外なく描画できること。
+        var sheet = SampleSheet();
+        sheet.PageNumber = 1;
+        var doc = new LadderDocument
+        {
+            Info = new DocumentInfo { CompanyName = "テスト電機株式会社", Title = "制御盤" },
+        };
+        doc.Sheets.Add(sheet);
+
+        var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "temp"));
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "titleblock_border_test.pdf");
+        File.Delete(path);   // 前回実行の残骸で誤検知しないよう、本テストの検証対象は必ず新規生成させる
+        var dr = new DiagramRenderer();
+        Exception? ex;
+        using (var surface = new PdfRenderSurface(path))
+        {
+            var r = surface.BeginPage(dr.PageSize(sheet, null, doc.Info, enableBorder: true));
+            ex = Record.Exception(() =>
+                dr.Render(r, sheet, null, null, xref: null, info: doc.Info, enableBorder: true));
+            surface.EndPage();
+        }   // Dispose() で実際にPDFがディスクへ保存される
+
+        Assert.Null(ex);
+        Assert.True(File.Exists(path));
     }
 
     private static void Render(Sheet sheet, string path, bool connectivity)

@@ -16,6 +16,8 @@ public sealed class LadderDocument
 /// <summary>タイトルブロック相当のメタ情報。</summary>
 public sealed class DocumentInfo
 {
+    /// <summary>社名（表題欄に表示）。</summary>
+    public string CompanyName { get; set; } = "";
     public string Title { get; set; } = "";
     public string DrawingNo { get; set; } = "";
     public string Customer { get; set; } = "";
