@@ -148,10 +148,4 @@ public sealed partial class MainPage : Page
         Canvas.Invalidate();
     }
 
-    private void OnCopyAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    { if (!_testMode) { CopySelection(); args.Handled = true; } }
-
-    private void OnPasteAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    { if (!_testMode) { PasteSelection(); args.Handled = true; } }
-
 }

@@ -34,25 +34,6 @@ public sealed partial class MainPage
     private void OnMenuUndo(object sender, RoutedEventArgs e) => DoUndo();
     private void OnMenuRedo(object sender, RoutedEventArgs e) => DoRedo();
 
-    // Ctrl+Z/Y はフォーカスに依存しない KeyboardAccelerator で処理（ツール選択中でも効く）
-    private void OnUndoAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    { DoUndo(); args.Handled = true; }
-    private void OnRedoAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    { DoRedo(); args.Handled = true; }
-    private async void OnSaveAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    { await SaveCurrentAsync(); args.Handled = true; }
-
-    // Delete もフォーカス非依存に（ツール選択中・要素/縦コネクタ選択後でも効く）。
-    // ただしインライン編集中・検索バー入力中はテキスト編集に委ね、要素を消さない
-    // （args.Handled を立てずに return し、TextBox に Delete を処理させる）。
-    private void OnDeleteAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        // テキスト入力中（インライン編集・プロパティパネル・検索バー）は要素を消さず、テキスト編集に委ねる。
-        if (IsInlineEditing || IsTextInputFocused()) return;
-        DeleteSelected();
-        args.Handled = true;
-    }
-
     // 配置直後・選択中の要素を Enter で機器名インライン編集（Canvas のフォーカス有無に依らず確実に拾う）。
     // キーボード配置モード中は Enter＝フォーカスセルへの配置確定を優先する（機器名編集は起動しない）。
     private void OnEnterAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
@@ -68,30 +49,6 @@ public sealed partial class MainPage
             return;
         }
         if (_selected is not null) { ShowDeviceNameEditor(_selected); args.Handled = true; }
-    }
-
-    private void OnF2Accelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        if (_testMode || _editingElement is not null || _editingComment is not null || _editingFrame is not null) return;
-        if (FindBar.Visibility == Visibility.Visible) return;
-        if (_selected is not null) { ShowCommentEditor(_selected); args.Handled = true; }
-    }
-
-    private void OnInsertRowAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        if (_testMode) return;
-        _history.Execute(new InsertLastRowCommand(_sheet));
-        Canvas.Invalidate();
-        args.Handled = true;
-    }
-
-    private void OnDeleteRowAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    {
-        if (_testMode) return;
-        if (_sheet.Grid.Rows <= 1) return;
-        _history.Execute(new DeleteLastRowCommand(_sheet));
-        Canvas.Invalidate();
-        args.Handled = true;
     }
 
     private void OnInsertRowBtn(object sender, RoutedEventArgs e)

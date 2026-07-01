@@ -93,17 +93,11 @@
 
     <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" KeyboardAcceleratorPlacementMode="Hidden">
         <Grid.KeyboardAccelerators>
-            <KeyboardAccelerator Modifiers="Control" Key="Z" Invoked="OnUndoAccelerator" />
-            <KeyboardAccelerator Modifiers="Control" Key="Y" Invoked="OnRedoAccelerator" />
-            <KeyboardAccelerator Key="Delete" Invoked="OnDeleteAccelerator" />
+            <!-- Enter は予約キー（機器名編集起動／キーボード配置モードの配置確定の二重用途で文脈分岐するため、
+                 ショートカットキー設定機能ではカスタマイズ対象外＝常にこの固定登録のまま）。
+                 それ以外のカスタマイズ可能なコマンド（Undo/Redo/削除/保存/検索/コメント編集/行操作/コピペ/
+                 ツール切替F5-F8/ズーム/新規/開く）は MainPage.KeyBindings.cs が起動時に動的登録する。 -->
             <KeyboardAccelerator Key="Enter" Invoked="OnEnterAccelerator" />
-            <KeyboardAccelerator Key="F2" Invoked="OnF2Accelerator" />
-            <KeyboardAccelerator Modifiers="Control,Shift" Key="Up" Invoked="OnInsertRowAccelerator" />
-            <KeyboardAccelerator Modifiers="Control,Shift" Key="Down" Invoked="OnDeleteRowAccelerator" />
-            <KeyboardAccelerator Modifiers="Control" Key="C" Invoked="OnCopyAccelerator" />
-            <KeyboardAccelerator Modifiers="Control" Key="V" Invoked="OnPasteAccelerator" />
-            <KeyboardAccelerator Modifiers="Control" Key="F" Invoked="OnFindAccelerator" />
-            <KeyboardAccelerator Modifiers="Control" Key="S" Invoked="OnSaveAccelerator" />
         </Grid.KeyboardAccelerators>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -134,6 +128,8 @@
                 <MenuFlyoutItem Text="検索・置換(F)..." KeyboardAcceleratorTextOverride="Ctrl+F" Click="OnMenuFind" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="削除(D)" KeyboardAcceleratorTextOverride="Del" Click="OnDelete" />
+                <MenuFlyoutSeparator />
+                <MenuFlyoutItem Text="ショートカットキー設定..." Click="OnMenuKeyBindingSettings" />
             </MenuBarItem>
             <MenuBarItem Title="図面(D)">
                 <MenuFlyoutItem Text="ドキュメント情報..." Click="OnDocumentInfo" />

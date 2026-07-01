@@ -226,6 +226,8 @@ public sealed partial class MainPage : Page
         LoadPaletteState();   // ツールパレットのドック/フロート状態・位置を復元
         LoadAutosaveInterval();   // オートセーブ間隔設定の復元（既定5分）
         StartAutosaveTimer();
+        LoadKeyBindings();   // ショートカットキー割り当ての復元（既定値で補完）
+        ApplyKeyBindings();  // 動的 KeyboardAccelerator を RootGrid へ登録
 #if !DEBUG
         RestartMenuItem.Visibility = Visibility.Collapsed;   // 開発用「再ビルドして再起動」は配布版で隠す
 #endif
@@ -483,9 +485,6 @@ public sealed partial class MainPage : Page
 
     // ===== 機器表パネル =====
 
-    private void OnFindAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
-    { ToggleFindBar(); args.Handled = true; }
-
     // ===== 削除 =====
 
     private void OnDelete(object sender, RoutedEventArgs e) => DeleteSelected();
@@ -612,10 +611,8 @@ public sealed partial class MainPage : Page
                 if (IsInlineEditing || IsTextInputFocused()) break;
                 DeleteSelected(); e.Handled = true; break;
 
-            case VirtualKey.F5: ActivateTool("ContactNO"); e.Handled = true; break;
-            case VirtualKey.F6: ActivateTool("ContactNC"); e.Handled = true; break;
-            case VirtualKey.F7: ActivateTool("Coil"); e.Handled = true; break;
-            case VirtualKey.F8: ActivateTool("PushButtonNO"); e.Handled = true; break;
+            // F5-F8（ツール切替）はカスタマイズ可能コマンドとして MainPage.KeyBindings.cs が
+            // 動的 KeyboardAccelerator で処理する（ここでは扱わない）。
 
             case VirtualKey.Escape:
                 if (_rangeSelecting) { _rangeSelecting = false; ClearMultiSelection(); Canvas.Invalidate(); e.Handled = true; break; }
