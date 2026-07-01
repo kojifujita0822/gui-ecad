@@ -625,6 +625,7 @@ public sealed partial class MainPage : Page
                 else if (_editingFrame != null) CommitFrameLabel(accept: false);
                 else if (FindBar.Visibility == Visibility.Visible) CloseFindBar();
                 else if (_tool.Mode != ToolMode.Select) ActivateTool("select");
+                else if (_keyboardModeActive) ExitKeyboardMode();
                 e.Handled = true;
                 break;
 
@@ -636,6 +637,12 @@ public sealed partial class MainPage : Page
                     _spacePanActive = true;
                     e.Handled = true;
                 }
+                break;
+
+            // キーボード配置モード中の矢印キー（フォーカスセル移動）・数字キー（ツール選択）。
+            // 既存ハンドラの無い組み合わせのため default に集約する。
+            default:
+                if (HandleKeyboardModeKey(e.Key)) e.Handled = true;
                 break;
         }
     }

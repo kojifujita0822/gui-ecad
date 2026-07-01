@@ -176,6 +176,15 @@
                               Content="&#x25B6; テスト" FontWeight="SemiBold"
                               Padding="10,5" MinWidth="80" />
                 <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
+                <!-- キーボード配置モード（マウスレス配置。矢印キーでフォーカスセル移動・数字キーでツール選択・Enterで配置） -->
+                <ToggleButton x:Name="KeyboardModeBtn" AutomationProperties.AutomationId="KeyboardModeBtn"
+                              VerticalAlignment="Center" Click="OnKeyboardModeToggle"
+                              Content="&#x2328; キー配置" ToolTipService.ToolTip="キーボード配置モード（矢印キー移動・数字キーでツール選択・Enterで配置・Escで終了）"
+                              Padding="10,5" />
+                <TextBlock x:Name="KeyboardModeHint" VerticalAlignment="Center" FontSize="11" Margin="6,0,0,0"
+                           Visibility="Collapsed"
+                           Text="1:a接点 2:b接点 3:コイル 4:PB-NO 5:PB-NC 6:限時a 7:限時b 8:表示灯 9:端子台 0:選択" />
+                <Rectangle Margin="4,2" Fill="{ThemeResource AppDividerBrush}" VerticalAlignment="Stretch" Width="1" />
                 <!-- Undo / Redo -->
                 <Button VerticalAlignment="Center" Click="OnMenuUndo" ToolTipService.ToolTip="元に戻す (Ctrl+Z)">
                     <FontIcon Glyph="&#xE7A7;" FontSize="14" />

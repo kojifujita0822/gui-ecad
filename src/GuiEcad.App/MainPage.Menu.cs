@@ -53,11 +53,20 @@ public sealed partial class MainPage
         args.Handled = true;
     }
 
-    // 配置直後・選択中の要素を Enter で機器名インライン編集（Canvas のフォーカス有無に依らず確実に拾う）
+    // 配置直後・選択中の要素を Enter で機器名インライン編集（Canvas のフォーカス有無に依らず確実に拾う）。
+    // キーボード配置モード中は Enter＝フォーカスセルへの配置確定を優先する（機器名編集は起動しない）。
     private void OnEnterAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         if (_testMode || _editingElement is not null || _editingComment is not null || _editingFrame is not null) return;
         if (FindBar.Visibility == Visibility.Visible) return;   // 検索バー入力中は除外
+        if (_keyboardModeActive)
+        {
+            if (PlaceKind is ElementKind kind && _focusCell.Row >= 0 && _focusCell.Column >= 0
+                && _focusCell.Column < _sheet.Grid.Columns)
+                PlaceElementAt(kind, _focusCell.Row, _focusCell.Column);
+            args.Handled = true;
+            return;
+        }
         if (_selected is not null) { ShowDeviceNameEditor(_selected); args.Handled = true; }
     }
 

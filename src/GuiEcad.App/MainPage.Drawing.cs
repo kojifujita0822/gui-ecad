@@ -136,21 +136,31 @@ public sealed partial class MainPage : Page
             renderer.DrawCircle(new(sd.XMm, sd.YMm), _geo.CellMm * 0.22,
                                 new StrokeStyle(DrawingTheme.Blue, 0.3));
 
-        // 記号配置ツール選択中：マウス位置に半透明の配置プレビュー（ゴースト）を描く。
-        // 配置可能なセル範囲（列内）にいるときだけ表示し、有効範囲を視認できるようにする。
+        // 記号配置ツール選択中：マウス位置（キーボード配置モード中はフォーカスセル）に
+        // 半透明の配置プレビュー（ゴースト）を描く。配置可能なセル範囲（列内）にいるときだけ表示する。
+        var previewCell = _keyboardModeActive ? _focusCell : _hoverCell;
         if (!_testMode && PlaceKind is ElementKind pk
-            && _hoverCell.Row >= 0 && _hoverCell.Column >= 0 && _hoverCell.Column < _sheet.Grid.Columns)
+            && previewCell.Row >= 0 && previewCell.Column >= 0 && previewCell.Column < _sheet.Grid.Columns)
         {
             var ghost = new ElementInstance
             {
                 Kind = pk,
-                Pos = _hoverCell,
+                Pos = previewCell,
                 PartId = PlacePartId,
                 CellWidth = _document.Library?.Get(PlacePartId)?.WidthCells
                             ?? ElementCatalog.DefaultCellWidth(pk),
             };
             if (PlaceOrient is not null) ghost.Params[ParamKeys.Orient] = PlaceOrient;
             dr.DrawPreview(renderer, ghost, new Color(120, 0, 120, 255));   // 半透明の青紫
+        }
+
+        // キーボード配置モード中：フォーカスセルを矩形で強調表示する（配置ツール未選択時も見えるように）。
+        if (_keyboardModeActive && _focusCell.Row >= 0 && _focusCell.Column >= 0
+            && _focusCell.Column < _sheet.Grid.Columns)
+        {
+            double fx = _geo.X(_focusCell.Column), fy = _geo.YRow(_focusCell.Row) - _geo.CellMm * 0.5;
+            renderer.DrawRectangle(new(fx, fy, _geo.CellMm, _geo.CellMm),
+                new StrokeStyle(new Color(220, 255, 140, 0), 0.4));   // オレンジ枠
         }
 
         // 選択中の枠ハイライト
