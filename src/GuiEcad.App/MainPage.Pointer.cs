@@ -152,7 +152,11 @@ public sealed partial class MainPage
         // 前操作のドラッグ残骸を破棄（キャプチャ喪失等で固まるのを防ぐ）＋キーボード操作のためフォーカス確保
         _connStartRow = null;
         _frameStartMm = null;
-        if (_editingElement is null && _editingComment is null && _editingRungComment is null && _editingFrame is null) Canvas.Focus(FocusState.Programmatic);
+        if (_editingElement is null && _editingComment is null && _editingRungComment is null && _editingFrame is null)
+        {
+            bool focused155 = Canvas.Focus(FocusState.Programmatic);
+            AppendFocusDebugLog($"OnPointerPressed:155 Canvas.Focus()={focused155}");
+        }
 
         var pos = e.GetCurrentPoint(Canvas).Position;
         var (xMm, yMm) = ToWorld(pos);
@@ -797,7 +801,8 @@ public sealed partial class MainPage
         double y = (_geo.YRow(frame.TopLeft.Row) - _geo.CellMm * 0.4) * scale + _viewport.PanY - 18;
         FrameLabelBox.Margin = new Thickness(x, Math.Max(0, y), 0, 0);
         FrameLabelBox.Visibility = Visibility.Visible;
-        FrameLabelBox.Focus(FocusState.Programmatic);
+        bool focused800 = FrameLabelBox.Focus(FocusState.Programmatic);
+        AppendFocusDebugLog($"ShowFrameLabelEditor:800 FrameLabelBox.Focus()={focused800}");
         FrameLabelBox.SelectAll();
     }
 
@@ -831,13 +836,17 @@ public sealed partial class MainPage
         System.IO.Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "GuiEcad", "focus-debug.log");
 
+    // 全ログ行に共通の連番を振り、複数箇所のFocus呼び出しとLostFocus発火の前後関係を時系列で追えるようにする。
+    private static int _focusLogSeq;
+
     private static void AppendFocusDebugLog(string message)
     {
         try
         {
+            int seq = System.Threading.Interlocked.Increment(ref _focusLogSeq);
             System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(FocusDebugLogPath)!);
             System.IO.File.AppendAllText(FocusDebugLogPath,
-                $"[{DateTime.Now:HH:mm:ss.fff}] {message}{Environment.NewLine}");
+                $"[{DateTime.Now:HH:mm:ss.fff}] #{seq} {message}{Environment.NewLine}");
         }
         catch { /* デバッグ用途のためログ書き込み失敗は無視 */ }
     }
