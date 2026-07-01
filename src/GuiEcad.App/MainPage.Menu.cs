@@ -35,7 +35,8 @@ public sealed partial class MainPage
     private void OnMenuRedo(object sender, RoutedEventArgs e) => DoRedo();
 
     // 配置直後・選択中の要素を Enter で機器名インライン編集（Canvas のフォーカス有無に依らず確実に拾う）。
-    // キーボード配置モード中は Enter＝フォーカスセルへの配置確定を優先する（機器名編集は起動しない）。
+    // キーボード配置モード中は Enter でフォーカスセルへ配置し、配置に成功したら続けて機器名編集も
+    // 起動する（マウス配置と同じ「配置→即名前入力」の流れに揃える。DeviceNameBox 側の Enter で確定）。
     private void OnEnterAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
         if (_testMode || _editingElement is not null || _editingComment is not null || _editingFrame is not null) return;
@@ -44,7 +45,10 @@ public sealed partial class MainPage
         {
             if (PlaceKind is ElementKind kind && _focusCell.Row >= 0 && _focusCell.Column >= 0
                 && _focusCell.Column < _sheet.Grid.Columns)
-                PlaceElementAt(kind, _focusCell.Row, _focusCell.Column);
+            {
+                var placed = PlaceElementAt(kind, _focusCell.Row, _focusCell.Column);
+                if (placed is not null) ShowDeviceNameEditor(placed);
+            }
             args.Handled = true;
             return;
         }

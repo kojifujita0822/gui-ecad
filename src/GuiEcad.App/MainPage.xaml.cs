@@ -169,9 +169,6 @@ public sealed partial class MainPage : Page
     private double _moveFrameOriginX, _moveFrameOriginY; // ドラッグ開始時の枠 VisualXMm/YMm
     private double _moveFrameClickX, _moveFrameClickY;   // クリック時のワールド座標
 
-    // スペースキーパン
-    private bool _spacePanActive;
-
     // 範囲選択（Ctrl+C / Ctrl+V 用）
     private bool _rangeSelecting;
     private GridPos _rangeStart;

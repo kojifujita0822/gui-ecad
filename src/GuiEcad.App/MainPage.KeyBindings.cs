@@ -186,6 +186,9 @@ public sealed partial class MainPage : Page
         // 作業用コピー。キャンセル時は現在の _keyBindings に影響しない。
         var working = new Dictionary<string, (VirtualKey Key, VirtualKeyModifiers Mods)>(_keyBindings);
         var displays = new Dictionary<string, TextBlock>();
+        // 多重クリック対策はダイアログ全体で1本のフラグに集約する（Button.IsEnabled=false にすると
+        // そのボタン自身がキーボードフォーカスを取得できなくなり、キー捕捉が無反応になるため使わない）。
+        bool capturingKeyBinding = false;
 
         var listPanel = new StackPanel { Spacing = 4 };
         foreach (var cmd in CommandDefs)
@@ -201,10 +204,11 @@ public sealed partial class MainPage : Page
             var changeBtn = new Button { Content = "変更" };
             changeBtn.Click += async (_, _) =>
             {
-                changeBtn.IsEnabled = false;
+                if (capturingKeyBinding) return;
+                capturingKeyBinding = true;
                 display.Text = "キーを押してください（Escでキャンセル）";
                 var captured = await CaptureKeyBindingInlineAsync(changeBtn);
-                changeBtn.IsEnabled = true;
+                capturingKeyBinding = false;
                 if (captured is not (VirtualKey key, VirtualKeyModifiers mods))
                 {
                     display.Text = FormatBinding(working[cmd.Id]);   // キャンセル時は表示を戻す

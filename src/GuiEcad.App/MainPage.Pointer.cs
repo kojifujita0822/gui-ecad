@@ -79,7 +79,9 @@ public sealed partial class MainPage
     // 要素配置（drawing-spec.md の仕様どおり「挿入」＝挿入位置(col)以降・同一行の既設要素は右へシフト。
     // シフトで行末（母線）からはみ出す、または既存要素の途中に重なる場合は警告して拒否。
     // マウスクリック（OnPointerPressed）・キーボード配置（Enterキー）の両方から呼ぶ共通処理。
-    private void PlaceElementAt(ElementKind kind, int row, int col)
+    // 戻り値: 配置した要素（拒否時は null）。キーボード配置モードから呼ぶ側が、配置成功時に
+    // 続けて機器名編集を起動するために使う。
+    private ElementInstance? PlaceElementAt(ElementKind kind, int row, int col)
     {
         var part = _document.Library?.Get(PlacePartId);
         int newWidth = part?.WidthCells ?? ElementCatalog.DefaultCellWidth(kind);
@@ -91,7 +93,7 @@ public sealed partial class MainPage
             if (col > l && col < r)
             {
                 _ = ShowErrorAsync("既存の要素の途中には挿入できません。");
-                return;
+                return null;
             }
             if (l >= col) toShift.Add(rowElem);
         }
@@ -101,7 +103,7 @@ public sealed partial class MainPage
             if (r + newWidth > _sheet.Grid.Columns)
             {
                 _ = ShowErrorAsync("行末をはみ出すため挿入できません。");
-                return;
+                return null;
             }
         }
 
@@ -130,6 +132,7 @@ public sealed partial class MainPage
         RefreshDevicePanel();
         RefreshPropertiesPanel();
         Canvas.Invalidate();
+        return el;
     }
 
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
@@ -153,22 +156,6 @@ public sealed partial class MainPage
 
         var pos = e.GetCurrentPoint(Canvas).Position;
         var (xMm, yMm) = ToWorld(pos);
-
-        // スペースキー保持中は全ツール共通でパン（テストモード除く）
-        // KeyDown フラグ＋GetKeyStateForCurrentThread の二重判定（Canvas がキーイベントを吸収する環境に対応）
-        // 物理的にスペースが押されていなければ KeyUp の取りこぼしに備えてフラグを必ず落とす。
-        // （残ると以降のクリックが常にパンになり、要素を選択できなくなる）
-        bool spacePhysical =
-            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Space) & CoreVirtualKeyStates.Down) != 0;
-        if (!spacePhysical) _spacePanActive = false;
-        bool spaceDown = !_testMode && (_spacePanActive || spacePhysical);
-        if (spaceDown)
-        {
-            _panning = true;
-            _lastPointer = pos;
-            Canvas.CapturePointer(e.Pointer);
-            return;
-        }
         int row = _geo.RowAt(yMm), col = _geo.ColAt(xMm);
 
         // 自前ダブルクリック検出: 選択/分岐ツールは CapturePointer で DoubleTapped が来ないため、
@@ -429,13 +416,6 @@ public sealed partial class MainPage
 
     private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
     {
-        // スペースキー解放をポーリング検知する（KeyboardAccelerator には KeyUp 相当が無いため）。
-        // 次にクリックした際の誤パン判定を防ぐためのフラグリセットであり、進行中のパン(_panning)
-        // 自体はマウスボタンを離すまで継続する（OnPointerPressed 内の同種チェックと同じ考え方）。
-        if (_spacePanActive &&
-            (InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Space) & CoreVirtualKeyStates.Down) == 0)
-            _spacePanActive = false;
-
         var pos = e.GetCurrentPoint(Canvas).Position;
 
         var (sxMm, syMm) = ToWorld(pos);

@@ -91,14 +91,17 @@ public sealed partial class MainPage : Page
         return false;
     }
 
-    // ===== グローバルキー（Escape/Backspace/Space） =====
+    // ===== グローバルキー（Escape/Backspace/PageUp/PageDown） =====
     //
     // 通常のマウス操作（MainPage.Pointer.cs の OnPointerPressed）は Canvas.Focus() を呼ぶため、
     // Canvas 上を一度でもクリックした状態では Page.OnKeyDown にキーが届かないことがある
-    // （既知の制約）。矢印キー・数字キーと同じ理由で、これら3キーも Canvas のフォーカス状態に
+    // （既知の制約）。矢印キー・数字キーと同じ理由で、これらのキーも Canvas のフォーカス状態に
     // 依存しない RootGrid の KeyboardAccelerator へ移行する。
+    // Space 押しっぱなしでの連続パンは廃止し、PageUp/PageDown 1回につき1行分の離散スクロールに
+    // 変更した（殿決定・ラウンド3 R3-2）。KeyboardAccelerator は単発発火のみのため、Space のような
+    // 「押しっぱなし状態」の管理（離した検知）が不要な離散操作の方が構造的に相性がよい。
 
-    /// <summary>起動時に1回だけ呼ぶ。Escape・Backspace・Space を RootGrid の KeyboardAccelerator として登録する。</summary>
+    /// <summary>起動時に1回だけ呼ぶ。Escape・Backspace・PageUp/PageDown を RootGrid の KeyboardAccelerator として登録する。</summary>
     private void RegisterGlobalKeyAccelerators()
     {
         void Add(VirtualKey key, Func<bool> handler)
@@ -109,7 +112,8 @@ public sealed partial class MainPage : Page
         }
         Add(VirtualKey.Escape, HandleEscape);
         Add(VirtualKey.Back, HandleBackspace);
-        Add(VirtualKey.Space, HandleSpaceDown);
+        Add(VirtualKey.PageUp, () => ScrollByRows(-1));
+        Add(VirtualKey.PageDown, () => ScrollByRows(1));
     }
 
     // Escape の意味は文脈で7通りに分かれる（優先順位はコード順）。常に処理済み扱い（true）。
@@ -135,14 +139,15 @@ public sealed partial class MainPage : Page
         return true;
     }
 
-    // Space 押下でパン開始。KeyboardAccelerator に KeyUp 相当が無いため、離した検知は
-    // MainPage.Pointer.cs の OnPointerMoved 内でポーリングする。編集中・検索バー表示中は無効。
-    private bool HandleSpaceDown()
+    // PageUp(-1)/PageDown(+1) で1行分（CellMm相当）を離散スクロールする。編集中・検索バー表示中は無効。
+    private bool ScrollByRows(int rows)
     {
         if (_testMode || _editingElement != null || _editingComment != null
             || _editingRungComment != null || _editingFrame != null
             || FindBar.Visibility == Visibility.Visible) return false;
-        _spacePanActive = true;
+        double scale = DipsPerMm * _viewport.Zoom;
+        _viewport.PanY -= rows * _geo.CellMm * scale;
+        Canvas.Invalidate();
         return true;
     }
 }
