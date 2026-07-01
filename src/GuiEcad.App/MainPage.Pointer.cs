@@ -806,6 +806,7 @@ public sealed partial class MainPage
         var frame = _editingFrame;
         _editingFrame = null;
         FrameLabelBox.Visibility = Visibility.Collapsed;
+        RootGrid.Focus(FocusState.Programmatic);
         if (accept)
         {
             string newLabel = FrameLabelBox.Text.Trim();
@@ -849,6 +850,7 @@ public sealed partial class MainPage
         var elem = _editingElement;
         _editingElement = null;
         DeviceNameBox.Visibility = Visibility.Collapsed;
+        RootGrid.Focus(FocusState.Programmatic);
 
         if (accept)
         {
@@ -897,6 +899,7 @@ public sealed partial class MainPage
         var elem = _editingComment;
         _editingComment = null;
         CommentBox.Visibility = Visibility.Collapsed;
+        RootGrid.Focus(FocusState.Programmatic);
 
         if (accept)
         {
@@ -944,6 +947,7 @@ public sealed partial class MainPage
         var rc = _editingRungComment;
         _editingRungComment = null;
         RungCommentBox.Visibility = Visibility.Collapsed;
+        RootGrid.Focus(FocusState.Programmatic);
 
         if (accept)
         {
