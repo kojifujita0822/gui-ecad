@@ -152,7 +152,7 @@ public sealed partial class MainPage
         // 前操作のドラッグ残骸を破棄（キャプチャ喪失等で固まるのを防ぐ）＋キーボード操作のためフォーカス確保
         _connStartRow = null;
         _frameStartMm = null;
-        if (_editingElement is null && _editingComment is null && _editingRungComment is null) Canvas.Focus(FocusState.Programmatic);
+        if (_editingElement is null && _editingComment is null && _editingRungComment is null && _editingFrame is null) Canvas.Focus(FocusState.Programmatic);
 
         var pos = e.GetCurrentPoint(Canvas).Position;
         var (xMm, yMm) = ToWorld(pos);
@@ -806,8 +806,7 @@ public sealed partial class MainPage
         var frame = _editingFrame;
         _editingFrame = null;
         FrameLabelBox.Visibility = Visibility.Collapsed;
-        bool focusedAfterFrameLabel = FocusSinkButton.Focus(FocusState.Programmatic);
-        System.Diagnostics.Debug.WriteLine($"[KeyboardFocusFix] CommitFrameLabel: FocusSinkButton.Focus()={focusedAfterFrameLabel}");
+        FocusSinkButton.Focus(FocusState.Programmatic);
         if (accept)
         {
             string newLabel = FrameLabelBox.Text.Trim();
@@ -851,8 +850,7 @@ public sealed partial class MainPage
         var elem = _editingElement;
         _editingElement = null;
         DeviceNameBox.Visibility = Visibility.Collapsed;
-        bool focusedAfterDeviceName = FocusSinkButton.Focus(FocusState.Programmatic);
-        System.Diagnostics.Debug.WriteLine($"[KeyboardFocusFix] CommitDeviceName: FocusSinkButton.Focus()={focusedAfterDeviceName}");
+        FocusSinkButton.Focus(FocusState.Programmatic);
 
         if (accept)
         {
@@ -901,8 +899,7 @@ public sealed partial class MainPage
         var elem = _editingComment;
         _editingComment = null;
         CommentBox.Visibility = Visibility.Collapsed;
-        bool focusedAfterComment = FocusSinkButton.Focus(FocusState.Programmatic);
-        System.Diagnostics.Debug.WriteLine($"[KeyboardFocusFix] CommitComment: FocusSinkButton.Focus()={focusedAfterComment}");
+        FocusSinkButton.Focus(FocusState.Programmatic);
 
         if (accept)
         {
@@ -950,8 +947,7 @@ public sealed partial class MainPage
         var rc = _editingRungComment;
         _editingRungComment = null;
         RungCommentBox.Visibility = Visibility.Collapsed;
-        bool focusedAfterRungComment = FocusSinkButton.Focus(FocusState.Programmatic);
-        System.Diagnostics.Debug.WriteLine($"[KeyboardFocusFix] CommitRungComment: FocusSinkButton.Focus()={focusedAfterRungComment}");
+        FocusSinkButton.Focus(FocusState.Programmatic);
 
         if (accept)
         {
