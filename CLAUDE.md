@@ -75,6 +75,7 @@ dotnet test  GuiEcad.sln
 | [docs/persistence.md](docs/persistence.md) | 永続化フォーマット（JSON / `.GCAD`） |
 | [docs/setup.md](docs/setup.md) | セットアップ・プロジェクト構成・雛形生成手順 |
 | [docs/todo.md](docs/todo.md) | 未着手・保留タスク一覧／進捗 |
+| [docs/known-issues.md](docs/known-issues.md) | 既知の不具合（修正を試みたが未解決・保留のもの） |
 | [docs/test-plan.md](docs/test-plan.md) | 総合テストプラン（パッケージング前・自動＋実機チェックリスト） |
 | [docs/packaging.md](docs/packaging.md) | パッケージング・配布手順（unpackaged self-contained） |
 | [docs/three-phase-plan.md](docs/three-phase-plan.md) | 三相動力回路（主回路図）作成プラン（次セッション着手） |

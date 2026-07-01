@@ -378,3 +378,146 @@ changeBtn.Click += async (_, _) =>
 **テスト方針**: 既存184テストの回帰確認＋実機確認（忍者）：「変更」→表示が「キーを押してください」に変わる→キー押下で即座に確定・表示更新、Escでキャンセル、を確認。念のため「変更」ボタンを連打した場合に多重捕捉が起きないことも確認。
 
 **概算工数**: 0.1〜0.25人日（原因が明確な小修正）。
+
+---
+
+## ラウンド4（2026-07-01・新規不具合：機器名入力後の方向キーでフォーカスが下部パネルに奪われる）
+
+> 家老より、キーボード配置モードで機器設置→機器名入力→方向キー移動時にキー入力が下部パネル（DRC/検索結果/接続検査のTabView）に奪われる不具合の調査依頼。コード読解のみで原因を特定（実機再現・フォーカス移動先の裏付けは忍者が並行確認中）。
+
+**現状**（`MainPage.Pointer.cs:846-863` `CommitDeviceName`）: `DeviceNameBox.Visibility = Visibility.Collapsed;`（851行）でエディタを閉じるのみで、**フォーカスをどこにも明示的に戻していない**。
+
+**原因（推定・最有力仮説）**: `Canvas`（`MainPage.xaml:530-539`）は現状も`IsTabStop`が未設定のまま（ラウンド1調査で既知の制約、方針B移行後も未対応）で、キーボードフォーカスを取得できない。`DeviceNameBox`が`Collapsed`になりフォーカスを喪失すると、WinUIの既定挙動として、フォーカスはビジュアルツリー内の他のフォーカス可能要素へ自動的に再割り当てされる。`Canvas`がその受け皿になれないため、下部パネルの`OutputTabView`（`MainPage.xaml:666`、DRC/検索結果/接続検査）内の`TabViewItem`がフォーカスを引き継いでいると推定される。`TabViewItem`は標準コントロールとしてフォーカスを持つと左右矢印キーでタブ切替する組み込みキー処理を持ち、ラウンド1で確認済みの一次資料「フォーカス中コントロールの組み込みアクセラレータが優先」の原則により、以降の方向キーが`RootGrid`の`KeyboardAccelerator`（`RegisterKeyboardModeAccelerators`）より先にTabView側の組み込み処理に消費されると考えられる。これが「キー入力が下部パネルに奪われる」の実体。
+
+**横展開（同型バグの可能性）**: 同じ「`Visibility=Collapsed`後にFocus復帰処理なし」パターンが`CommitFrameLabel`（803-816行）・`CommitComment`（894行台）・`CommitRungComment`（941行台）にも存在する。機器名編集固有ではなく、インライン編集全般に共通する構造。
+
+**方針（案）**: Commit系メソッドで`Visibility=Collapsed`直後、フォーカスを安全な場所へ明示的に戻す。
+- 案A: `Canvas`に`IsTabStop="True"`を追加した上で`Canvas.Focus(FocusState.Programmatic)`を呼ぶ（ラウンド1で指摘済みのWin2D Issue #686対応をここで併せて行う）。
+- 案B: Canvasフォーカス依存を再導入しない方針Bの発想を踏襲し、`RootGrid`配下の何らかのフォーカス可能な非表示要素（またはPage自身）にFocusを戻す。
+矢印キー処理自体は既に`RootGrid`の`KeyboardAccelerator`に集約されフォーカス非依存のはずだが、`TabView`のような「フォーカス時に矢印キーを消費する組み込み動作」を持つコントロールにフォーカスが渡ってしまうと機能しなくなるため、**Commit系メソッドがフォーカスを迷子にしない**ことが根本対応として必須と考える。実装方式（案A/B）の選定は侍・家老判断。
+
+**影響範囲・変更ファイル（推定）**: `src/GuiEcad.App/MainPage.Pointer.cs`（`CommitDeviceName`/`CommitFrameLabel`/`CommitComment`/`CommitRungComment`）、案A採用時は`src/GuiEcad.App/MainPage.xaml`（Canvas`IsTabStop`追加）。
+
+**テスト方針**: 実機確認（忍者）必須：キーボード配置モードで機器名入力確定→方向キー移動が下部パネルに奪われず正しくセル移動すること。横展開4箇所（機器名・枠ラベル・コメント・行コメント）すべてで同様の確認。
+
+**概算工数**: 0.25〜0.5人日（Commit系4箇所への同一パターン適用）。
+
+---
+
+## ラウンド5（2026-07-01・cd60080後も再現した枠ラベル早期確定バグの再調査）
+
+> 侍がcd60080（155行目に`_editingFrame is null`追加）を適用後も、忍者のUIA実機確認で再現。忍者の詳細切り分けにより「PointerPressed直後はFrameLabelBoxに正しくフォーカスがあるが、直後のPointerReleased発生時には既にFocusSinkButtonへ移りCommitFrameLabelが実行済み」と判明。発火源はPointerPressedではなくPointerReleased側にある可能性が高いとの依頼で再調査。
+
+**確認したこと（事実）**:
+- `OnPointerReleased`（`MainPage.Pointer.cs:557-750`）全体を通読したが、`FrameLabelBox`から明示的にフォーカスを奪うコード（`Focus()`呼び出し等）は存在しない。
+- 忍者が疑った`_movingFrame`関連処理（672-676行目）は、今回のシナリオ（ドラッグを伴わない単純な2クリック）では無関係と判断する。理由: 1回目のクリック（`isDouble=false`）でHitTestFrameにヒットし`_movingFrame=true`がセットされるが、1回目のクリックに対応するPointerReleasedで672-676行目が評価され`_movingFrame=false`にリセットされる。2回目のクリック（`isDouble=true`）はOnPointerPressed内のisDoubleブロック（179行目）で`ShowFrameLabelEditor`を呼んだ後`return`しており、`_movingFrame`はセットされないため、2回目のPointerReleased時点では`_movingFrame`は既にfalseで672-676行目は素通りする。
+- 唯一気になる箇所は`OnPointerReleased`末尾（749行目）の**無条件**`Canvas.ReleasePointerCapture(e.Pointer);`。他の早期returnパス（`_rangeSelecting`・`_frameStartMm`・`_connStartRow`等）は個別にReleasePointerCaptureを呼んでいるが、末尾のこの1行だけは、Commit系メソッドで使っている`_editingXxx`系ガードが一切適用されない。他の3パターン（機器名/コメント/行コメント編集中）でも理論上同じ経路を通りうるが、現時点で不具合報告があるのは枠ラベルのみ（枠は`_movingFrame`という他パターンにはない専用のドラッグ状態を経由する点が唯一の違い）。
+
+**判定できなかったこと（不明・断定不可）**:
+- `Canvas.ReleasePointerCapture`の呼び出し自体が`FrameLabelBox`のフォーカス喪失を引き起こすという直接的な一次資料の裏付けは得られていない。WinUIの「ポインタキャプチャ解放時に暗黙のフォーカス再計算が走る」ような挙動があるかどうかは未確認。
+- 代替仮説として、2回目のクリックのPointerPressed処理中に`FrameLabelBox.Visibility`が`Collapsed→Visible`に変化することで、対応するPointerReleased（mouseup）発生時点のヒットテスト結果がCanvasからFrameLabelBoxへ変わり、その过程で何らかのWinUI内部処理（フォーカス再計算等）が働いている可能性があるが、これも一次資料での裏付けはなく推測の域を出ない。
+- したがって、忍者が言う「PointerReleased側が発火源」という切り分けは事実として尊重しつつ、**コード読解のみでは一次原因を確定できなかった**。
+
+**推奨案（優先度順）**:
+1. **対症・低リスク**: `OnPointerReleased`末尾の`Canvas.ReleasePointerCapture(e.Pointer);`に、他のCommit系ガードと同型の条件（`_editingFrame is null && _editingElement is null && _editingComment is null && _editingRungComment is null`）を追加し、インライン編集中はこの呼び出し自体をスキップする。他3パターンとの対称性の観点でも妥当だが、効果があるかは未検証。
+2. **根本確認・要実機**: `OnFrameLabelBoxLostFocus`に一時的なデバッグログ（呼び出しタイミング・`e.OriginalSource`・スタック情報等）を仕込み、実機で「PointerReleasedのどの処理段階で・何がLostFocusを引き起こしているか」を忍者に再確認してもらう。cd60080で削除した検証ログと同種のアプローチを、今度はLostFocus側に仕込む形。**これが最も確実な次の一手**と考える。
+3. **構造的対応（大きめ）**: Commit系メソッドに短時間のデバウンス（`ShowXxxEditor`呼び出し直後の一定ミリ秒以内のLostFocusは無視する等）を導入し、同一ポインタジェスチャに起因する意図しない早期確定を構造的に防ぐ。副作用（正当なLostFocusも遅延する等）の検証が必要なため、まずは1・2を優先すべき。
+
+**影響範囲・変更ファイル（案1採用時）**: `src/GuiEcad.App/MainPage.Pointer.cs`（`OnPointerReleased`末尾のガード追加のみ）。
+
+**要判断事項**: 案1（対症）を先に試し、実機で直らなければ案2（デバッグログ）で一次原因を確定してから再修正する段階的対応でよいか。原因未確定のため、いきなり案3（構造変更）に進むのはリスクが高いと考える。
+
+---
+
+## ラウンド6（2026-07-01・案2ログにより真犯人判明：RefreshPropertiesPanelのChildren.Clear）
+
+> 侍が仕込んだ一時ログにより、`newFocus`が`ScrollViewer`（`MainPage.xaml:779`、x:Name無し、プロパティタブ内、`PropertiesPanel`を包む要素）と判明。かつこのログはCommitFrameLabel呼び出し**前**（FocusSinkButtonへの退避処理より前）に記録されており、ラウンド4/5の修正・調査対象とは別の経路と確定。
+
+**原因（確定度：高）**: `RefreshPropertiesPanel`（`MainPage.Properties.cs:124-146`）の`PropertiesPanel.Children.Clear()`（127行目）。`MainPage.xaml:779`で`PropertiesPanel`（`StackPanel`）は`ScrollViewer`（既定`IsTabStop=True`）に包まれている。
+
+流れ:
+1. 枠をダブルクリックする1回目のクリック（`isDouble=false`）で`HitTestFrame`にヒットし`SelectFrame(hitFrame)`（`MainPage.Pointer.cs:346`）が呼ばれる。`SelectFrame`は`_selected = null`にする（30-37行目、選択種別の相互排他ヘルパー）。
+2. 同じ1回目のクリック処理の末尾、`MainPage.Pointer.cs:413`で`RefreshPropertiesPanel()`が呼ばれる。`_selected is null`のため136-146行目の分岐に入り、`PropertiesPanel.Children.Clear()`実行後「要素を選択してください」のTextBlockのみを追加する。
+3. **もし直前に選択されていた要素（SelectSwitchのノッチ位置、Timerの設定時間等でNumberBoxを表示する種別）のプロパティ内NumberBoxがフォーカスを保持していた場合**、Clear()でそのNumberBoxがVisual Treeから消え、WinUIの既定フォーカス委譲ロジックにより、Visual Treeを親方向に遡って最初に見つかるフォーカス可能要素＝`ScrollViewer`（既定IsTabStop=True）へフォーカスが移る。
+4. このフォーカス委譲はUIスレッドの次のレイアウト/コンポジションタイミングでわずかに遅延して発生すると推定される。そのため、直後（2回目のクリック、`isDouble=true`）で`ShowFrameLabelEditor`→`FrameLabelBox.Focus()`が実行された直後は正しくフォーカスされている（忍者のログ「PointerPressed直後は正常」と一致）が、その後の非同期タイミングで1回目のクリックが仕込んだフォーカス委譲が遅れて発動し、FrameLabelBoxのフォーカスを上書き→LostFocus発火→CommitFrameLabel実行、という順序になっていると推定される。
+
+**枠のみで顕在化する理由**: 機器名/コメント/行コメントのダブルクリック編集は、1回目のクリックが編集対象の要素自体をヒットするため`_selected`はその要素のままか別要素に変わるだけで、`RefreshPropertiesPanel`は「別の内容」に置き換わるだけで済むことが多い。一方`SelectFrame`は`_selected`を必ず`null`にするため、「要素を選択してください」という完全に空の状態への遷移が強制され、直前にNumberBox等がフォーカスを持っていた場合にフォーカス委譲が起きやすい。
+
+**断定できない点**: 「直前にプロパティパネルのNumberBox等が実際にフォーカスを持っていたか」は実機シナリオ（直前の操作）に依存しコード読解のみでは確認しきれない。またフォーカス委譲が同期か非同期かはWinUI内部実装の一次資料での裏付けは無い（観測結果からの推定）。ただし`Children.Clear()`→`ScrollViewer`という経路自体は`MainPage.xaml:779`の構造とWinUIの既定挙動（ScrollViewerの既定IsTabStop=True）から高い確度で説明がつく。
+
+**推奨案**: `RefreshPropertiesPanel()`冒頭、`PropertiesPanel.Children.Clear()`を呼ぶ**前**に、既存のCommit系4箇所と同じパターンで`FocusSinkButton.Focus(FocusState.Programmatic)`を無条件に呼んでおく。これによりClear()実行時点でPropertiesPanel配下にフォーカスがある状態自体を作らず、既定フォーカス委譲（ScrollViewerへの意図しない移動）を未然に防げる。
+
+**実装イメージ**:
+```csharp
+private void RefreshPropertiesPanel()
+{
+    // Children.Clear() 実行前にフォーカスを退避しないと、Clear対象の子要素(NumberBox等)が
+    // フォーカスを持っていた場合、既定のフォーカス委譲で親のScrollViewer(IsTabStop既定True)へ
+    // フォーカスが移り、他のインライン編集(枠ラベル等)からフォーカスを奪ってしまう。
+    FocusSinkButton.Focus(FocusState.Programmatic);
+    _refreshingProps = true;
+    PropertiesPanel.Children.Clear();
+    ...
+```
+既存のCommit系4箇所と発想は同一（Visual Treeから要素が消える操作の前にフォーカスを安全な場所へ逃がす）。
+
+**影響範囲・変更ファイル**: `src/GuiEcad.App/MainPage.Properties.cs`（`RefreshPropertiesPanel`冒頭に1行追加）。
+
+**テスト方針**: 実機確認（忍者）：SelectSwitch/Timer等NumberBoxを持つ要素を選択→プロパティパネルのNumberBoxをクリックしてフォーカスさせる→枠をダブルクリックして編集開始→文字入力できることを確認。既存の機器名/コメント/行コメント編集や通常のプロパティ編集（NumberBox操作等）に回帰が無いことも確認。
+
+**概算工数**: 0.1人日（1行追加のみ）。
+
+---
+
+## ラウンド7（2026-07-01・7b3c16e適用後も再現。真因は未確定に後退）
+
+> 侍が7b3c16e（`RefreshPropertiesPanel`冒頭に`FocusSinkButton.Focus()`追加）を適用後も、忍者確認で再現。ログも前回と同一内容（`newFocus=ScrollViewer`）。忍者より4項目の再検証依頼。
+
+**検証結果（事実）**:
+1. **`RefreshPropertiesPanel`の全呼び出し箇所**: `MainPage.Sheets.cs:82,110,133` / `MainPage.Image.cs:50` / `MainPage.Pointer.cs:133,413` / `MainPage.Properties.cs:499,503` / `MainPage.Menu.cs:31,32`（Undo/Redo）。このうち枠ダブルクリックのフローで実行されるのは`MainPage.Pointer.cs:413`（1回目のクリック、`SelectFrame`直後）**のみ**。2回目のクリック（`isDouble`ブロック、179行目）は`ShowFrameLabelEditor`呼び出し後に即`return`しており、310行目以降の`SelectFrame`/`RefreshPropertiesPanel`経路には到達しない。忍者の指摘通り、**2回目クリックからRefreshPropertiesPanelには到達しないことを再確認・確定**。
+2. **`Children.Clear()`と同種の処理**: `RefreshDevicePanel`（`MainPage.Properties.cs:81-112`）が`DeviceListView.Items.Clear()`（102行目）を持つが、これは「機器表」タブ（非アクティブ想定）の中身操作であり、`_devicePanelVisible`が真の場合のみ実行される。枠選択のフローで`RefreshDevicePanel`が呼ばれる箇所は見当たらない（`SelectFrame`から辿れる経路にはない）。他に同種のClear操作は確認範囲内では見当たらず。
+3. **`FocusSinkButton.Focus()`のタイミング**: 7b3c16eのdiff通り、`RefreshPropertiesPanel`冒頭でコード上`FocusSinkButton.Focus(FocusState.Programmatic)`→`PropertiesPanel.Children.Clear()`の順に記述されており、C#の同期実行順としては前者が完了してから後者が実行されるはず。ただし**戻り値(bool)は確認しておらず、実際に成功したか自体は未検証**。
+4. **isDouble判定の到達可否**: 上記1と同一。179行目の`return`により、2回目クリックが310行目以降に到達しないことは確定。
+
+**評価**: 上記1・4が確定した以上、**ラウンド6で結論づけた「RefreshPropertiesPanelのChildren.Clearが真因」という前回の推定は、根拠が崩れた**。もし本当にRefreshPropertiesPanel（1回目クリックのみで実行）が原因だったなら、2回目クリックのFrameLabelBox.Focus()の方が時間的に後であり、同期処理である限りは「後勝ち」でFrameLabelBoxがフォーカスを維持できるはずである。それでも直らないという事実は、**「1回目クリックのRefreshPropertiesPanelによる委譲が非同期的に遅延して2回目クリック後に発動する」というラウンド6の遅延仮説自体が誤りだった**可能性が高いことを示す。7b3c16eの修正（理論的には正しい対症療法）が効かなかったことも、この評価と整合する。
+
+**現時点での判断**: **一次原因は未確定に後退した**。RefreshPropertiesPanel以外の経路、あるいはWinUIの既定フォーカス処理そのもの（PointerPressedイベントに対する何らかの既定動作が、アプリのFocus()呼び出しより後に働く競合レース、ラウンド1で発見したパターンと同型の可能性）を疑うべきだが、コード読解のみでは追加の手がかりが得られなかった。
+
+**推奨する次の一手（優先度順）**:
+1. **最優先・確度が高い**: 忍者に依頼し、以下3箇所のFocus呼び出しの**戻り値（bool）**を実機ログで確認する。
+   - `MainPage.Pointer.cs:155`（`Canvas.Focus(FocusState.Programmatic)`）→ もしtrueを返しているなら、Canvasが想定に反してフォーカス可能になっている疑いがあり、重大な手がかりになる。
+   - `MainPage.Pointer.cs:799`（`ShowFrameLabelEditor`内、`FrameLabelBox.Focus(FocusState.Programmatic)`）→ 本当に成功しているか。
+   - `MainPage.Properties.cs`（`RefreshPropertiesPanel`冒頭、7b3c16eで追加した`FocusSinkButton.Focus()`）→ 本当に成功しているか。
+2. `OnFrameLabelBoxLostFocus`側で、`FocusManager.GetFocusedElement`だけでなく、LostFocus発火の**タイミング**（1回目クリックの直後か、2回目クリックの直後か、PointerReleased中か）を区別できるログ（例えばカウンタやタイムスタンプ）を追加し、「どのクリックが引き金か」をより精密に切り分ける。
+3. 上記1・2の結果次第で、疑うべき対象をWinUIの既定フォーカス処理（ラウンド1と同型の同期競合レース）側に移し、`ShowFrameLabelEditor`の`FrameLabelBox.Focus()`呼び出しを`DispatcherQueue.TryEnqueue`で1テンポ遅らせて実行する等の対応を検討する余地がある（ラウンド1で`FocusCanvasForKeyboardMode`に適用したのと同型の対処）。ただし原因未確定の段階での実装は時期尚早。
+
+**要判断事項**: 原因が2ラウンド続けて確定できていないため、次は先にデバッグログ（上記1・2）で一次原因を確実に特定してから修正する、という順序を徹底したい。対症療法の繰り返しはリスクが高いと考える。
+
+---
+
+## ラウンド8（2026-07-01・時系列ログで核心に接近、WinUI3既知バグに到達）
+
+> 忍者の時系列ログで、`FrameLabelBox.Focus()`成功(True)から72ms後に`OnFrameLabelBoxLostFocus`発火、かつその間に仕込んだ3箇所(Canvas.Focus/FrameLabelBox.Focus/FocusSinkButton.Focus)はどれも呼ばれていないと判明。72msの間には2回目のマウスアップ(PointerReleased)が挟まる。家老よりOnPointerReleased全処理の洗い出しと、フレームワーク側の一次資料確認を依頼された。
+
+**確認1（コード側）**: `OnPointerReleased`（`MainPage.Pointer.cs:561-755`）を通読。753-754行目の`Canvas.ReleasePointerCapture`は既に21716b8で`_editingFrame is null`等のガードが追加済みで、編集中はスキップされる。それ以外の処理（`_movingFrame`/`_movingLine`/`_movingDot`/`_movingImage`/`_multiMoveOrigins`等の確定処理）は、今回のシナリオ（ドラッグなしの2クリックのみ）ではいずれも該当条件が偽で素通りする。**明示的にフォーカスへ影響するコードはコード内に存在しないことを再確認**。
+
+**確認2（一次資料）**: WebSearchで一致度の高いMicrosoft公式Issueを発見。**[microsoft/microsoft-ui-xaml Issue #6179「Focus moves unexpected after PointerReleased event」](https://github.com/microsoft/microsoft-ui-xaml/issues/6179)**（not plannedでクローズ済み＝Microsoft側は修正しない方針）。
+- 内容: 要素をクリックすると、その要素がPointerPressedを処理していても、**PointerReleased発生後にフォーカスがタブオーダー内の別要素（報告例ではTabIndex=0の要素）へ移ってしまう**、という既知の挙動。Tabキーでの移動は正常。
+- Microsoftからの技術的な根本原因の説明は無く、「仕様として直さない」という扱い。回避策も本Issue内には明記なし。
+
+**本アプリへの当てはめ（推定）**: この既知バグが今回の症状と一致する。2回目のクリックのPointerPressed処理内で`FrameLabelBox.Focus()`が同期的に成功する（忍者ログ通り）が、**そのクリックに対応するPointerReleasedが発生した際、WinUI3のこの既知バグにより、フレームワークが暗黙的に「タブオーダー上の別の有効なフォーカス候補」へフォーカスを移してしまう**。これはアプリコードのどのFocus()呼び出しも経由しない、フレームワーク内部の処理であるため、72ms間3箇所とも呼ばれていないという観測と完全に整合する。
+
+**なぜ`FocusSinkButton`ではなく`ScrollViewer`が選ばれるのか（推定・未検証）**: `FocusSinkButton`（`MainPage.xaml:111-112`）は`IsHitTestVisible="False"`が設定されている。WinUIの既定フォーカス委譲がフォーカス候補を探索する際、**ヒットテスト不可能な要素は候補から除外される**可能性が高く、その場合次に見つかる有効な候補として「現在アクティブなプロパティタブの`ScrollViewer`」（`MainPage.xaml:779`、既定`IsTabStop=True`、`IsHitTestVisible`は既定でtrue）が選ばれていると推定される。**ただしこの「IsHitTestVisible=Falseだと除外される」という点はIssue本文に明記された一次資料ではなく、状況証拠からの推定**である。
+
+**これまで3ラウンド原因を特定できなかった理由**: 真因がアプリコード内ではなくWinUI3フレームワーク自体の既知の挙動だったため、コード読解・アプリ内Focus呼び出し箇所の追跡だけでは原因に辿り着けなかった。
+
+**推奨案（優先度順、いずれも未検証で実機確認必須）**:
+1. **低リスク・最初に試す価値あり**: `FocusSinkButton`の`IsHitTestVisible`を`True`に変更する（`Width="0" Height="0" Opacity="0"`は維持、サイズ0のためクリックの妨げにはならないと推定）。既定フォーカス委譲の候補にFocusSinkButtonが含まれるようになれば、少なくとも「ScrollViewer(意図しないタブ)」ではなく「FocusSinkButton(無害な退避先)」へ委譲されるようになる可能性がある。
+2. 上記1で解決しない場合、`OnFrameLabelBoxLostFocus`（および他のCommit系3箇所）で、`ShowXxxEditor`呼び出し直後の極短時間内（例:100-200ms）に発生したLostFocusは「WinUI既知バグ由来の偽の委譲」とみなし、`CommitXxx`を呼ばずに`Focus()`を奪い返すデバウンス処理を検討する。Issue自体がMicrosoft側で修正されない前提のため、アプリ側での「奪い返し」対応が現実的な落とし所になる可能性が高い。
+3. `Canvas`/`FrameLabelBox`側の`PointerReleased`で`e.Handled = true`を設定することでフレームワークの既定処理が抑制されるか試す余地はあるが、他機能への副作用リスクが読めないため優先度は低い。
+
+**要判断事項**: 案1は変更が1属性のみで低リスクなため、まず実機確認してよいか。効果が無ければ案2（デバウンス）に進む、という段階的対応を提案する。
+
+---
+
+**【2026-07-01 殿判断・確定】本件（枠ラベル早期確定バグ、WinUI3既知バグ Issue #6179 由来）は今回保留とし、既知の制限事項として記録するに留める。** 案1（`FocusSinkButton.IsHitTestVisible`変更）以降の追加対応（案2のデバウンス処理等）は実施しない。実用上の影響（枠をダブルクリック編集した直後に別操作を挟んだ場合にまれに空ラベルのまま確定される）は限定的と判断し、修正コストと発生頻度のバランスから見送りとした。既知の制限事項として`docs/todo.md`にも記録する。
