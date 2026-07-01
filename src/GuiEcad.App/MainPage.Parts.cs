@@ -422,8 +422,9 @@ public sealed partial class MainPage
             (false, ToolMode.Select) when _selectedLine is not null
                 => "ドラッグ: 移動 | DEL: 削除",
             (false, ToolMode.Select) when _selectedDot is not null
-                => "DEL: 削除",
-            (false, ToolMode.Select) when _selectedSet.Count > 0
+                => "ドラッグ: 移動 | DEL: 削除",
+            (false, ToolMode.Select) when _selectedSet.Count + _selectedConnectorSet.Count
+                    + _selectedLineSet.Count + _selectedFrameSet.Count + _selectedDotSet.Count > 0
                 => "ドラッグ: 一括移動 | DEL: 一括削除 | Ctrl+C: コピー",
             (false, ToolMode.Select)
                 => "クリック: 選択 | ドラッグ: 範囲選択",

@@ -102,6 +102,23 @@ internal sealed class MoveFreeLineCommand : IUndoCommand
     public void Undo() { _line.X1Mm = _ox1; _line.Y1Mm = _oy1; _line.X2Mm = _ox2; _line.Y2Mm = _oy2; }
 }
 
+internal sealed class MoveDotCommand : IUndoCommand
+{
+    private readonly Sheet _sheet;
+    private readonly ConnectionDot _dot;
+    private readonly double _ox, _oy, _nx, _ny;
+
+    public MoveDotCommand(Sheet sheet, ConnectionDot dot, double ox, double oy, double nx, double ny)
+    {
+        _sheet = sheet; _dot = dot;
+        _ox = ox; _oy = oy; _nx = nx; _ny = ny;
+    }
+
+    public Sheet Target => _sheet;
+    public void Execute() { _dot.XMm = _nx; _dot.YMm = _ny; }
+    public void Undo() { _dot.XMm = _ox; _dot.YMm = _oy; }
+}
+
 internal sealed class MoveElementCommand : IUndoCommand
 {
     private readonly Sheet _sheet;

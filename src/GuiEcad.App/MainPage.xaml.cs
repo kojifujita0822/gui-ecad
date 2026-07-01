@@ -151,6 +151,10 @@ public sealed partial class MainPage : Page
     private FreeLine? _selectedLine;
     // 接続点（●）ツール
     private ConnectionDot? _selectedDot;
+    // 接続点の単体ドラッグ移動（自由直線と同じく mm 座標・細分格子スナップ）
+    private bool _movingDot;
+    private (double X, double Y) _dotMoveClick;
+    private (double X, double Y) _dotOrig;
     // 自由直線のドラッグ移動
     private bool _movingLine;
     private (double X, double Y) _lineMoveClick;
@@ -180,6 +184,10 @@ public sealed partial class MainPage : Page
     private Dictionary<FreeLine, (double X1, double Y1, double X2, double Y2)> _multiMoveLineOrigins = new();
     private Dictionary<GroupFrame, (GridPos TopLeft, double? VisX, double? VisY)> _multiMoveFrameOrigins = new();
     private Dictionary<ConnectionDot, (double X, double Y)> _multiMoveDotOrigins = new();
+    // 接続点をクリックして開始するグループドラッグの基準点（要素起点の _moving/_moveStartPos に相当。
+    // ConnectionDot はグリッド Pos を持たないため mm→行列換算した仮想セル位置を基準にする）。
+    private ConnectionDot? _groupMoveDotAnchor;
+    private GridPos _groupMoveDotAnchorStart;
 
     // 複数選択（要素＋分岐線＋自由直線＋枠線＋接続点）をまとめて解除する。
     private void ClearMultiSelection()

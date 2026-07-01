@@ -35,6 +35,46 @@ public sealed partial class MainPage
     private void SelectDot(ConnectionDot d) { _selectedDot = d; _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; }
     private void ClearSelection() { _selected = null; _selectedConnector = null; _selectedFrame = null; _selectedLine = null; _selectedDot = null; }
 
+    // 範囲選択の一括移動：基準セル位置からのデルタ(行/列)を全選択要素・分岐線・自由直線・枠・接続点へ適用する。
+    // 移動先が範囲外（行<0・列<0・列>=Columns）になる要素が1つでもあれば何もせず false を返す。
+    // グループドラッグの起点が要素(_moving)でも接続点(_groupMoveDotAnchor)でも共通して使う。
+    private bool TryApplyGroupMoveDelta(int dRow, int dCol)
+    {
+        bool valid = _multiMoveOrigins.Values.All(origin =>
+        {
+            int nr = origin.Row + dRow;
+            int nc = origin.Column + dCol;
+            return nr >= 0 && nc >= 0 && nc < _sheet.Grid.Columns;
+        });
+        if (!valid) return false;
+
+        foreach (var (elem, origin) in _multiMoveOrigins)
+            elem.Pos = new GridPos(origin.Row + dRow, origin.Column + dCol);
+        foreach (var (conn, orig) in _multiMoveConnectorOrigins)
+        {
+            conn.Column    = orig.Col + dCol;
+            conn.TopRow    = orig.TopRow + dRow;
+            conn.BottomRow = orig.BotRow + dRow;
+        }
+        double dxMm = dCol * _geo.CellMm, dyMm = dRow * _geo.CellMm;
+        foreach (var (line, orig) in _multiMoveLineOrigins)
+        {
+            line.X1Mm = orig.X1 + dxMm; line.Y1Mm = orig.Y1 + dyMm;
+            line.X2Mm = orig.X2 + dxMm; line.Y2Mm = orig.Y2 + dyMm;
+        }
+        foreach (var (frame, orig) in _multiMoveFrameOrigins)
+        {
+            frame.TopLeft = new GridPos(orig.TopLeft.Row + dRow, orig.TopLeft.Column + dCol);
+            frame.VisualXMm = orig.VisX.HasValue ? orig.VisX.Value + dxMm : (double?)null;
+            frame.VisualYMm = orig.VisY.HasValue ? orig.VisY.Value + dyMm : (double?)null;
+        }
+        foreach (var (dot, orig) in _multiMoveDotOrigins)
+        {
+            dot.XMm = orig.X + dxMm; dot.YMm = orig.Y + dyMm;
+        }
+        return true;
+    }
+
     private void OnPointerPressed(object sender, PointerRoutedEventArgs e)
     {
         // 右クリックはコンテキストメニュー専用（RightTapped で処理）。
@@ -280,9 +320,32 @@ public sealed partial class MainPage
             _moveFrameClickX = xMm;
             _moveFrameClickY = yMm;
         }
-        else if (HitTestDot(xMm, yMm) is ConnectionDot hitDot)
+        else if (HitTestDot(xMm, yMm) is ConnectionDot hitDot)   // 線の交点上に置かれるため自由直線より先に判定
         {
-            SelectDot(hitDot);   // 線の交点上に置かれるため自由直線より先に判定
+            if (_selectedDotSet.Count > 1 && _selectedDotSet.Contains(hitDot))
+            {
+                // 範囲選択中の点をドラッグ → 全選択要素・分岐線・自由直線・枠・点を一括移動
+                // SelectDot は呼ばない（多重選択ハイライトを維持する）
+                _groupMoveDotAnchor = hitDot;
+                _groupMoveDotAnchorStart = new GridPos(_geo.RowAt(hitDot.YMm), _geo.ColAt(hitDot.XMm));
+                _multiMoveOrigins = _selectedSet.ToDictionary(e => e, e => e.Pos);
+                _multiMoveConnectorOrigins = _selectedConnectorSet.ToDictionary(
+                    c => c, c => (c.Column, c.TopRow, c.BottomRow));
+                _multiMoveLineOrigins = _selectedLineSet.ToDictionary(
+                    l => l, l => (l.X1Mm, l.Y1Mm, l.X2Mm, l.Y2Mm));
+                _multiMoveFrameOrigins = _selectedFrameSet.ToDictionary(
+                    f => f, f => (f.TopLeft, f.VisualXMm, f.VisualYMm));
+                _multiMoveDotOrigins = _selectedDotSet.ToDictionary(
+                    d => d, d => (d.XMm, d.YMm));
+            }
+            else
+            {
+                ClearMultiSelection();
+                SelectDot(hitDot);
+                _movingDot = true;
+                _dotMoveClick = (xMm, yMm);
+                _dotOrig = (hitDot.XMm, hitDot.YMm);
+            }
         }
         else if (HitTestFreeLine(xMm, yMm) is FreeLine hitLine)
         {
@@ -380,11 +443,35 @@ public sealed partial class MainPage
             return;
         }
 
+        // 接続点のドラッグ移動（自由直線と同じく細分格子スナップで平行移動）
+        if (_movingDot && _selectedDot is ConnectionDot md)
+        {
+            double step = _geo.CellMm / LineSnapDiv;
+            double dx = Math.Round((sxMm - _dotMoveClick.X) / step) * step;
+            double dy = Math.Round((syMm - _dotMoveClick.Y) / step) * step;
+            md.XMm = _dotOrig.X + dx; md.YMm = _dotOrig.Y + dy;
+            Canvas.Invalidate();
+            return;
+        }
+
         if (_movingFrame && _selectedFrame is GroupFrame movFr)
         {
             movFr.VisualXMm = _moveFrameOriginX + (sxMm - _moveFrameClickX);
             movFr.VisualYMm = _moveFrameOriginY + (syMm - _moveFrameClickY);
             Canvas.Invalidate();
+            return;
+        }
+
+        // 接続点をクリックして開始したグループドラッグ（範囲選択に要素が含まれない場合も含む）。
+        if (_groupMoveDotAnchor is ConnectionDot anchorDot)
+        {
+            var (xMm, yMm) = ToWorld(pos);
+            int row = _geo.RowAt(yMm), col = _geo.ColAt(xMm);
+            int curRow = _geo.RowAt(anchorDot.YMm), curCol = _geo.ColAt(anchorDot.XMm);
+            int dRow = row - _groupMoveDotAnchorStart.Row;
+            int dCol = col - _groupMoveDotAnchorStart.Column;
+            if (dRow != curRow - _groupMoveDotAnchorStart.Row || dCol != curCol - _groupMoveDotAnchorStart.Column)
+                if (TryApplyGroupMoveDelta(dRow, dCol)) Canvas.Invalidate();
             return;
         }
 
@@ -398,42 +485,7 @@ public sealed partial class MainPage
                 int dRow = row - _moveStartPos.Row;
                 int dCol = col - _moveStartPos.Column;
                 if (dRow != _moving.Pos.Row - _moveStartPos.Row || dCol != _moving.Pos.Column - _moveStartPos.Column)
-                {
-                    bool valid = _multiMoveOrigins.Values.All(origin =>
-                    {
-                        int nr = origin.Row + dRow;
-                        int nc = origin.Column + dCol;
-                        return nr >= 0 && nc >= 0 && nc < _sheet.Grid.Columns;
-                    });
-                    if (valid)
-                    {
-                        foreach (var (elem, origin) in _multiMoveOrigins)
-                            elem.Pos = new GridPos(origin.Row + dRow, origin.Column + dCol);
-                        foreach (var (conn, orig) in _multiMoveConnectorOrigins)
-                        {
-                            conn.Column   = orig.Col + dCol;
-                            conn.TopRow   = orig.TopRow + dRow;
-                            conn.BottomRow = orig.BotRow + dRow;
-                        }
-                        double dxMm = dCol * _geo.CellMm, dyMm = dRow * _geo.CellMm;
-                        foreach (var (line, orig) in _multiMoveLineOrigins)
-                        {
-                            line.X1Mm = orig.X1 + dxMm; line.Y1Mm = orig.Y1 + dyMm;
-                            line.X2Mm = orig.X2 + dxMm; line.Y2Mm = orig.Y2 + dyMm;
-                        }
-                        foreach (var (frame, orig) in _multiMoveFrameOrigins)
-                        {
-                            frame.TopLeft = new GridPos(orig.TopLeft.Row + dRow, orig.TopLeft.Column + dCol);
-                            frame.VisualXMm = orig.VisX.HasValue ? orig.VisX.Value + dxMm : (double?)null;
-                            frame.VisualYMm = orig.VisY.HasValue ? orig.VisY.Value + dyMm : (double?)null;
-                        }
-                        foreach (var (dot, orig) in _multiMoveDotOrigins)
-                        {
-                            dot.XMm = orig.X + dxMm; dot.YMm = orig.Y + dyMm;
-                        }
-                        Canvas.Invalidate();
-                    }
-                }
+                    if (TryApplyGroupMoveDelta(dRow, dCol)) Canvas.Invalidate();
             }
             else if (row >= 0 && col >= 0 && col < _sheet.Grid.Columns
                 && (row != _moving.Pos.Row || col != _moving.Pos.Column)
@@ -585,10 +637,22 @@ public sealed partial class MainPage
         }
         _movingLine = false;
 
-        // ドラッグ移動のコマンド登録（位置が変わっていれば）
-        if (_multiMoveOrigins.Count > 0)
+        // 接続点のドラッグ移動の確定（位置が変わっていれば）
+        if (_movingDot && _selectedDot is ConnectionDot rd)
         {
-            // 範囲選択の一括移動：移動した要素・分岐線・自由直線を BatchCommand で Undo/Redo 可能にする。
+            var (ox, oy) = _dotOrig;
+            if (rd.XMm != ox || rd.YMm != oy)
+                _history.Execute(new MoveDotCommand(_sheet, rd, ox, oy, rd.XMm, rd.YMm));
+        }
+        _movingDot = false;
+
+        // ドラッグ移動のコマンド登録（位置が変わっていれば）。
+        // グループドラッグの起点が要素(_moving)でも接続点(_groupMoveDotAnchor)でもここに来る
+        // （接続点起点の場合、選択に要素が1件も無ければ _multiMoveOrigins は空になりうる点に注意）。
+        if (_multiMoveOrigins.Count > 0 || _multiMoveConnectorOrigins.Count > 0 || _multiMoveLineOrigins.Count > 0
+            || _multiMoveFrameOrigins.Count > 0 || _multiMoveDotOrigins.Count > 0)
+        {
+            // 範囲選択の一括移動：移動した要素・分岐線・自由直線・枠・接続点を BatchCommand で Undo/Redo 可能にする。
             var cmds = new List<IUndoCommand>();
             foreach (var (elem, from) in _multiMoveOrigins)
                 if (elem.Pos != from)
@@ -608,17 +672,22 @@ public sealed partial class MainPage
                     cmds.Add(new MoveFrameFullCommand(_sheet, frame,
                         orig.TopLeft, orig.VisX, orig.VisY,
                         frame.TopLeft, frame.VisualXMm, frame.VisualYMm));
+            foreach (var (dot, orig) in _multiMoveDotOrigins)
+                if (dot.XMm != orig.X || dot.YMm != orig.Y)
+                    cmds.Add(new MoveDotCommand(_sheet, dot, orig.X, orig.Y, dot.XMm, dot.YMm));
             if (cmds.Count > 0)
                 _history.Execute(new BatchCommand(_sheet, cmds));
             _multiMoveOrigins.Clear();
             _multiMoveConnectorOrigins.Clear();
             _multiMoveLineOrigins.Clear();
             _multiMoveFrameOrigins.Clear();
+            _multiMoveDotOrigins.Clear();
         }
         else if (_moving is not null && _moving.Pos != _moveStartPos)
             _history.Execute(new MoveElementCommand(_sheet, _moving, _moveStartPos, _moving.Pos));
 
         _moving = null;
+        _groupMoveDotAnchor = null;
         _panning = false;
         Canvas.ReleasePointerCapture(e.Pointer);
     }
@@ -628,10 +697,12 @@ public sealed partial class MainPage
     {
         _panning = false;
         _moving = null;
+        _groupMoveDotAnchor = null;
         _multiMoveOrigins.Clear();
         _multiMoveConnectorOrigins.Clear();
         _multiMoveLineOrigins.Clear();
         _multiMoveFrameOrigins.Clear();
+        _multiMoveDotOrigins.Clear();
         _movingFrame = false;
         _movingConnector = null;
         _rangeSelecting = false;
@@ -639,6 +710,7 @@ public sealed partial class MainPage
         _frameStartMm = null;
         _lineStartMm = null;
         _movingLine = false;
+        _movingDot = false;
     }
 
     // キャプチャ喪失（フライアウト表示・フォーカス移動等）で PointerReleased が来ないと
