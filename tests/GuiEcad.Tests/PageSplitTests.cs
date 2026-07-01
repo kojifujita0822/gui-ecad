@@ -124,4 +124,34 @@ public class PageSplitTests
         Assert.Null(ex);
         Assert.Equal(0, rec.ClipDepth);
     }
+
+    [Fact]
+    public void MainCircuit_MultiPage_FrameExtentOnly_ClipsAcrossPageBoundary()
+    {
+        // 枠(GroupFrame)の VisualYMm/VisualHeightMm だけで複数ページにまたがる主回路シートを描画。
+        // DrawFrames がページ帯クリップを一切呼ばないと、枠がページ境界を跨いだ際に表題欄領域まで
+        // 無条件描画されてしまう（回帰防止: PushClip が実際に呼ばれることを確認する）。
+        var sheet = new Sheet { MainCircuit = true, Grid = new GridSpec { Columns = 6, Rows = 3 } };
+        sheet.Frames.Add(new GroupFrame
+        {
+            TopLeft = new GridPos(0, 0), Width = 2, Height = 2,
+            VisualYMm = 20, VisualHeightMm = 40 * 9,
+        });
+
+        var dr = new DiagramRenderer();
+        var rec = new NullRenderer();
+        int pages = dr.RenderPageCount(sheet);
+        Assert.Equal(2, pages);
+
+        var ex = Record.Exception(() =>
+        {
+            for (int page = 0; page < pages; page++)
+                dr.Render(rec, sheet, enableBorder: true,
+                          pageRowStart: page * DiagramRenderer.RowsPerPage,
+                          pageRowCount: DiagramRenderer.RowsPerPage);
+        });
+        Assert.Null(ex);
+        Assert.Equal(0, rec.ClipDepth);          // Push/Pop が全ページで釣り合う
+        Assert.True(rec.PushClipCount > 0);      // ページ分割時にクリップが実際に呼ばれている
+    }
 }

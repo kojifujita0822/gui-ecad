@@ -21,9 +21,12 @@ internal static class TestHelper
 internal sealed class NullRenderer : IRenderer
 {
     public int ClipDepth { get; private set; }
+    /// <summary>PushClip が呼ばれた累計回数（ClipDepth と異なり Pop されても減らない）。
+    /// 「クリップが一度も呼ばれていない」ことを区別するために使う。</summary>
+    public int PushClipCount { get; private set; }
     public void PushTransform(double tx, double ty, double scale = 1.0) { }
     public void PopTransform() { }
-    public void PushClip(Rect2D r) => ClipDepth++;
+    public void PushClip(Rect2D r) { ClipDepth++; PushClipCount++; }
     public void PopClip() => ClipDepth--;
     public void DrawLine(Point2D a, Point2D b, StrokeStyle s) { }
     public void DrawPolyline(ReadOnlySpan<Point2D> p, StrokeStyle s) { }

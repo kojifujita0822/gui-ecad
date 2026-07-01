@@ -184,7 +184,7 @@ public sealed class DiagramRenderer
         DrawConnectors(r, sheet, rowStart, rowEnd);
         DrawFreeLines(r, sheet, rowStart, rowEnd, totalRows);
         DrawDots(r, sheet, rowStart, rowEnd);
-        DrawFrames(r, sheet);
+        DrawFrames(r, sheet, rowStart, rowEnd, totalRows);
         foreach (var e in sheet.Elements)
             if (InWindow(e.Pos.Row)) DrawElement(r, e, energized, sim?.Inputs);
         DrawRungComments(r, sheet, columns, rowStart, rowEnd);
@@ -447,7 +447,9 @@ public sealed class DiagramRenderer
                 r.FillCircle(new(d.XMm, PageY(d.YMm)), Cell * 0.10, col);
     }
 
-    private void DrawFrames(IRenderer r, Sheet sheet)
+    // 設置場所グルーピング枠。DrawFreeLines と同じくページ行ウィンドウへ縦クリップする
+    // （枠が VisualYMm/VisualHeightMm でページ境界を跨ぐと、無クリップでは表題欄領域まで描画されてしまうため）。
+    private void DrawFrames(IRenderer r, Sheet sheet, int rowStart, int rowEnd, int totalRows)
     {
         var baseStroke = _theme.Get(StrokeRole.GroupFrame);
         var labelStyle = _theme.Text(TextRole.DeviceName) with
@@ -457,6 +459,14 @@ public sealed class DiagramRenderer
             HAlign = HAlign.Left,
         };
         double labelOffY = Cell * 0.25;   // ラベルを枠上辺より少し上に配置
+
+        bool partialPage = rowStart > 0 || rowEnd < totalRows;
+        if (partialPage)
+        {
+            double bandTop = _opt.MarginMm;
+            double bandH = Math.Max(1, rowEnd - rowStart) * Cell;
+            r.PushClip(new Rect2D(-1000, bandTop, 100000, bandH));
+        }
 
         foreach (var f in sheet.Frames)
         {
@@ -471,6 +481,8 @@ public sealed class DiagramRenderer
             if (!string.IsNullOrEmpty(f.Label))
                 r.DrawText(f.Label, new(x + 1.0, y - labelOffY), labelStyle);
         }
+
+        if (partialPage) r.PopClip();
     }
 
     // 横配線セグメント。区間内に配線分断(WireBreak)があれば、その分断点を含む「ノード間セグメント」
